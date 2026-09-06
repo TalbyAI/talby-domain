@@ -31,6 +31,14 @@ s:BusinessError a sh:NodeShape ; sh:targetClass c:BusinessError ; sh:nodeKind sh
             FILTER($this != ?other)
         }
     """ ] .
+s:SiblingNames a sh:NodeShape ; sh:targetSubjectsOf c:parent ;
+    sh:sparql [ sh:message "Nombre duplicado entre elementos con el mismo padre" ; sh:select """
+        PREFIX c: <https://example.org/talby/contract#>
+        SELECT $this WHERE {
+            $this c:parent ?parent ; c:name ?name .
+            ?other c:parent ?parent ; c:name ?name . FILTER($this != ?other)
+        }
+    """ ] .
 s:OperationErrors a sh:NodeShape ; sh:targetSubjectsOf c:errors ;
     sh:or ( [ sh:class c:Command ] [ sh:class c:Query ] ) ;
     sh:property [ sh:path c:errors ; sh:class c:BusinessError ] .

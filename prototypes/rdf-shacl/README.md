@@ -49,6 +49,10 @@ inspeccionarlos sin servidor, pero los cambios en Turtle se verifican ejecutando
   `allowAnonymous true` permite anonimato y no se combina con permisos. Omitir ambos deniega acceso.
 - Features, entidades, comandos y queries tienen un único `parent`, módulo o feature;
   el módulo no tiene padre y la jerarquía no forma ciclos.
+- Los nombres son únicos entre elementos con el mismo `parent`, independientemente
+  de su clase. Pueden repetirse bajo padres diferentes.
+- Los campos afectados por una aserción se deducen de las referencias de su expresión
+  CEL, resueltas en la agrupación; no se exige una lista manual redundante.
 - Los errores de negocio tienen IRI y código único dentro de un módulo. Pueden declarar
   una agrupación para sus detalles; comandos y queries referencian los errores que pueden producir.
 - El perfil aplica `required=true` y `nullable=false` al campo cuando no se declaran.
@@ -86,8 +90,9 @@ Los namespaces `example.org` son marcadores del prototipo, no una decisión de p
 | `BusinessError` | `module` 1, `code` 1, `detailsType` 0..1 agrupación |
 | Errores de comandos/queries | `errors` 0..N referencias a errores declarados |
 
-`Entity`, `Command`, `Query`, `Event` y `ReadModel` se representan aquí como especializaciones de
-`FieldGroup`; la jerarquía completa también está pendiente de revisión.
+`Command`, `Query`, `Event` y `ReadModel` especializan `FieldGroup` conforme a la
+especificación aprobada. El prototipo representa también `Entity` como agrupación de datos
+con un identificador designado.
 Los JSON se transportan aquí como cadenas Turtle; el tipo literal definitivo no está aprobado.
 Las shapes admiten referencias a comandos y queries explícitos. `DerivedCrudOperation`
 es un marcador experimental usado para comprobar la exclusión de CRUD, incluso cuando
@@ -108,6 +113,8 @@ para hashing ni un algoritmo de identidad por contenido. La identidad exige cons
 el artefacto producido, sin sobrescribir el original.
 
 No se evalúa CEL ni se verifica todavía su entorno de nombres, funciones o tipos.
+La deducción de campos afectados está acordada, pero no se implementa en este prototipo:
+requiere el árbol de la expresión comprobada, no una extracción por expresiones regulares.
 No se ejecuta normalización ni se comprueba la acumulación general de restricciones
 o la validez de datos `Periodo`. Las dos restricciones de longitud de título se conservan en el grafo,
 pero aún no se ejecutan sobre un payload.

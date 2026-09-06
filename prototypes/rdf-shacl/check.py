@@ -272,6 +272,11 @@ def main():
     case("itemNullable debe ser booleano", False, add='d:Tags c:itemNullable "si" .')
     case("Una regla de presencia necesita un booleano", False,
          add='d:BrokenPresence a c:Required ; c:enabled "si" . d:Title c:constraint d:BrokenPresence .')
+    case("Clases diferentes tampoco pueden compartir nombre y padre", False,
+         remove=((D.ApproveProject, C.name, None),), add='d:ApproveProject c:name "Proyecto" .')
+    case("Un mismo nombre puede aparecer bajo padres distintos", True,
+         remove=((D.ApproveProject, C.name, None), (D.ApproveProject, C.parent, None)),
+         add='d:ApproveProject c:name "Proyecto" ; c:parent d:Service .')
 
     graph = Graph().parse("semantic.ttl")
 
