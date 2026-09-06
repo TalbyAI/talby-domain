@@ -1,12 +1,17 @@
 @prefix c: <https://example.org/talby/contract#> .
 @prefix d: <urn:talby:prototype:declaration:> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
 d:Service a c:Module ; c:name "GestionProyectos" .
 d:ProjectsFeature a c:Feature ; c:name "Proyectos" ; c:parent d:Service .
 d:Client c:parent d:Service .
 d:Project c:parent d:ProjectsFeature .
 d:ApproveProject c:parent d:ProjectsFeature ; c:errors d:CannotApprove .
+d:ProjectSummary c:parent d:ProjectsFeature .
+d:ApprovalResult c:parent d:ProjectsFeature .
+d:ApprovalNotice a c:Event ; c:name "ProyectoAprobado" ; c:parent d:ProjectsFeature ;
+    c:eventKind c:Domain ; c:uses d:ProjectIdUse .
 d:CannotApprove a c:BusinessError ; c:module d:Service ;
     c:code "PROYECTO_NO_APROBABLE" ; c:detailsType d:RejectionDetails .
 d:RejectionDetails a c:FieldGroup ; c:name "DetalleRechazo" ; c:uses d:ProjectIdUse .
@@ -23,6 +28,8 @@ d:StatusValues a c:OneOf ; c:allowedValue "borrador", "aprobado" .
 d:Title a c:Field ; c:name "titulo" ; c:valueType c:Text ;
     c:normalizers (c:Trim) ; c:constraint d:Title100 .
 d:Title100 a c:MaxLength ; c:limit 100 .
+d:Title c:constraint d:TitleRequiredLength .
+d:TitleRequiredLength a c:MinLength ; c:limit 1 .
 d:Title60 a c:MaxLength ; c:limit 60 .
 d:TitleUse a c:FieldUse ; c:field d:Title .
 d:ShortTitleUse a c:FieldUse ; c:field d:Title ;
@@ -32,6 +39,8 @@ d:ShortTitleUse a c:FieldUse ; c:field d:Title ;
 d:Client a c:Entity ; c:name "Cliente" ; c:uses d:TitleUse, d:ClientIdUse ;
     c:identifierUse d:ClientIdUse .
 d:ClientId a c:Field ; c:name "clienteId" ; c:valueType c:Identifier .
+d:ClientId c:constraint d:ClientPrefix .
+d:ClientPrefix a c:Prefix ; c:text "cli_" .
 d:ClientIdUse a c:FieldUse ; c:field d:ClientId .
 d:Project a c:Entity ; c:name "Proyecto" ;
     c:uses d:TitleUse, d:ShortTitleUse, d:PlannedPeriod, d:ActualPeriod,
@@ -58,11 +67,19 @@ d:Tags a c:CollectionType ; c:itemType c:Text .
 d:TagsField a c:Field ; c:name "etiquetas" ; c:valueType d:Tags .
 d:TagsUse a c:FieldUse ; c:field d:TagsField .
 d:Amount a c:Field ; c:name "importe" ; c:valueType c:Decimal .
+d:Amount c:constraint d:AmountRange, d:AmountPrecision, d:AmountScale .
+d:AmountRange a c:Range ; c:lower "0"^^xsd:decimal ; c:lowerInclusive false .
+d:AmountPrecision a c:Precision ; c:limit 18 .
+d:AmountScale a c:Scale ; c:limit 2 .
+d:Tags c:constraint d:TagsLimit .
+d:TagsLimit a c:MaxItems ; c:limit 10 .
 _:amount a c:FieldUse ; c:field d:Amount .
 
 # Un blank node tampoco queda restringido a una sola agrupación.
 d:ProjectSummary a c:ReadModel ; c:name "ResumenProyecto" ; c:uses _:amount .
 d:ProjectId a c:Field ; c:name "proyectoId" ; c:valueType c:Identifier .
+d:ProjectId c:constraint d:ProjectPrefix .
+d:ProjectPrefix a c:Prefix ; c:text "prj_" .
 d:ApproveProject a c:Command ; c:name "AprobarProyecto" ;
     c:uses [ a c:FieldUse ; c:field d:ProjectId ] ; c:result d:ApprovalResult ;
     c:requiresPermission d:ApprovePermission .

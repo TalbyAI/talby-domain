@@ -10,7 +10,7 @@
 s:Module a sh:NodeShape ; sh:targetClass c:Module ; sh:nodeKind sh:IRI ;
     sh:property [ sh:path c:name ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ; sh:minLength 1 ],
     [ sh:path c:parent ; sh:maxCount 0 ] .
-s:Organization a sh:NodeShape ; sh:targetClass c:Feature, c:Entity, c:Command, c:Query ;
+s:Organization a sh:NodeShape ; sh:targetClass c:Feature, c:Entity, c:Command, c:Query, c:Event, c:ReadModel ;
     sh:nodeKind sh:IRI ;
     sh:property [ sh:path c:name ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ; sh:minLength 1 ],
     [ sh:path c:parent ; sh:minCount 1 ; sh:maxCount 1 ;
@@ -89,7 +89,8 @@ s:Type a sh:NodeShape ; sh:targetClass c:Type ; sh:nodeKind sh:IRI ;
 
 s:Collection a sh:NodeShape ; sh:targetClass c:CollectionType ;
     sh:property [ sh:path c:itemType ; sh:minCount 1 ; sh:maxCount 1 ; sh:class c:Type ],
-    [ sh:path c:itemNullable ; sh:maxCount 1 ; sh:datatype xsd:boolean ] .
+    [ sh:path c:itemNullable ; sh:maxCount 1 ; sh:datatype xsd:boolean ],
+    [ sh:path c:constraint ; sh:class c:Constraint ] .
 s:PresenceRule a sh:NodeShape ; sh:targetClass c:Required, c:Nullable ;
     sh:property [ sh:path c:enabled ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:boolean ] .
 s:Reference a sh:NodeShape ; sh:targetClass c:EntityReference ;
@@ -119,7 +120,8 @@ s:Command a sh:NodeShape ; sh:targetClass c:Command ;
 s:Query a sh:NodeShape ; sh:targetClass c:Query ;
     sh:property [ sh:path c:result ; sh:minCount 1 ; sh:maxCount 1 ; sh:class c:Type ] .
 s:Event a sh:NodeShape ; sh:targetClass c:Event ;
-    sh:property [ sh:path c:result ; sh:maxCount 0 ] .
+    sh:property [ sh:path c:result ; sh:maxCount 0 ],
+    [ sh:path c:eventKind ; sh:minCount 1 ; sh:maxCount 1 ; sh:in (c:Domain c:Integration) ] .
 s:Permission a sh:NodeShape ; sh:targetClass c:Permission ; sh:nodeKind sh:IRI ;
     sh:property [ sh:path c:name ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ; sh:minLength 1 ] .
 s:Access a sh:NodeShape ; sh:targetClass c:Command, c:Query ;
@@ -131,9 +133,30 @@ s:Access a sh:NodeShape ; sh:targetClass c:Command, c:Query ;
         [ sh:property [ sh:path c:allowAnonymous ; sh:hasValue true ] ]
         [ sh:property [ sh:path c:requiresPermission ; sh:minCount 1 ] ]
     ) ] .
-s:MaxLength a sh:NodeShape ; sh:targetClass c:MaxLength ;
+s:NonNegativeLimit a sh:NodeShape ; sh:targetClass c:MinLength, c:MaxLength, c:MinItems, c:MaxItems ;
     sh:property [ sh:path c:limit ; sh:minCount 1 ; sh:maxCount 1 ;
         sh:datatype xsd:integer ; sh:minInclusive 0 ] .
+s:Precision a sh:NodeShape ; sh:targetClass c:Precision ;
+    sh:property [ sh:path c:limit ; sh:minCount 1 ; sh:maxCount 1 ;
+        sh:datatype xsd:integer ; sh:minInclusive 1 ; sh:maxInclusive 4096 ] .
+s:Scale a sh:NodeShape ; sh:targetClass c:Scale ;
+    sh:property [ sh:path c:limit ; sh:minCount 1 ; sh:maxCount 1 ;
+        sh:datatype xsd:integer ; sh:minInclusive 0 ; sh:maxInclusive 4096 ] .
+s:Pattern a sh:NodeShape ; sh:targetClass c:Pattern ;
+    sh:property [ sh:path c:pattern ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ] .
+s:Affix a sh:NodeShape ; sh:targetClass c:Prefix, c:Suffix ;
+    sh:property [ sh:path c:text ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ] .
+s:Range a sh:NodeShape ; sh:targetClass c:Range ;
+    sh:property [ sh:path c:lower ; sh:maxCount 1 ; sh:node s:Bound ],
+    [ sh:path c:upper ; sh:maxCount 1 ; sh:node s:Bound ],
+    [ sh:path c:lowerInclusive ; sh:maxCount 1 ; sh:datatype xsd:boolean ],
+    [ sh:path c:upperInclusive ; sh:maxCount 1 ; sh:datatype xsd:boolean ] ;
+    sh:or ( [ sh:property [ sh:path c:lower ; sh:minCount 1 ] ]
+        [ sh:property [ sh:path c:upper ; sh:minCount 1 ] ] ) .
+s:Bound a sh:NodeShape ; sh:or ( [ sh:datatype xsd:integer ] [ sh:datatype xsd:decimal ]
+    [ sh:datatype xsd:date ] [ sh:datatype xsd:dateTime ] ) .
+s:Primitive a sh:NodeShape ; sh:targetClass c:PrimitiveType ;
+    sh:in (c:Text c:Boolean c:Integer c:Decimal c:Date c:Instant c:Identifier) .
 s:Assertion a sh:NodeShape ; sh:targetClass c:Assertion ;
     sh:property [ sh:path c:expression ; sh:minCount 1 ; sh:maxCount 1 ;
         sh:datatype xsd:string ; sh:minLength 1 ] .

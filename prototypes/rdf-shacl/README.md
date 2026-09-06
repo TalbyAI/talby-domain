@@ -53,6 +53,11 @@ inspeccionarlos sin servidor, pero los cambios en Turtle se verifican ejecutando
   de su clase. Pueden repetirse bajo padres diferentes.
 - Los campos afectados por una aserción se deducen de las referencias de su expresión
   CEL, resueltas en la agrupación; no se exige una lista manual redundante.
+- Eventos y modelos de lectura también tienen `parent`. Cada evento declara
+  `eventKind` como dominio o integración; esto no ejecuta ni publica eventos.
+- El catálogo incluye mínimos/máximos de longitud y cardinalidad, rango, patrón,
+  precisión, escala, prefijo y sufijo, con parámetros tipados y restricciones con IRI.
+- Respuestas y errores JSON de mocking se guardan como `xsd:string` y se validan aparte.
 - Los errores de negocio tienen IRI y código único dentro de un módulo. Pueden declarar
   una agrupación para sus detalles; comandos y queries referencian los errores que pueden producir.
 - El perfil aplica `required=true` y `nullable=false` al campo cuando no se declaran.
@@ -73,27 +78,33 @@ Los namespaces `example.org` son marcadores del prototipo, no una decisión de p
 | `Entity` | `identifierUse` 1, incluido entre sus `uses` y de tipo identificador |
 | `Command` | `result` 0..1 |
 | `Query` | `result` 1 |
-| `Event` | `result` prohibido |
-| `CollectionType` | `itemType` 1 |
+| `Event` | `result` prohibido, `eventKind` 1: `Domain` o `Integration` |
+| `CollectionType` | `itemType` 1, `constraint` 0..N |
 | `EntityReference` | `targetEntity` 1 |
 | `ValueType` | `baseType` 1 escalar, `constraint` 0..N |
 | `OneOf` | `allowedValue` 1..N literales |
 | `Required`, `Nullable` | `enabled` 1 booleano; recursos de restricción con IRI |
 | Nulabilidad de colección | `itemNullable` 0..1 booleano en `CollectionType`, default false |
-| `MaxLength` | `limit` 1 entero no negativo |
+| `MinLength`, `MaxLength`, `MinItems`, `MaxItems` | `limit` 1 entero no negativo |
+| `Precision`, `Scale` | `limit` 1 entero; precisión 1..4096, escala 0..4096 |
+| `Range` | `lower` / `upper` 0..1 cada uno, al menos uno; flags `lowerInclusive` / `upperInclusive` 0..1, default true |
+| `Pattern` | `pattern` 1 cadena |
+| `Prefix`, `Suffix` | `text` 1 cadena literal, puede estar vacía |
 | `Assertion` | `expression` 1 cadena CEL no vacía |
 | `Scenario` | `operation` 1, `when` 1, exactamente una de `responseJson` / `errorJson` / `success true` |
 | `Permission` | `name` 1 |
 | Acceso de comandos/queries | `requiresPermission` 0..N, `allowAnonymous` 0..1 booleano; true excluye permisos |
 | `Module` | `name` 1, `parent` prohibido |
-| `Feature`, `Entity`, `Command`, `Query` | `parent` 1, módulo o feature |
+| `Feature`, `Entity`, `Command`, `Query`, `Event`, `ReadModel` | `parent` 1, módulo o feature |
 | `BusinessError` | `module` 1, `code` 1, `detailsType` 0..1 agrupación |
 | Errores de comandos/queries | `errors` 0..N referencias a errores declarados |
 
 `Command`, `Query`, `Event` y `ReadModel` especializan `FieldGroup` conforme a la
 especificación aprobada. El prototipo representa también `Entity` como agrupación de datos
 con un identificador designado.
-Los JSON se transportan aquí como cadenas Turtle; el tipo literal definitivo no está aprobado.
+Los JSON se transportan como literales `xsd:string`, conforme a la decisión aprobada.
+Los extremos de rango se proponen como literales RDF `xsd:integer`, `xsd:decimal`,
+`xsd:date` o `xsd:dateTime`; esto no cambia sus representaciones HTTP/JSON.
 Las shapes admiten referencias a comandos y queries explícitos. `DerivedCrudOperation`
 es un marcador experimental usado para comprobar la exclusión de CRUD, incluso cuando
 la operación también está tipada como comando; no decide la representación de los contratos
@@ -111,6 +122,9 @@ El paso canónico sustituye únicamente blank nodes tipados `FieldUse`; las celd
 auxiliares de listas RDF siguen siendo anónimas. No es canonicalización de grafos
 para hashing ni un algoritmo de identidad por contenido. La identidad exige conservar
 el artefacto producido, sin sobrescribir el original.
+La salida canónica del experimento usa [N-Triples](https://www.w3.org/TR/n-triples/), un subconjunto de Turtle,
+para conservar los literales: el serializador Turtle abreviado de la biblioteca
+reescribía `"0"^^xsd:decimal` como `0.0`. La prueba verifica isomorfismo tras recargar.
 
 No se evalúa CEL ni se verifica todavía su entorno de nombres, funciones o tipos.
 La deducción de campos afectados está acordada, pero no se implementa en este prototipo:
@@ -142,11 +156,20 @@ Se comprueban la jerarquía organizativa y las declaraciones de errores; no se g
 namespaces/rutas ni se verifica aún el código y los detalles de un JSON de error contra
 las declaraciones de la operación. El envoltorio HTTP corresponde a su ticket.
 
-No se definen todavía el formato completo de identificadores, actores de prueba, metadatos de eventos, contratos completos de queries,
-CRUD, HTTP, SQLite ni el catálogo completo de restricciones. El ejemplo de entidad
-es deliberadamente incompleto; no constituye el caso de aceptación del servicio entero.
+El vocabulario representa el catálogo de restricciones acordado, pero no ejecuta su
+semántica completa. En particular, las shapes de rango no comparan extremos ni verifican
+su correspondencia con el tipo de uso; las de patrón no validan su subconjunto portable;
+los prefijos/sufijos no comprueban todavía alfabeto, solapamiento ni satisfacibilidad.
+El perfil de identificador conserva ASCII, longitud 1..128 por defecto, prefijo explícito
+(puede ser vacío) y sufijo vacío por defecto, conforme al anexo léxico aprobado.
+
+No se definen todavía actores de prueba, contratos CRUD efectivos, HTTP ni SQLite.
+El ejemplo no constituye el caso de aceptación ejecutable del servicio entero.
 Las shapes son abiertas: el script rechaza propiedades desconocidas, pero aún no se
 detectan todas las propiedades conocidas fuera de lugar.
+
+La propuesta conjunta de nombres, tipos literales y responsabilidades está en
+[`review.md`](review.md). Su revisión no implica considerar implementadas las comprobaciones pendientes.
 
 ## Fuentes técnicas
 

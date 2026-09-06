@@ -42,8 +42,7 @@ def inspect(semantic, mocking):
     for _, predicate, value in mocking:
         if str(predicate).startswith(str(C)) or (predicate == RDF.type and str(value).startswith(str(C))):
             issues.append("Declaración semántica dentro de la fuente de mocking")
-    _, report, _ = validate(semantic + mocking + VOCAB, shacl_graph=SHAPES,
-                            inference="none", meta_shacl=True)
+    _, report, _ = validate(semantic + mocking + VOCAB, shacl_graph=SHAPES, inference="none")
     for result in report.subjects(RDF.type, SH.ValidationResult):
         issues.append(" | ".join(str(report.value(result, prop) or "")
                                  for prop in (SH.focusNode, SH.resultPath, SH.resultMessage)))
@@ -108,6 +107,8 @@ def presence_issues(graph, group, use, present, value):
 
 
 def main():
+    # Las shapes no cambian entre casos: comprobar su estructura una sola vez.
+    validate(Graph(), shacl_graph=SHAPES, meta_shacl=True)
     cases = []
 
     def case(name, expected, *, add="", remove=(), mock_add="", mock_remove=(), no_mock=False):
@@ -218,9 +219,9 @@ def main():
     case("El resultado debe referenciar un tipo declarado", False,
          remove=((D.ApproveProject, C.result, None),), add="d:ApproveProject c:result d:Missing .")
     case("Un evento tiene datos pero no resultado de operación", True,
-         add='d:ApprovedEvent a c:Event ; c:name "ProyectoAprobado" ; c:uses d:ProjectIdUse .')
+         add='d:ApprovedEvent a c:Event ; c:parent d:Service ; c:eventKind c:Domain ; c:name "ProyectoAprobado" ; c:uses d:ProjectIdUse .')
     case("Un evento no admite resultado de operación", False,
-         add='d:ApprovedEvent a c:Event ; c:name "ProyectoAprobado" ; c:result d:ApprovalResult .')
+         add='d:ApprovedEvent a c:Event ; c:parent d:Service ; c:eventKind c:Domain ; c:name "ProyectoAprobado" ; c:result d:ApprovalResult .')
     case("Un comando sin resultado admite éxito sin datos", True,
          remove=((D.ApproveProject, C.result, None),),
          mock_remove=((S.ApproveKnownProject, M.responseJson, None),),
@@ -277,6 +278,30 @@ def main():
     case("Un mismo nombre puede aparecer bajo padres distintos", True,
          remove=((D.ApproveProject, C.name, None), (D.ApproveProject, C.parent, None)),
          add='d:ApproveProject c:name "Proyecto" ; c:parent d:Service .')
+    case("Un evento declara su clase de contrato", False,
+         remove=((D.ApprovalNotice, C.eventKind, None),))
+    case("Un evento puede ser de integración", True,
+         remove=((D.ApprovalNotice, C.eventKind, None),), add="d:ApprovalNotice c:eventKind c:Integration .")
+    case("Un modelo de lectura tiene ubicación organizativa", False,
+         remove=((D.ProjectSummary, C.parent, None),))
+    case("Una restricción de cardinalidad no admite negativos", False,
+         remove=((D.TagsLimit, C.limit, None),), add="d:TagsLimit c:limit -1 .")
+    case("La precisión tiene que ser positiva", False,
+         remove=((D.AmountPrecision, C.limit, None),), add="d:AmountPrecision c:limit 0 .")
+    case("El perfil no admite escala superior a 4096", False,
+         remove=((D.AmountScale, C.limit, None),), add="d:AmountScale c:limit 4097 .")
+    case("Un rango necesita al menos un extremo", False,
+         remove=((D.AmountRange, C["lower"], None),))
+    case("Los extremos de rango no se declaran como texto sin tipo", False,
+         remove=((D.AmountRange, C["lower"], None),), add='d:AmountRange c:lower "0" .')
+    case("Prefijo y sufijo pueden declararse vacíos", True,
+         add='d:EmptyPrefix a c:Prefix ; c:text "" . d:EmptySuffix a c:Suffix ; c:text "" .')
+    case("El patrón se declara como cadena", True,
+         add='d:CodePattern a c:Pattern ; c:pattern "[A-Z]+" .')
+    case("El vocabulario incorpora entero e instante ya acordados", True,
+         add='d:Count a c:Field ; c:name "cantidad" ; c:valueType c:Integer . d:CreatedAt a c:Field ; c:name "creado" ; c:valueType c:Instant .')
+    case("Declarar un primitivo desconocido no lo hace soportado", False,
+         add="d:UnknownPrimitive a c:PrimitiveType .")
 
     graph = Graph().parse("semantic.ttl")
 
@@ -337,12 +362,13 @@ def main():
     assert len(list(canonical.subjects(C.uses, mapped))) == 2
     assert not inspect(canonical, Graph().parse("mocking.ttl"))
     Path("results").mkdir(exist_ok=True)
-    canonical.serialize("results/canonical.ttl", format="turtle")
+    # N-Triples es un subconjunto de Turtle y conserva los literales sin abreviarlos.
+    canonical.serialize("results/canonical.ttl", format="nt")
     reloaded = Graph().parse("results/canonical.ttl")
     assert isomorphic(canonical, reloaded)
     assert isomorphic(canonical, canonicalize(reloaded))
     cases.append(dict(name="Fuente canónica: IRIs persistidas, reutilización e idempotencia al recargar",
-                      conforms=True, issues=[], semantic=canonical.serialize(format="turtle"), mocking=""))
+                      conforms=True, issues=[], semantic=canonical.serialize(format="nt"), mocking=""))
     Path("results/cases.json").write_text(json.dumps(cases, ensure_ascii=False, indent=2), encoding="utf-8")
     buttons = "".join(f'<button type="button" onclick="show({i})">{html.escape(case["name"])}</button>'
                       for i, case in enumerate(cases))

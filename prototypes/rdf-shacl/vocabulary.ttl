@@ -18,6 +18,9 @@ c:Query a rdfs:Class ; rdfs:subClassOf c:FieldGroup .
 c:DerivedCrudOperation a rdfs:Class ; rdfs:subClassOf c:FieldGroup .
 c:ReadModel a rdfs:Class ; rdfs:subClassOf c:FieldGroup .
 c:Event a rdfs:Class ; rdfs:subClassOf c:FieldGroup .
+c:EventKind a rdfs:Class .
+c:Domain a c:EventKind .
+c:Integration a c:EventKind .
 c:CollectionType a rdfs:Class ; rdfs:subClassOf c:Type .
 c:EntityReference a rdfs:Class ; rdfs:subClassOf c:Type .
 c:Field a rdfs:Class .
@@ -25,6 +28,15 @@ c:FieldUse a rdfs:Class .
 c:Permission a rdfs:Class .
 c:Constraint a rdfs:Class .
 c:MaxLength a rdfs:Class ; rdfs:subClassOf c:Constraint .
+c:MinLength a rdfs:Class ; rdfs:subClassOf c:Constraint .
+c:MinItems a rdfs:Class ; rdfs:subClassOf c:Constraint .
+c:MaxItems a rdfs:Class ; rdfs:subClassOf c:Constraint .
+c:Range a rdfs:Class ; rdfs:subClassOf c:Constraint .
+c:Pattern a rdfs:Class ; rdfs:subClassOf c:Constraint .
+c:Precision a rdfs:Class ; rdfs:subClassOf c:Constraint .
+c:Scale a rdfs:Class ; rdfs:subClassOf c:Constraint .
+c:Prefix a rdfs:Class ; rdfs:subClassOf c:Constraint .
+c:Suffix a rdfs:Class ; rdfs:subClassOf c:Constraint .
 c:OneOf a rdfs:Class ; rdfs:subClassOf c:Constraint .
 c:Required a rdfs:Class ; rdfs:subClassOf c:Constraint .
 c:Nullable a rdfs:Class ; rdfs:subClassOf c:Constraint .
@@ -36,6 +48,8 @@ c:Date a c:PrimitiveType .
 c:Identifier a c:PrimitiveType .
 c:Decimal a c:PrimitiveType .
 c:Boolean a c:PrimitiveType .
+c:Integer a c:PrimitiveType .
+c:Instant a c:PrimitiveType .
 m:Scenario a rdfs:Class .
 
 c:name a rdf:Property .
@@ -56,6 +70,13 @@ c:uses a rdf:Property .
 c:itemType a rdf:Property .
 c:targetEntity a rdf:Property .
 c:limit a rdf:Property .
+c:lower a rdf:Property .
+c:upper a rdf:Property .
+c:lowerInclusive a rdf:Property .
+c:upperInclusive a rdf:Property .
+c:pattern a rdf:Property .
+c:text a rdf:Property .
+c:eventKind a rdf:Property .
 c:expression a rdf:Property .
 c:result a rdf:Property .
 c:identifierUse a rdf:Property .
