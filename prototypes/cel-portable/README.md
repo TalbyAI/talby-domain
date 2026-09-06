@@ -56,12 +56,12 @@ Para reproducir el rechazo de WASM: `node build-browser.mjs wasm`, seguido de `p
 
 | Candidato sin parches | Resultado | Tamaño observado |
 | --- | --- | --- |
-| CEL + RE2JS | 217 casos pasan con `script-src 'self'`, sin permisos para WASM/eval; ninguna petición externa o WASM | Worker: 449 483 bytes; gzip 98 131 bytes, aproximadamente 96 KiB |
+| CEL + RE2JS | 220 casos pasan con `script-src 'self'`, sin permisos para WASM/eval; ninguna petición externa o WASM | Worker: 449 483 bytes; gzip 98 131 bytes, aproximadamente 96 KiB |
 | CEL + RE2-WASM | Con `wasm-unsafe-eval`, falla al cargar por `new Function`; con `unsafe-eval` en una prueba negativa, falla `WrappedRE2 is not a constructor` | Worker 69 635 bytes gzip y WASM 312 328 bytes gzip; unos 373 KiB combinados |
 
 No se parcheó WASM ni se propone debilitar la CSP. Los fallos pertenecen a esa versión y empaquetado, no demuestran una limitación intrínseca de WebAssembly. Reparar/recompilar sus bindings sigue siendo posible; RE2JS ya resuelve los casos comprobados con menor integración.
 
-`browser-evidence.json` conserva la ejecución en HeadlessChrome 152, Windows: 217 casos, cero fallos, cuatro peticiones al mismo origen. Los tiempos conservados son una medición local, no un benchmark o garantía. `browser-wasm-evidence.json` conserva los fallos del otro candidato. El tamaño incluye CEL, host, verificadores y fixture; excluye HTML, launcher y datos de prueba. No predice la biblioteca generada final.
+`browser-evidence.json` conserva la ejecución en HeadlessChrome 152, Windows: 220 casos, cero fallos, cuatro peticiones al mismo origen. Los tiempos conservados son una medición local, no un benchmark o garantía. `browser-wasm-evidence.json` conserva los fallos del otro candidato. El tamaño incluye CEL, host, verificadores y fixture; excluye HTML, launcher y datos de prueba. No predice la biblioteca generada final.
 
 No se probaron Firefox, Safari, móviles, todos los bundlers, CSP de extensiones ni funcionamiento offline.
 
