@@ -1,0 +1,43 @@
+@prefix c: <https://example.org/talby/contract#> .
+@prefix m: <https://example.org/talby/mocking#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+# PROTOTIPO: nombres e IRIs de vocabulario propuestos, pendientes de revisión.
+c:Type a rdfs:Class .
+c:PrimitiveType a rdfs:Class ; rdfs:subClassOf c:Type .
+c:FieldGroup a rdfs:Class ; rdfs:subClassOf c:Type .
+c:Entity a rdfs:Class ; rdfs:subClassOf c:FieldGroup .
+c:Command a rdfs:Class ; rdfs:subClassOf c:FieldGroup .
+c:ReadModel a rdfs:Class ; rdfs:subClassOf c:FieldGroup .
+c:CollectionType a rdfs:Class ; rdfs:subClassOf c:Type .
+c:EntityReference a rdfs:Class ; rdfs:subClassOf c:Type .
+c:Field a rdfs:Class .
+c:FieldUse a rdfs:Class .
+c:Constraint a rdfs:Class .
+c:MaxLength a rdfs:Class ; rdfs:subClassOf c:Constraint .
+c:Assertion a rdfs:Class ; rdfs:subClassOf c:Constraint .
+c:Normalizer a rdfs:Class .
+c:Trim a c:Normalizer .
+c:Text a c:PrimitiveType .
+c:Date a c:PrimitiveType .
+c:Identifier a c:PrimitiveType .
+c:Decimal a c:PrimitiveType .
+c:Boolean a c:PrimitiveType .
+m:Scenario a rdfs:Class .
+
+c:name a rdf:Property .
+c:valueType a rdf:Property .
+c:normalizers a rdf:Property .
+c:constraint a rdf:Property .
+c:field a rdf:Property .
+c:uses a rdf:Property .
+c:itemType a rdf:Property .
+c:targetEntity a rdf:Property .
+c:limit a rdf:Property .
+c:expression a rdf:Property .
+c:result a rdf:Property .
+m:operation a rdf:Property .
+m:when a rdf:Property .
+m:responseJson a rdf:Property .
+m:errorJson a rdf:Property .

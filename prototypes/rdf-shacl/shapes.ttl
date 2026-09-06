@@ -1,0 +1,73 @@
+@prefix c: <https://example.org/talby/contract#> .
+@prefix m: <https://example.org/talby/mocking#> .
+@prefix s: <https://example.org/talby/shapes#> .
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+# PROTOTIPO PARCIAL: las shapes son abiertas; la política de extensiones no está decidida.
+s:Field a sh:NodeShape ; sh:targetClass c:Field ; sh:nodeKind sh:IRI ;
+    sh:property [ sh:path c:name ; sh:minCount 1 ; sh:maxCount 1 ;
+        sh:datatype xsd:string ; sh:minLength 1 ],
+    [ sh:path c:valueType ; sh:minCount 1 ; sh:maxCount 1 ; sh:class c:Type ],
+    [ sh:path c:constraint ; sh:class c:Constraint ],
+    [ sh:path c:normalizers ; sh:maxCount 1 ; sh:nodeKind sh:BlankNodeOrIRI ],
+    [ sh:path ( c:normalizers [ sh:zeroOrMorePath rdf:rest ] rdf:first ) ;
+        sh:class c:Normalizer ] .
+
+s:FieldUse a sh:NodeShape ; sh:targetClass c:FieldUse ;
+    sh:nodeKind sh:BlankNodeOrIRI ;
+    sh:property [ sh:path c:field ; sh:minCount 1 ; sh:maxCount 1 ; sh:class c:Field ],
+    [ sh:path c:name ; sh:maxCount 1 ; sh:datatype xsd:string ; sh:minLength 1 ],
+    [ sh:path c:constraint ; sh:class c:Constraint ],
+    [ sh:path c:normalizers ; sh:maxCount 0 ] .
+
+s:Group a sh:NodeShape ; sh:targetClass c:FieldGroup ; sh:nodeKind sh:IRI ;
+    sh:property [ sh:path c:name ; sh:minCount 1 ; sh:maxCount 1 ;
+        sh:datatype xsd:string ; sh:minLength 1 ],
+    [ sh:path c:uses ; sh:class c:FieldUse ],
+    [ sh:path c:constraint ; sh:class c:Constraint ] ;
+    sh:sparql [ sh:message "Nombres efectivos duplicados en la agrupación" ;
+        sh:select """
+        PREFIX c: <https://example.org/talby/contract#>
+        SELECT $this WHERE {
+            $this c:uses ?left, ?right . FILTER(?left != ?right)
+            ?left c:field/c:name ?defaultLeft .
+            ?right c:field/c:name ?defaultRight .
+            OPTIONAL { ?left c:name ?localLeft }
+            OPTIONAL { ?right c:name ?localRight }
+            FILTER(COALESCE(?localLeft, ?defaultLeft) = COALESCE(?localRight, ?defaultRight))
+        }
+        """ ] .
+
+s:Type a sh:NodeShape ; sh:targetClass c:Type ; sh:nodeKind sh:IRI ;
+    sh:xone ( [ sh:class c:PrimitiveType ] [ sh:class c:FieldGroup ]
+        [ sh:class c:CollectionType ] [ sh:class c:EntityReference ] ) ;
+    sh:sparql [ sh:message "Ciclo de composición anidada" ; sh:select """
+        PREFIX c: <https://example.org/talby/contract#>
+        SELECT $this WHERE {
+            $this (c:uses/c:field/c:valueType|c:itemType)+ $this .
+        }
+    """ ] .
+
+s:Collection a sh:NodeShape ; sh:targetClass c:CollectionType ;
+    sh:property [ sh:path c:itemType ; sh:minCount 1 ; sh:maxCount 1 ; sh:class c:Type ] .
+s:Reference a sh:NodeShape ; sh:targetClass c:EntityReference ;
+    sh:property [ sh:path c:targetEntity ; sh:minCount 1 ; sh:maxCount 1 ; sh:class c:Entity ] .
+s:Constraint a sh:NodeShape ; sh:targetClass c:Constraint ; sh:nodeKind sh:IRI .
+s:MaxLength a sh:NodeShape ; sh:targetClass c:MaxLength ;
+    sh:property [ sh:path c:limit ; sh:minCount 1 ; sh:maxCount 1 ;
+        sh:datatype xsd:integer ; sh:minInclusive 0 ] .
+s:Assertion a sh:NodeShape ; sh:targetClass c:Assertion ;
+    sh:property [ sh:path c:expression ; sh:minCount 1 ; sh:maxCount 1 ;
+        sh:datatype xsd:string ; sh:minLength 1 ] .
+
+s:Scenario a sh:NodeShape ; sh:targetClass m:Scenario ; sh:nodeKind sh:IRI ;
+    sh:property [ sh:path m:operation ; sh:minCount 1 ; sh:maxCount 1 ; sh:class c:Command ],
+    [ sh:path m:when ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ; sh:minLength 1 ],
+    [ sh:path m:responseJson ; sh:maxCount 1 ; sh:datatype xsd:string ],
+    [ sh:path m:errorJson ; sh:maxCount 1 ; sh:datatype xsd:string ] ;
+    sh:xone (
+        [ sh:property [ sh:path m:responseJson ; sh:minCount 1 ], [ sh:path m:errorJson ; sh:maxCount 0 ] ]
+        [ sh:property [ sh:path m:errorJson ; sh:minCount 1 ], [ sh:path m:responseJson ; sh:maxCount 0 ] ]
+    ) .

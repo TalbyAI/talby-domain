@@ -11,7 +11,7 @@ Transición de un servicio definido en el DSL a una implementación en un stack 
 Nivel que describe el modelo de datos público y sus reglas de validación estructural y normalización tal como los percibe un consumidor del servicio.
 
 **Vista de datos**:
-Agrupación de campos y de otras agrupaciones para describir un contrato, como un comando, un evento o un modelo de lectura. Los modelos de entrada pueden añadir validaciones que relacionen varios campos.
+Agrupación de usos de campo para describir un contrato, como un comando, un evento o un modelo de lectura, incluida la composición anidada de otras agrupaciones. Puede declarar reglas que combinen varios usos de campo.
 
 **Comando**:
 Especialización de una agrupación de campos con reglas, permisos, configuración API y referencias a resultados y errores. Sus metadatos describen el contrato y no forman parte de los datos enviados.
@@ -60,6 +60,18 @@ Identidad estable de un elemento de la especificación, independiente de su nomb
 
 **Identificador de entidad**:
 Valor que identifica una instancia de entidad, sujeto a reglas del modelo sobre caracteres, longitud, prefijo y sufijo, sin quedar ligado a un generador concreto. Es distinto del identificador de la declaración que describe su tipo.
+
+**Campo**:
+Definición reutilizable de un dato, con nombre por defecto, tipo, normalizadores y restricciones originales. Su nombre se aplica a los usos que no declaran uno propio.
+
+**Uso de campo**:
+Declaración reutilizable que incorpora un campo a una o varias vistas de datos, con nombre opcional que sustituye al nombre por defecto en esos usos. Conserva la secuencia de normalizadores del campo sin añadir normalizadores locales y permite añadir restricciones sin sustituir ni debilitar las originales; un mismo campo puede tener varios usos en una misma vista o en vistas diferentes.
+
+**Referencia a entidad**:
+Tipo de dato cuyo valor identifica una instancia de la entidad destino, sin incorporar sus datos. Valida el tipo y formato de su identificador; la existencia del destino requiere una regla de negocio adicional.
+
+**Colección**:
+Tipo de dato que describe una lista ordenada de elementos de un tipo declarado. En los cambios parciales, una colección aportada sustituye la lista completa.
 
 **Escenario de mocking**:
 Caso que selecciona una operación y condiciones de entrada para producir una respuesta o error declarado. Forma parte de una fuente de mocking.

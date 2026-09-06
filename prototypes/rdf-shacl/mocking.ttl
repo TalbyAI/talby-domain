@@ -1,0 +1,8 @@
+@prefix m: <https://example.org/talby/mocking#> .
+@prefix d: <urn:talby:prototype:declaration:> .
+@prefix s: <urn:talby:prototype:scenario:> .
+
+s:ApproveKnownProject a m:Scenario ;
+    m:operation d:ApproveProject ;
+    m:when 'proyectoId == "prj_001"' ;
+    m:responseJson '{"proyectoId":"prj_001","aprobado":true}' .

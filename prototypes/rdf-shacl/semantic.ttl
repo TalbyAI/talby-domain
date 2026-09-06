@@ -1,0 +1,48 @@
+@prefix c: <https://example.org/talby/contract#> .
+@prefix d: <urn:talby:prototype:declaration:> .
+
+# IRIs de muestra fijas: no se regeneran al cambiar c:name o la agrupación.
+d:Title a c:Field ; c:name "titulo" ; c:valueType c:Text ;
+    c:normalizers (c:Trim) ; c:constraint d:Title100 .
+d:Title100 a c:MaxLength ; c:limit 100 .
+d:Title60 a c:MaxLength ; c:limit 60 .
+d:TitleUse a c:FieldUse ; c:field d:Title .
+d:ShortTitleUse a c:FieldUse ; c:field d:Title ;
+    c:name "tituloCorto" ; c:constraint d:Title60 .
+
+# Un mismo FieldUse nombrado se comparte entre dos agrupaciones.
+d:Client a c:Entity ; c:name "Cliente" ; c:uses d:TitleUse .
+d:Project a c:Entity ; c:name "Proyecto" ;
+    c:uses d:TitleUse, d:ShortTitleUse, d:PlannedPeriod, d:ActualPeriod,
+        d:ClientUse, d:TagsUse, _:amount .
+
+d:Start a c:Field ; c:name "inicio" ; c:valueType c:Date .
+d:End a c:Field ; c:name "fin" ; c:valueType c:Date .
+d:Period a c:FieldGroup ; c:name "Periodo" ;
+    c:uses [ a c:FieldUse ; c:field d:Start ],
+           [ a c:FieldUse ; c:field d:End ] ;
+    c:constraint d:PeriodOrder .
+d:PeriodOrder a c:Assertion ;
+    c:expression "compareDate(fin, inicio) >= 0" .
+d:PeriodField a c:Field ; c:name "periodo" ; c:valueType d:Period .
+d:PlannedPeriod a c:FieldUse ; c:field d:PeriodField ; c:name "periodoPrevisto" .
+d:ActualPeriod a c:FieldUse ; c:field d:PeriodField ; c:name "periodoReal" .
+
+d:ClientReference a c:EntityReference ; c:targetEntity d:Client .
+d:ClientField a c:Field ; c:name "cliente" ; c:valueType d:ClientReference .
+d:ClientUse a c:FieldUse ; c:field d:ClientField .
+d:Tags a c:CollectionType ; c:itemType c:Text .
+d:TagsField a c:Field ; c:name "etiquetas" ; c:valueType d:Tags .
+d:TagsUse a c:FieldUse ; c:field d:TagsField .
+d:Amount a c:Field ; c:name "importe" ; c:valueType c:Decimal .
+_:amount a c:FieldUse ; c:field d:Amount .
+
+# Un blank node tampoco queda restringido a una sola agrupación.
+d:ProjectSummary a c:ReadModel ; c:name "ResumenProyecto" ; c:uses _:amount .
+d:ProjectId a c:Field ; c:name "proyectoId" ; c:valueType c:Identifier .
+d:ApproveProject a c:Command ; c:name "AprobarProyecto" ;
+    c:uses [ a c:FieldUse ; c:field d:ProjectId ] ; c:result d:ApprovalResult .
+d:Approved a c:Field ; c:name "aprobado" ; c:valueType c:Boolean .
+d:ApprovalResult a c:ReadModel ; c:name "ResultadoAprobacion" ;
+    c:uses [ a c:FieldUse ; c:field d:ProjectId ],
+           [ a c:FieldUse ; c:field d:Approved ] .
