@@ -34,6 +34,9 @@ inspeccionarlos sin servidor, pero los cambios en Turtle se verifican ejecutando
 - Referencias y colecciones con tipos explícitos. Ciclos de composición prohibidos;
   los ciclos mediante referencias a entidades están permitidos.
 - Mocking opcional separado, con condición CEL y una respuesta o error JSON fijo.
+- Escenarios para comandos y queries explícitos; CRUD conserva su comportamiento derivado.
+- Propiedades no reconocidas rechazadas. Los puntos explícitos de extensión para metadatos
+  están aprobados como política, pero su forma RDF sigue pendiente; aún no se admiten en este borrador.
 
 ## Propuesta concreta de propiedades y cardinalidades
 
@@ -51,10 +54,13 @@ Los namespaces `example.org` son marcadores del prototipo, no una decisión de p
 | `Assertion` | `expression` 1 cadena CEL no vacía |
 | `Scenario` | `operation` 1, `when` 1, exactamente una de `responseJson` / `errorJson` |
 
-`Entity`, `Command` y `ReadModel` se representan aquí como especializaciones de
+`Entity`, `Command`, `Query` y `ReadModel` se representan aquí como especializaciones de
 `FieldGroup`; la jerarquía completa también está pendiente de revisión.
 Los JSON se transportan aquí como cadenas Turtle; el tipo literal definitivo no está aprobado.
-La muestra usa una referencia a `Command`; no decide todavía qué otras operaciones pueden simularse.
+Las shapes admiten referencias a comandos y queries explícitos. `DerivedCrudOperation`
+es un marcador experimental usado para comprobar la exclusión de CRUD, incluso cuando
+la operación también está tipada como comando; no decide la representación de los contratos
+derivados, que corresponde al ticket del modelo efectivo. No se ejecuta SQLite en esta prueba.
 
 ## Qué comprueba y qué no
 
@@ -62,7 +68,7 @@ Las shapes comprueban tipos RDF, presencia/cardinalidad de las propiedades anter
 referencias declaradas, nombres efectivos duplicados y ciclos de composición.
 Dos shapes usan SHACL-SPARQL para estos últimos casos. Es una ubicación experimental:
 no obliga a usar SPARQL en el verificador de producción. El script comprueba además
-separación de fuentes, listas de normalizadores bien formadas y sintaxis JSON.
+separación de fuentes, propiedades desconocidas, listas de normalizadores bien formadas y sintaxis JSON.
 
 El paso canónico sustituye únicamente blank nodes tipados `FieldUse`; las celdas
 auxiliares de listas RDF siguen siendo anónimas. No es canonicalización de grafos
@@ -77,11 +83,12 @@ Se analiza JSON, **no se valida todavía contra el resultado o error de la opera
 Tampoco se ejecutan condiciones ni los casos de cero/una/varias coincidencias.
 
 No se definen todavía módulo/features, tipos de valor, enumeraciones, presencia/null,
-identificadores de entidad completos, permisos, errores declarados, eventos, queries,
+identificadores de entidad completos, permisos, errores declarados, eventos, contratos completos de queries,
 CRUD, HTTP, SQLite ni el catálogo completo de restricciones. El ejemplo de entidad
 es deliberadamente incompleto; no constituye el caso de aceptación del servicio entero.
-Las shapes son abiertas: no detectan todas las propiedades desconocidas o fuera de lugar.
-La política de extensiones debe decidirse antes de considerar completo el vocabulario.
+Las shapes son abiertas: el script rechaza propiedades desconocidas, pero aún no se
+detectan todas las propiedades conocidas fuera de lugar. La representación de los puntos
+de extensión debe concretarse antes de considerar completo el vocabulario.
 
 ## Fuentes técnicas
 

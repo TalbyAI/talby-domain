@@ -5,7 +5,7 @@
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
-# PROTOTIPO PARCIAL: las shapes son abiertas; la política de extensiones no está decidida.
+# PROTOTIPO PARCIAL: check.py rechaza predicados desconocidos; las shapes aún son abiertas.
 s:Field a sh:NodeShape ; sh:targetClass c:Field ; sh:nodeKind sh:IRI ;
     sh:property [ sh:path c:name ; sh:minCount 1 ; sh:maxCount 1 ;
         sh:datatype xsd:string ; sh:minLength 1 ],
@@ -63,7 +63,9 @@ s:Assertion a sh:NodeShape ; sh:targetClass c:Assertion ;
         sh:datatype xsd:string ; sh:minLength 1 ] .
 
 s:Scenario a sh:NodeShape ; sh:targetClass m:Scenario ; sh:nodeKind sh:IRI ;
-    sh:property [ sh:path m:operation ; sh:minCount 1 ; sh:maxCount 1 ; sh:class c:Command ],
+    sh:property [ sh:path m:operation ; sh:minCount 1 ; sh:maxCount 1 ;
+        sh:or ( [ sh:class c:Command ] [ sh:class c:Query ] ) ;
+        sh:not [ sh:class c:DerivedCrudOperation ] ],
     [ sh:path m:when ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ; sh:minLength 1 ],
     [ sh:path m:responseJson ; sh:maxCount 1 ; sh:datatype xsd:string ],
     [ sh:path m:errorJson ; sh:maxCount 1 ; sh:datatype xsd:string ] ;

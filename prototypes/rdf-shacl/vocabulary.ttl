@@ -9,6 +9,9 @@ c:PrimitiveType a rdfs:Class ; rdfs:subClassOf c:Type .
 c:FieldGroup a rdfs:Class ; rdfs:subClassOf c:Type .
 c:Entity a rdfs:Class ; rdfs:subClassOf c:FieldGroup .
 c:Command a rdfs:Class ; rdfs:subClassOf c:FieldGroup .
+c:Query a rdfs:Class ; rdfs:subClassOf c:FieldGroup .
+# Marcador experimental; no fija el modelo efectivo de operaciones derivadas.
+c:DerivedCrudOperation a rdfs:Class ; rdfs:subClassOf c:FieldGroup .
 c:ReadModel a rdfs:Class ; rdfs:subClassOf c:FieldGroup .
 c:CollectionType a rdfs:Class ; rdfs:subClassOf c:Type .
 c:EntityReference a rdfs:Class ; rdfs:subClassOf c:Type .

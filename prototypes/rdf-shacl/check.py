@@ -5,7 +5,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from pyshacl import validate
-from rdflib import BNode, Graph, Literal, Namespace, RDF, URIRef
+from rdflib import BNode, Graph, Namespace, RDF, URIRef
 from rdflib.compare import isomorphic
 
 C = Namespace("https://example.org/talby/contract#")
@@ -32,6 +32,10 @@ def unique_keys(pairs):
 
 def inspect(semantic, mocking):
     issues = []
+    allowed_properties = set(VOCAB.subjects(RDF.type, RDF.Property)) | {RDF.type, RDF.first, RDF.rest}
+    for source in (semantic, mocking):
+        for predicate in set(source.predicates()) - allowed_properties:
+            issues.append(f"Propiedad no reconocida: {predicate}")
     for _, predicate, value in semantic:
         if str(predicate).startswith(str(M)) or (predicate == RDF.type and str(value).startswith(str(M))):
             issues.append("Mocking dentro de la fuente semántica")
@@ -131,6 +135,21 @@ def main():
          mock_add='d:Title c:name "alterado" .')
     case("La fuente semántica no contiene escenarios", False,
          add="d:WrongSource a m:Scenario .")
+    case("Una query explícita admite un escenario", True,
+         add='d:FindProject a c:Query ; c:name "BuscarProyecto" ; c:uses [ a c:FieldUse ; c:field d:ProjectId ] ; c:result d:ApprovalResult .',
+         mock_remove=((S.ApproveKnownProject, M.operation, None),),
+         mock_add="s:ApproveKnownProject m:operation d:FindProject .")
+    case("Un escenario no sustituye una operación CRUD derivada", False,
+         add='d:CreateProject a c:Command, c:DerivedCrudOperation ; c:name "CrearProyecto" .',
+         mock_remove=((S.ApproveKnownProject, M.operation, None),),
+         mock_add="s:ApproveKnownProject m:operation d:CreateProject .")
+    case("Una entidad no es una operación simulable", False,
+         mock_remove=((S.ApproveKnownProject, M.operation, None),),
+         mock_add="s:ApproveKnownProject m:operation d:Project .")
+    case("Error tipográfico en propiedad semántica", False, add="d:Title c:maxLenght 80 .")
+    case("Propiedad desconocida de mocking", False, mock_add="s:ApproveKnownProject m:priority 1 .")
+    case("Un vocabulario externo no habilita propiedades por sí solo", False,
+         add='d:Title <https://example.org/extension#rule> "ignorar" .')
 
     original = Graph().parse("semantic.ttl")
     assert len(list(original.subjects(C.uses, D.TitleUse))) == 2
