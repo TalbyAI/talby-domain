@@ -5,7 +5,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from pyshacl import validate
-from rdflib import BNode, Graph, Namespace, RDF, RDFS, URIRef
+from rdflib import BNode, Graph, Literal, Namespace, RDF, RDFS, URIRef
 from rdflib.compare import isomorphic
 
 C = Namespace("https://example.org/talby/contract#")
@@ -74,6 +74,37 @@ def canonicalize(graph):
     for triple in graph:
         result.add(tuple(replacements.get(term, term) for term in triple))
     return result
+
+
+def presence_policy(graph, group, use):
+    """Experimento acotado sobre un grafo ya comprobado, no modelo efectivo completo."""
+    field = graph.value(use, C.field)
+
+    def flags(owner, kind):
+        return [graph.value(rule, C.enabled).toPython()
+                for rule in graph.objects(owner, C.constraint) if (rule, RDF.type, kind) in graph]
+
+    field_required = flags(field, C.Required)
+    field_nullable = flags(field, C.Nullable)
+    required = (any(field_required) if field_required else True) or any(flags(use, C.Required))
+    nullable = (all(field_nullable) if field_nullable else False) and all(flags(use, C.Nullable))
+    if (group, C.identifierUse, use) in graph:
+        required, nullable = True, False
+    return required, nullable
+
+
+def presence_issues(graph, group, use, present, value):
+    """Solo presencia/null del campo y null de elementos; no tipos, CEL ni PATCH."""
+    required, nullable = presence_policy(graph, group, use)
+    if not present:
+        return ["Campo obligatorio ausente"] if required else []
+    if value is None:
+        return ["El campo no admite null"] if not nullable else []
+    value_type = graph.value(graph.value(use, C.field), C.valueType)
+    if (value_type, RDF.type, C.CollectionType) in graph and isinstance(value, list):
+        if graph.value(value_type, C.itemNullable) != Literal(True) and any(item is None for item in value):
+            return ["La colección no admite elementos null"]
+    return []
 
 
 def main():
@@ -238,6 +269,53 @@ def main():
          remove=((D.CannotApprove, C.detailsType, None),), add="d:CannotApprove c:detailsType c:Text .")
     case("El error referenciado debe estar declarado", False,
          add="d:ApproveProject c:errors d:Missing .")
+    case("itemNullable debe ser booleano", False, add='d:Tags c:itemNullable "si" .')
+    case("Una regla de presencia necesita un booleano", False,
+         add='d:BrokenPresence a c:Required ; c:enabled "si" . d:Title c:constraint d:BrokenPresence .')
+
+    graph = Graph().parse("semantic.ttl")
+
+    def presence_case(name, expected, present, value, use=D.TagsUse, group=D.Project):
+        issues = presence_issues(graph, group, use, present, value)
+        assert (not issues) == expected, f"{name}: {issues}"
+        cases.append(dict(name=name, conforms=not issues, issues=issues,
+                          semantic=graph.serialize(format="turtle"), mocking=""))
+
+    assert presence_policy(graph, D.Project, D.TagsUse) == (True, False)
+    presence_case("Default obligatorio: campo ausente rechazado", False, False, None)
+    presence_case("Default no nulo: null rechazado", False, True, None)
+    presence_case("Una lista vacía no equivale a ausencia ni a null", True, True, [])
+    presence_case("Default de elementos: [null] rechazado", False, True, [None])
+    for node, kind, enabled in ((D.Optional, C.Required, False), (D.AllowNull, C.Nullable, True),
+                                (D.MustExist, C.Required, True), (D.NotNull, C.Nullable, False)):
+        graph.add((node, RDF.type, kind))
+        graph.add((node, C.enabled, Literal(enabled)))
+    graph.add((D.TagsField, C.constraint, D.Optional))
+    graph.add((D.TagsField, C.constraint, D.AllowNull))
+    assert presence_policy(graph, D.Project, D.TagsUse) == (False, True)
+    presence_case("Campo declarado opcional: ausencia admitida", True, False, None)
+    presence_case("Campo declarado nullable: null admitido", True, True, None)
+    presence_case("Nullable del campo no habilita [null]", False, True, [None])
+    graph.add((D.Tags, C.itemNullable, Literal(True)))
+    presence_case("itemNullable true habilita [null]", True, True, [None])
+    graph.add((D.TagsUse, C.constraint, D.MustExist))
+    graph.add((D.TagsUse, C.constraint, D.NotNull))
+    assert presence_policy(graph, D.Project, D.TagsUse) == (True, False)
+    presence_case("Un uso puede exigir un campo originalmente opcional", False, False, None)
+    presence_case("Un uso puede prohibir null admitido por el campo", False, True, None)
+    presence_case("Endurecer el campo no cambia itemNullable", True, True, [None])
+    graph.add((D.TitleUse, C.constraint, D.Optional))
+    graph.add((D.TitleUse, C.constraint, D.AllowNull))
+    assert presence_policy(graph, D.Project, D.TitleUse) == (True, False)
+    presence_case("Un uso no debilita el default obligatorio del campo", False, False, None, D.TitleUse)
+    presence_case("Un uso no debilita el default no nulo del campo", False, True, None, D.TitleUse)
+    graph.add((D.ProjectId, C.constraint, D.Optional))
+    graph.add((D.ProjectId, C.constraint, D.AllowNull))
+    presence_case("El identificador de la entidad siempre es obligatorio", False, False, None, D.ProjectIdUse)
+    presence_case("El identificador de la entidad siempre es no nulo", False, True, None, D.ProjectIdUse)
+    presence_case("Reutilizar el uso fuera de la entidad conserva su presencia declarada", True, False, None,
+                  D.ProjectIdUse, D.RejectionDetails)
+    assert not inspect(graph, Graph().parse("mocking.ttl"))
 
     original = Graph().parse("semantic.ttl")
     # Conservación declarativa; la ejecución de las restricciones no forma parte de esta prueba.

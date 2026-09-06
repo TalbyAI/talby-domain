@@ -51,6 +51,10 @@ inspeccionarlos sin servidor, pero los cambios en Turtle se verifican ejecutando
   el módulo no tiene padre y la jerarquía no forma ciclos.
 - Los errores de negocio tienen IRI y código único dentro de un módulo. Pueden declarar
   una agrupación para sus detalles; comandos y queries referencian los errores que pueden producir.
+- El perfil aplica `required=true` y `nullable=false` al campo cuando no se declaran.
+  Las declaraciones del campo pueden seleccionar otros valores; un uso conserva las
+  restricciones del campo y solo añade restricciones acumulativas.
+- `itemNullable` es independiente de `nullable` del campo; su default es false.
 
 ## Propuesta concreta de propiedades y cardinalidades
 
@@ -70,6 +74,8 @@ Los namespaces `example.org` son marcadores del prototipo, no una decisión de p
 | `EntityReference` | `targetEntity` 1 |
 | `ValueType` | `baseType` 1 escalar, `constraint` 0..N |
 | `OneOf` | `allowedValue` 1..N literales |
+| `Required`, `Nullable` | `enabled` 1 booleano; recursos de restricción con IRI |
+| Nulabilidad de colección | `itemNullable` 0..1 booleano en `CollectionType`, default false |
 | `MaxLength` | `limit` 1 entero no negativo |
 | `Assertion` | `expression` 1 cadena CEL no vacía |
 | `Scenario` | `operation` 1, `when` 1, exactamente una de `responseJson` / `errorJson` / `success true` |
@@ -102,8 +108,8 @@ para hashing ni un algoritmo de identidad por contenido. La identidad exige cons
 el artefacto producido, sin sobrescribir el original.
 
 No se evalúa CEL ni se verifica todavía su entorno de nombres, funciones o tipos.
-No se ejecuta normalización ni se comprueba la acumulación efectiva de restricciones
-o la validez de datos `Periodo`. Las dos restricciones de título se conservan en el grafo,
+No se ejecuta normalización ni se comprueba la acumulación general de restricciones
+o la validez de datos `Periodo`. Las dos restricciones de longitud de título se conservan en el grafo,
 pero aún no se ejecutan sobre un payload.
 Se analiza JSON, **no se valida todavía contra el resultado o error de la operación**.
 Tampoco se ejecutan condiciones ni los casos de cero/una/varias coincidencias.
@@ -111,10 +117,14 @@ Se comprueba que `success true` solo se aplica a un comando sin resultado y que 
 declara una respuesta JSON. No se traduce todavía a HTTP.
 Las reglas de acceso se comprueban estructuralmente; no se ejecuta autorización de actores,
 incluida la denegación por defecto y la exigencia de todos los permisos.
-La obligatoriedad y no nulabilidad del identificador son invariantes aprobados del contrato;
-el prototipo comprueba su designación y tipo, no valida todavía presencia/null en payloads
-ni contradicciones con restricciones explícitas de presencia. Su exposición en el modelo
-efectivo corresponde al ticket de ese modelo.
+Un experimento adicional comprueba presencia/null en un campo y null de los elementos
+directos de una colección. Calcula los defaults del campo, acumula restricciones de su uso
+y aplica la obligatoriedad/no nulabilidad del identificador únicamente en el contexto de
+la entidad. Se comprueba que reutilizar ese uso fuera de la entidad no le impone esas
+invariantes contextuales. Una regla local neutral no anula una restricción heredada.
+No es un validador completo de payloads: no comprueba tipos ni colecciones anidadas,
+no ejecuta PATCH y no materializa el modelo efectivo completo. Los defaults deberán
+ser visibles en ese modelo conforme a la decisión aprobada.
 
 Los tipos de valor y las enumeraciones se comprueban estructuralmente. Se verifica que
 la cadena de bases conserva las referencias a restricciones; no se ejecuta su conjunción.
@@ -125,8 +135,7 @@ Se comprueban la jerarquía organizativa y las declaraciones de errores; no se g
 namespaces/rutas ni se verifica aún el código y los detalles de un JSON de error contra
 las declaraciones de la operación. El envoltorio HTTP corresponde a su ticket.
 
-No se definen todavía presencia/null,
-formato completo de identificadores, actores de prueba, metadatos de eventos, contratos completos de queries,
+No se definen todavía el formato completo de identificadores, actores de prueba, metadatos de eventos, contratos completos de queries,
 CRUD, HTTP, SQLite ni el catálogo completo de restricciones. El ejemplo de entidad
 es deliberadamente incompleto; no constituye el caso de aceptación del servicio entero.
 Las shapes son abiertas: el script rechaza propiedades desconocidas, pero aún no se

@@ -26,6 +26,8 @@ c:Permission a rdfs:Class .
 c:Constraint a rdfs:Class .
 c:MaxLength a rdfs:Class ; rdfs:subClassOf c:Constraint .
 c:OneOf a rdfs:Class ; rdfs:subClassOf c:Constraint .
+c:Required a rdfs:Class ; rdfs:subClassOf c:Constraint .
+c:Nullable a rdfs:Class ; rdfs:subClassOf c:Constraint .
 c:Assertion a rdfs:Class ; rdfs:subClassOf c:Constraint .
 c:Normalizer a rdfs:Class .
 c:Trim a c:Normalizer .
@@ -45,6 +47,8 @@ c:errors a rdf:Property .
 c:valueType a rdf:Property .
 c:baseType a rdf:Property .
 c:allowedValue a rdf:Property .
+c:enabled a rdf:Property .
+c:itemNullable a rdf:Property .
 c:normalizers a rdf:Property .
 c:constraint a rdf:Property .
 c:field a rdf:Property .
