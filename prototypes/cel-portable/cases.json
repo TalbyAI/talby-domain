@@ -963,6 +963,20 @@
     }
   },
   {
+    "name": "profile pattern a",
+    "expression": "fullMatch(m.text,m.pattern)",
+    "input": {
+      "m": {
+        "text": "a\n",
+        "pattern": "a"
+      }
+    },
+    "expected": {
+      "status": "ok",
+      "value": false
+    }
+  },
+  {
     "name": "profile pattern ^a$",
     "expression": "fullMatch(m.text,m.pattern)",
     "input": {
@@ -974,6 +988,20 @@
     "expected": {
       "status": "ok",
       "value": false
+    }
+  },
+  {
+    "name": "profile pattern ^a\\n$",
+    "expression": "fullMatch(m.text,m.pattern)",
+    "input": {
+      "m": {
+        "text": "a\n",
+        "pattern": "^a\\n$"
+      }
+    },
+    "expected": {
+      "status": "ok",
+      "value": true
     }
   },
   {

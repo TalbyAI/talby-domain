@@ -40,7 +40,7 @@ add('trim before decimal','canon(decimal(trim(" 0001.2300 ")))', '1.23');
 add('trim and decimal idempotence','canon(decimal(trim(canon(decimal(trim(" 0001.2300 "))))))','1.23');
 add('trim null type','trim(null)',null,'check-error');
 for (const [p,s,expected] of [
- ['^a$','a',true],['^a$','a\n',false],['\\$','$',true],['a|bc','bc',true],['(?:a|bc)+','abca',true],
+ ['^a$','a',true],['a','a\n',false],['^a$','a\n',false],['^a\\n$','a\n',true],['\\$','$',true],['a|bc','bc',true],['(?:a|bc)+','abca',true],
  ['[a-c]+','abc',true],['[-a]+','-a',true],['[a-]+','a-',true],['[a\\-z]+','-az',true],
  ['[\\]\\\\]+',']\\',true],['\\n\\r\\t','\n\r\t',true],['[0-9]{2,4}','123',true],
  ['a{0}','',true],['a{2,}','aaa',true],['a?b*c+','abbbcc',true],['','',true],['😀{2}','😀😀',true],
