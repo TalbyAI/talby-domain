@@ -1,4 +1,4 @@
-@prefix m: <https://example.org/talby/mocking#> .
+@prefix m: <https://github.com/TalbyAI/talby-domain/vocab/mocking#> .
 @prefix d: <urn:talby:prototype:declaration:> .
 @prefix s: <urn:talby:prototype:scenario:> .
 

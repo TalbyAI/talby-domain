@@ -8,8 +8,8 @@ from pyshacl import validate
 from rdflib import BNode, Graph, Literal, Namespace, RDF, RDFS, URIRef
 from rdflib.compare import isomorphic
 
-C = Namespace("https://example.org/talby/contract#")
-M = Namespace("https://example.org/talby/mocking#")
+C = Namespace("https://github.com/TalbyAI/talby-domain/vocab/contract#")
+M = Namespace("https://github.com/TalbyAI/talby-domain/vocab/mocking#")
 D = Namespace("urn:talby:prototype:declaration:")
 S = Namespace("urn:talby:prototype:scenario:")
 SH = Namespace("http://www.w3.org/ns/shacl#")

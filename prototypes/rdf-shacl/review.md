@@ -1,8 +1,8 @@
 # Revisión conjunta: vocabulario de contrato y mocking
 
-Estado: propuesta para ratificación. Las decisiones de comportamiento se han acordado
-en la conversación y registrado en el ticket; este documento reúne la forma RDF propuesta
-y explicita su alcance. No es una implementación de producción.
+Estado: **aprobado por el usuario en la revisión conjunta**, incluidos nombres,
+cardinalidades, parámetros y bases de IRI. Este documento reúne la decisión RDF y
+explicita su alcance. No es una implementación de producción.
 
 ## Artefactos para revisar
 
@@ -14,13 +14,13 @@ y explicita su alcance. No es una implementación de producción.
 - `README.md`: tabla de propiedades/cardinalidades y límites exactos del experimento.
 - `report.html`: casos registrados. No ejecuta un motor de contrato en el navegador.
 
-## Forma propuesta para ratificar
+## Forma aprobada
 
-Se propone adoptar los nombres de clases y propiedades del vocabulario, salvo el marcador
+Se adoptan los nombres de clases y propiedades del vocabulario, salvo el marcador
 experimental `DerivedCrudOperation`, y las cardinalidades de la tabla del README.
 Los prefijos `c:` y `m:` son abreviaturas de autoría, no identidades.
 
-Propuesta de bases definitivas para ratificar, bajo la dirección del repositorio:
+Bases de IRI aprobadas, bajo la dirección del repositorio:
 
 - Contrato: `https://github.com/TalbyAI/talby-domain/vocab/contract#`.
 - Mocking: `https://github.com/TalbyAI/talby-domain/vocab/mocking#`.
@@ -28,7 +28,7 @@ Propuesta de bases definitivas para ratificar, bajo la dirección del repositori
 
 Son identificadores; no prometen publicar documentos descargables en esas rutas.
 La carga sigue siendo explícita y no descarga una IRI al encontrarla.
-El prototipo mantiene `example.org` hasta que se apruebe esta propuesta de bases.
+El prototipo utiliza estas bases y conserva el resultado de su comprobación con ellas.
 Tampoco se deben adoptar las IRIs
 `urn:talby:prototype:declaration:` como formato obligatorio de las declaraciones de usuario.
 
@@ -45,7 +45,7 @@ conserva identidad; regenerarlo desde una fuente anónima no promete las mismas 
 
 ## Parámetros de restricciones
 
-| Restricción | Parámetros propuestos | Comprobación del significado |
+| Restricción | Parámetros | Comprobación del significado |
 | --- | --- | --- |
 | `Required`, `Nullable` | `enabled`: booleano | Defaults en Field; conjunción acumulativa en sus usos |
 | `MinLength`, `MaxLength` | `limit`: entero ≥ 0 | Longitud en valores escalares Unicode; reglas del identificador cuando corresponda |
@@ -58,7 +58,7 @@ conserva identidad; regenerarlo desde una fuente anónima no promete las mismas 
 | `OneOf` | `allowedValue`: uno o varios literales | Tipo escalar homogéneo, canonicalización y pertenencia exacta |
 | `Assertion` | `expression`: cadena CEL | Entorno tipado, resultado booleano y perfil de funciones/sintaxis aprobado |
 
-La propuesta usa literales RDF nativos para parámetros escalares: `xsd:string`,
+Se usan literales RDF nativos para parámetros escalares: `xsd:string`,
 `xsd:boolean`, `xsd:integer`, `xsd:decimal`, `xsd:date` y `xsd:dateTime`.
 Los extremos de rango se limitan a los cuatro últimos tipos. El verificador comprueba
 su correspondencia con el tipo al que se aplica la regla y las restricciones léxicas
@@ -91,7 +91,7 @@ La elección y capacidad de un generador no pertenecen a este vocabulario de con
 | Ejecución de autorización, CEL, normalización y persistencia | Implementación posterior con casos de aceptación |
 
 `DerivedCrudOperation` es solo un marcador experimental de los casos negativos.
-No se propone ratificarlo como parte del vocabulario de entrada: la forma del CRUD
+No forma parte del vocabulario de entrada aprobado: la forma del CRUD
 derivado corresponde al ticket del modelo efectivo.
 
 El grafo visual permanece separado conforme a la especificación y ADR-0006. Este ticket
@@ -99,9 +99,9 @@ pregunta por fuentes semántica y de mocking; no diseña el editor ni introduce 
 visuales en ellas. El vocabulario visual mínimo exigido debe concretarse en un ticket
 propio del mapa antes de dar por decidida la entrega.
 
-## Qué significa aprobar esta propuesta
+## Alcance de la aprobación
 
-Ratifica la representación acordada y los nombres/cardinalidades/literales revisados;
+La aprobación ratifica la representación acordada y los nombres/cardinalidades/literales revisados;
 no afirma que el prototipo sea un verificador exhaustivo. Los casos registrados son
-evidencia acotada y sus límites figuran en el README. Antes de cerrar el ticket debe
-resolverse la base de IRIs de vocabulario y quedar registrada la revisión humana del conjunto.
+evidencia acotada y sus límites figuran en el README. La revisión humana del conjunto
+ha concluido; la resolución del ticket enlaza esta decisión y la evidencia reproducible.

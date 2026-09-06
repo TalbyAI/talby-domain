@@ -1,6 +1,7 @@
 # Prototipo desechable: vocabulario RDF y shapes SHACL
 
-Estado: **borrador para revisión**, no ontología aprobada ni cargador completo.
+Estado: **decisión de vocabulario aprobada por el usuario**; el prototipo es evidencia
+experimental parcial, no un cargador completo ni un motor de producción.
 Pregunta: ¿la estructura expresa campos reutilizables, usos compartidos o anónimos,
 composición anidada y fuentes de mocking separadas conforme a las decisiones acordadas?
 
@@ -65,12 +66,16 @@ inspeccionarlos sin servidor, pero los cambios en Turtle se verifican ejecutando
   restricciones del campo y solo añade restricciones acumulativas.
 - `itemNullable` es independiente de `nullable` del campo; su default es false.
 
-## Propuesta concreta de propiedades y cardinalidades
+## Propiedades y cardinalidades aprobadas
 
-Los nombres y la ubicación de las comprobaciones son propuestas, no decisiones aprobadas.
-Los namespaces `example.org` son marcadores del prototipo, no una decisión de publicación.
+Los nombres, cardinalidades y bases de IRI han sido aprobados. La ubicación experimental
+de algunas comprobaciones en SHACL-SPARQL no obliga a utilizarlo en producción.
+Las bases de contrato, mocking y shapes son respectivamente
+`https://github.com/TalbyAI/talby-domain/vocab/contract#`,
+`https://github.com/TalbyAI/talby-domain/vocab/mocking#` y
+`https://github.com/TalbyAI/talby-domain/vocab/shapes#`.
 
-| Declaración | Propiedades propuestas |
+| Declaración | Propiedades |
 | --- | --- |
 | `Field` | `name` 1, `valueType` 1, `constraint` 0..N, `normalizers` 0..1 lista |
 | `FieldUse` | `field` 1, `name` 0..1, `constraint` 0..N; `normalizers` prohibido |
@@ -103,7 +108,7 @@ Los namespaces `example.org` son marcadores del prototipo, no una decisión de p
 especificación aprobada. El prototipo representa también `Entity` como agrupación de datos
 con un identificador designado.
 Los JSON se transportan como literales `xsd:string`, conforme a la decisión aprobada.
-Los extremos de rango se proponen como literales RDF `xsd:integer`, `xsd:decimal`,
+Los extremos de rango se declaran como literales RDF `xsd:integer`, `xsd:decimal`,
 `xsd:date` o `xsd:dateTime`; esto no cambia sus representaciones HTTP/JSON.
 Las shapes admiten referencias a comandos y queries explícitos. `DerivedCrudOperation`
 es un marcador experimental usado para comprobar la exclusión de CRUD, incluso cuando
@@ -168,8 +173,8 @@ El ejemplo no constituye el caso de aceptación ejecutable del servicio entero.
 Las shapes son abiertas: el script rechaza propiedades desconocidas, pero aún no se
 detectan todas las propiedades conocidas fuera de lugar.
 
-La propuesta conjunta de nombres, tipos literales y responsabilidades está en
-[`review.md`](review.md). Su revisión no implica considerar implementadas las comprobaciones pendientes.
+La decisión conjunta de nombres, tipos literales y responsabilidades está en
+[`review.md`](review.md). Su aprobación no implica considerar implementadas las comprobaciones pendientes.
 
 ## Fuentes técnicas
 
@@ -177,5 +182,5 @@ La propuesta conjunta de nombres, tipos literales y responsabilidades está en
 - [RDF 1.1: sustitución de blank nodes por IRIs](https://www.w3.org/TR/rdf11-concepts/#section-skolemization).
 - [pySHACL](https://github.com/RDFLib/pySHACL): validador usado únicamente en este prototipo.
 
-La forma de autoría, las cardinalidades propuestas y las políticas del contrato son
+La forma de autoría, las cardinalidades y las políticas del contrato son
 elecciones de este proyecto, no requisitos impuestos por estos estándares.

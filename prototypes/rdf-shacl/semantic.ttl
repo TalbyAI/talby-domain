@@ -1,4 +1,4 @@
-@prefix c: <https://example.org/talby/contract#> .
+@prefix c: <https://github.com/TalbyAI/talby-domain/vocab/contract#> .
 @prefix d: <urn:talby:prototype:declaration:> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .

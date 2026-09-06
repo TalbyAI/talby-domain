@@ -1,9 +1,9 @@
-@prefix c: <https://example.org/talby/contract#> .
-@prefix m: <https://example.org/talby/mocking#> .
+@prefix c: <https://github.com/TalbyAI/talby-domain/vocab/contract#> .
+@prefix m: <https://github.com/TalbyAI/talby-domain/vocab/mocking#> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 
-# PROTOTIPO: nombres e IRIs de vocabulario propuestos, pendientes de revisión.
+# Vocabulario aprobado; implementación experimental de conformidad, no motor de producción.
 c:Type a rdfs:Class .
 c:Module a rdfs:Class .
 c:Feature a rdfs:Class .
