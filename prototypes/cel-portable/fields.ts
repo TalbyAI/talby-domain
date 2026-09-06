@@ -1,7 +1,7 @@
 import {normalize, trimValue, order} from './probe.ts';
 
 // Tiny effective-model fixture. No RDF loader, generated client or HTTP API.
-export function fields(spec: any[], input: any): any {
+export function fields(spec: any[], input: any, inputOrder?: string[]): any {
   const value: any = {}, issues: any[] = [];
   const issue = (field: string, rule: string) => issues.push({field,rule});
   if (!input || typeof input !== 'object' || Array.isArray(input)) return {status:'validation-error',value,issues:[{field:'',rule:'type'}]};
@@ -17,11 +17,12 @@ export function fields(spec: any[], input: any): any {
       });
       if(minima.some(a=>maxima.some(b=>order(f.type,a,b)>0))) throw Error('range');
       if(enums.length && !enums[0].some(x=>enums.every(e=>e.includes(x)))) throw Error('enum');
+      if(f.type!=='string'&&f.type!=='id'&&rules.some(r=>r.minLength!==undefined||r.maxLength!==undefined)) throw Error('length-type');
       const lo=Math.max(0,...rules.map(r=>r.minLength??0)), hi=Math.min(Infinity,...rules.map(r=>r.maxLength??Infinity));
       if(lo>hi) throw Error('length');
     }
   } catch {return {status:'model-error'};}
-  for(const k of Object.keys(input)) if(!spec.some(f=>f.name===k)) issue(k,'unknown');
+  for(const k of inputOrder??Object.keys(input)) if(!spec.some(f=>f.name===k)) issue(k,'unknown');
   for(const f of spec) {
     const rules = f.rules ?? [];
     if(!Object.hasOwn(input,f.name)) {if(rules.some(r=>r.required===true))issue(f.name,'required');continue;}
@@ -37,7 +38,7 @@ export function fields(spec: any[], input: any): any {
     catch {issue(f.name,'type-or-format');continue;}
     value[f.name]=v;
     for(const r of rules) {
-      if(r.minLength!==undefined && [...v].length<r.minLength || r.maxLength!==undefined && [...v].length>r.maxLength) issue(f.name,'length');
+      if((f.type==='string'||f.type==='id') && (r.minLength!==undefined && [...v].length<r.minLength || r.maxLength!==undefined && [...v].length>r.maxLength)) issue(f.name,'length');
       if(r.min!==undefined&&(order(f.type,v,normalize(f.type,r.min))<0 || r.minInclusive===false&&order(f.type,v,normalize(f.type,r.min))===0)) issue(f.name,'range');
       if(r.max!==undefined&&(order(f.type,v,normalize(f.type,r.max))>0 || r.maxInclusive===false&&order(f.type,v,normalize(f.type,r.max))===0)) issue(f.name,'range');
       if(r.oneOf && !r.oneOf.map(x=>normalize(f.type,x)).includes(v)) issue(f.name,'oneOf');

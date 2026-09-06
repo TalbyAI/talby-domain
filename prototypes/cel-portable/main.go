@@ -162,6 +162,7 @@ func main() {
 		Name       string          `json:"name"`
 		Expression string          `json:"expression"`
 		Input      json.RawMessage `json:"input"`
+		InputOrder []string        `json:"inputOrder"`
 		Fields     []fieldSpec     `json:"fields"`
 		Assert     bool            `json:"assert"`
 		Expected   map[string]any  `json:"expected"`
@@ -174,7 +175,7 @@ func main() {
 	for _, c := range cases {
 		actual := map[string]any{"status": "check-error"}
 		if c.Fields != nil {
-			actual = validateFields(c.Fields, c.Input)
+			actual = validateFields(c.Fields, c.Input, c.InputOrder)
 			c.Expression = "(host pipeline)"
 		} else {
 			ast, issues := env.Compile(c.Expression)

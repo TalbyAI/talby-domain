@@ -50,7 +50,7 @@ for (const [p,s,expected] of [
 for (const p of ['.','[^a]','\\d','\\w','\\s','\\p{L}','\\b','(a)\\1','(?=a)','(?<=a)','(?i:a)','a+?','a++','a{1001}','a{3,2}','a{2,1001}','a{,2}','a^b','a$b','^^a','a$$','[z-a]','[]','[[:alpha:]]','[😀]','\\q','a{2}{3}','(','[a','a\\','('.repeat(33)+'a'+')'.repeat(33),'a'.repeat(4097),'(a{1000}){2}','(abcdefghi){1000}']) add('reject pattern '+p.slice(0,45),'fullMatch(m.text,m.pattern)',null,'eval-error',{m:{text:'a',pattern:p}});
 add('reject pattern input ceiling','fullMatch(m.text,m.pattern)',null,'eval-error',{m:{text:'a'.repeat(65537),pattern:'a*'}});
 for(const expression of ['decimal("0.1") == decimal("0.10")','date("2000-01-01") == date("2000-01-01")','"a".matches("a")','[1,2].all(x,x>0)','timestamp("2000-01-01T00:00:00Z")','1.5 < 2.0','1 + 2','true ? false : true','true'+' '.repeat(65533),'!'.repeat(65)+'true',Array(520).fill('true').join(' && ')]) add('reject CEL profile '+expression.slice(0,50),expression,null,'check-error');
-const host=(name,fields,input,value,issues=[])=>cases.push({name:'host '+name,fields,input,expected:{status:issues.length?'validation-error':'ok',value,issues}});
+const host=(name,fields,input,value,issues=[],inputOrder)=>cases.push({name:'host '+name,fields,input,...(inputOrder?{inputOrder}:{}),expected:{status:issues.length?'validation-error':'ok',value,issues}});
 const f=(type,rules=[])=>[{name:'x',type,rules}];
 const err=(rule,field='x')=>({field,rule});
 for(const [input,valid,value] of [[9007199254740991,true,9007199254740991],[9007199254740992,false,null],[-9007199254740991,true,-9007199254740991],[1.5,false,null],['1',false,null],[1,true,1]])host('JSON integer '+input,f('integer'),{x:input},valid?{x:value}:{},valid?[]:[err('type-or-format')]);
@@ -74,6 +74,8 @@ host('required cannot be weakened',f('string',[{required:true},{required:false}]
 host('nullable cannot be weakened',f('string',[{nullable:false},{nullable:true}]),{x:null},{},[err('nullable')]);
 host('independent errors',[{name:'a',type:'decimal'},{name:'b',type:'date'}],{a:'wrong',b:'2026-02-30'}, {},[err('type-or-format','a'),err('type-or-format','b')]);
 host('unknown input',f('string'),{x:'a',extra:1},{x:'a'},[err('unknown','extra')]);
+host('unknown numeric input order',f('string'),{'10':'a','2':'b'},{},[err('unknown','10'),err('unknown','2')],['10','2']);
+cases.push({name:'host reject model length on integer',fields:f('integer',[{minLength:1,maxLength:2}]),input:{x:1},expected:{status:'model-error'}});
 const periods=[{name:'a',type:'period'},{name:'b',type:'period'}];
 const inputPeriods={a:{inicio:'2026-01-01',fin:'2026-02-01'},b:{inicio:'2026-03-01',fin:'2026-02-01'}};
 host('two independent Periodo inclusions',periods,inputPeriods,inputPeriods,[err('period','b.inicio'),err('period','b.fin')]);

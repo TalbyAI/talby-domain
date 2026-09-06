@@ -2727,6 +2727,59 @@
     }
   },
   {
+    "name": "host unknown numeric input order",
+    "fields": [
+      {
+        "name": "x",
+        "type": "string",
+        "rules": []
+      }
+    ],
+    "input": {
+      "2": "b",
+      "10": "a"
+    },
+    "inputOrder": [
+      "10",
+      "2"
+    ],
+    "expected": {
+      "status": "validation-error",
+      "value": {},
+      "issues": [
+        {
+          "field": "10",
+          "rule": "unknown"
+        },
+        {
+          "field": "2",
+          "rule": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "host reject model length on integer",
+    "fields": [
+      {
+        "name": "x",
+        "type": "integer",
+        "rules": [
+          {
+            "minLength": 1,
+            "maxLength": 2
+          }
+        ]
+      }
+    ],
+    "input": {
+      "x": 1
+    },
+    "expected": {
+      "status": "model-error"
+    }
+  },
+  {
     "name": "host two independent Periodo inclusions",
     "fields": [
       {

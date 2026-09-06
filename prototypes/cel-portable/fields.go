@@ -120,7 +120,7 @@ func wellFormedJSONText(raw []byte) bool {
 	}
 	return true
 }
-func validateFields(spec []fieldSpec, raw json.RawMessage) map[string]any {
+func validateFields(spec []fieldSpec, raw json.RawMessage, inputOrder []string) map[string]any {
 	value := map[string]any{}
 	issues := []map[string]string{}
 	issue := func(field, rule string) { issues = append(issues, map[string]string{"field": field, "rule": rule}) }
@@ -133,6 +133,14 @@ func validateFields(spec []fieldSpec, raw json.RawMessage) map[string]any {
 		enums := [][]any{}
 		lo, hi := float64(0), math.Inf(1)
 		for _, r := range f.Rules {
+			if f.Type != "string" && f.Type != "id" {
+				if _, ok := r["minLength"]; ok {
+					return map[string]any{"status": "model-error"}
+				}
+				if _, ok := r["maxLength"]; ok {
+					return map[string]any{"status": "model-error"}
+				}
+			}
 			for _, bound := range []string{"min", "max"} {
 				if x, exists := r[bound]; exists {
 					v, e := normalize(f.Type, x)
@@ -200,14 +208,16 @@ func validateFields(spec []fieldSpec, raw json.RawMessage) map[string]any {
 		}
 	}
 	// Match input declaration order for deterministic probe diagnostics.
-	var keys []string
-	dec := json.NewDecoder(strings.NewReader(string(raw)))
-	dec.Token()
-	for dec.More() {
-		k, _ := dec.Token()
-		keys = append(keys, k.(string))
-		var ignored json.RawMessage
-		dec.Decode(&ignored)
+	keys := inputOrder
+	if keys == nil {
+		dec := json.NewDecoder(strings.NewReader(string(raw)))
+		dec.Token()
+		for dec.More() {
+			k, _ := dec.Token()
+			keys = append(keys, k.(string))
+			var ignored json.RawMessage
+			dec.Decode(&ignored)
+		}
 	}
 	for _, k := range keys {
 		found := false
@@ -248,7 +258,7 @@ func validateFields(spec []fieldSpec, raw json.RawMessage) map[string]any {
 		}
 		if f.Type == "period" {
 			nested := []fieldSpec{{"inicio", "date", []map[string]any{{"required": true, "nullable": false}}}, {"fin", "date", []map[string]any{{"required": true, "nullable": false}}}}
-			r := validateFields(nested, vRaw)
+			r := validateFields(nested, vRaw, nil)
 			for _, e := range r["issues"].([]map[string]string) {
 				issue(f.Name+"."+e["field"], e["rule"])
 			}
@@ -286,13 +296,15 @@ func validateFields(spec []fieldSpec, raw json.RawMessage) map[string]any {
 		value[f.Name] = v
 		hasMaxLength := false
 		for _, r := range f.Rules {
-			if n, ok := r["minLength"].(float64); ok && float64(utf8.RuneCountInString(v.(string))) < n {
-				issue(f.Name, "length")
-			}
-			if n, ok := r["maxLength"].(float64); ok {
-				hasMaxLength = true
-				if float64(utf8.RuneCountInString(v.(string))) > n {
+			if f.Type == "string" || f.Type == "id" {
+				if n, ok := r["minLength"].(float64); ok && float64(utf8.RuneCountInString(v.(string))) < n {
 					issue(f.Name, "length")
+				}
+				if n, ok := r["maxLength"].(float64); ok {
+					hasMaxLength = true
+					if float64(utf8.RuneCountInString(v.(string))) > n {
+						issue(f.Name, "length")
+					}
 				}
 			}
 			for _, bound := range []string{"min", "max"} {

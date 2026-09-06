@@ -5,6 +5,7 @@ import { resolve } from 'node:path';
 const mode=process.argv[2]??'js';
 if(!['js','wasm'].includes(mode))throw Error('Use js or wasm');
 mkdirSync('dist', {recursive:true});
+mkdirSync('results', {recursive:true});
 await build({entryPoints:['worker.ts'],bundle:true,format:'iife',platform:'browser',external:['fs','path'],outfile:'dist/worker.js',plugins:mode==='wasm'?[{name:'wasm-candidate',setup(b){b.onResolve({filter:/^\.\/regex\.ts$/},()=>({path:resolve('regex-wasm.ts')}));}}]:[]});
 if(mode==='wasm')copyFileSync('node_modules/re2-wasm/build/wasm/re2.wasm','dist/re2.wasm');
 copyFileSync('cases.json','dist/cases.json');

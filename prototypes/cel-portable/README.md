@@ -4,7 +4,7 @@
 
 ## Propuesta
 
-217 casos coinciden con sus resultados esperados en TypeScript/Node, cel-go y Chrome. Se propone adoptar **CEL acotado, tipos/comparadores del host y RE2JS para patrones** en la primera entrega. La equivalencia comprobada pertenece a este perfil, no a CEL completo ni a cualquier implementación del lenguaje.
+219 casos coinciden con sus resultados esperados en TypeScript/Node, cel-go y Chrome. Se propone adoptar **CEL acotado, tipos/comparadores del host y RE2JS para patrones** en la primera entrega. La equivalencia comprobada pertenece a este perfil, no a CEL completo ni a cualquier implementación del lenguaje.
 
 El usuario permitió evaluar WASM como candidato, sujeto a integración, tamaño y comportamiento en navegador. Las pruebas posteriores favorecen RE2JS: funciona sin WASM ni evaluación dinámica de JavaScript. No se reduce el perfil para usar RegExp nativo ni se necesita mantener un motor de regex propio.
 
