@@ -65,6 +65,22 @@ s:Metadata a sh:NodeShape ; sh:targetSubjectsOf rdfs:label, rdfs:comment ;
     sh:property [ sh:path rdfs:label ; sh:or ( [ sh:datatype xsd:string ] [ sh:datatype rdf:langString ] ) ],
     [ sh:path rdfs:comment ; sh:or ( [ sh:datatype xsd:string ] [ sh:datatype rdf:langString ] ) ] .
 s:Constraint a sh:NodeShape ; sh:targetClass c:Constraint ; sh:nodeKind sh:IRI .
+s:Entity a sh:NodeShape ; sh:targetClass c:Entity ;
+    sh:property [ sh:path c:identifierUse ; sh:minCount 1 ; sh:maxCount 1 ; sh:class c:FieldUse ;
+        sh:node [ sh:property [ sh:path (c:field c:valueType [ sh:zeroOrMorePath c:baseType ]) ;
+            sh:hasValue c:Identifier ] ] ] ;
+    sh:sparql [ sh:message "El identificador debe ser un uso de la propia entidad" ; sh:select """
+        PREFIX c: <https://example.org/talby/contract#>
+        SELECT $this WHERE {
+            $this c:identifierUse ?use . FILTER NOT EXISTS { $this c:uses ?use }
+        }
+    """ ] .
+s:Command a sh:NodeShape ; sh:targetClass c:Command ;
+    sh:property [ sh:path c:result ; sh:maxCount 1 ; sh:class c:Type ] .
+s:Query a sh:NodeShape ; sh:targetClass c:Query ;
+    sh:property [ sh:path c:result ; sh:minCount 1 ; sh:maxCount 1 ; sh:class c:Type ] .
+s:Event a sh:NodeShape ; sh:targetClass c:Event ;
+    sh:property [ sh:path c:result ; sh:maxCount 0 ] .
 s:MaxLength a sh:NodeShape ; sh:targetClass c:MaxLength ;
     sh:property [ sh:path c:limit ; sh:minCount 1 ; sh:maxCount 1 ;
         sh:datatype xsd:integer ; sh:minInclusive 0 ] .

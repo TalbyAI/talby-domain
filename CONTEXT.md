@@ -14,10 +14,10 @@ Nivel que describe el modelo de datos público y sus reglas de validación estru
 Agrupación de usos de campo para describir un contrato, como un comando, un evento o un modelo de lectura, incluida la composición anidada de otras agrupaciones. Puede declarar reglas que combinen varios usos de campo.
 
 **Comando**:
-Especialización de una agrupación de campos con reglas, permisos, configuración API y referencias a resultados y errores. Sus metadatos describen el contrato y no forman parte de los datos enviados.
+Especialización de una agrupación de campos con reglas, permisos, configuración API y referencias a resultados y errores. Puede declarar un resultado u omitirlo para indicar que no devuelve datos. Sus metadatos describen el contrato y no forman parte de los datos enviados.
 
 **Query**:
-Agrupación especializada de parámetros para una consulta, con permisos, configuración API y un resultado asociado.
+Agrupación especializada de parámetros para una consulta, con permisos, configuración API y exactamente un resultado declarado.
 
 **Continuation token**:
 Valor opaco devuelto por un listado para continuar desde la última posición, vinculado a su consulta, filtros y orden. Se utiliza junto con un límite de resultados y no se combina con `offset`.
@@ -59,7 +59,7 @@ Datos RDF opcionales que enriquecen la simulación de operaciones conforme a una
 Identidad estable de un elemento de la especificación, independiente de su nombre y namespace. Permite reconocer el mismo elemento al reorganizarlo y rastrear sus representaciones derivadas.
 
 **Identificador de entidad**:
-Valor que identifica una instancia de entidad, sujeto a reglas del modelo sobre caracteres, longitud, prefijo y sufijo, sin quedar ligado a un generador concreto. Es distinto del identificador de la declaración que describe su tipo.
+Valor obligatorio y no nulo que identifica una instancia de entidad, sujeto a reglas del modelo sobre caracteres, longitud, prefijo y sufijo, sin quedar ligado a un generador concreto. Cada entidad señala un único uso de campo propio como identificador. Es distinto del identificador de la declaración que describe su tipo.
 
 **Campo**:
 Definición reutilizable de un dato, con nombre por defecto, tipo, normalizadores y restricciones originales. Su nombre se aplica a los usos que no declaran uno propio.

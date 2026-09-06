@@ -14,6 +14,7 @@ c:Query a rdfs:Class ; rdfs:subClassOf c:FieldGroup .
 # Marcador experimental; no fija el modelo efectivo de operaciones derivadas.
 c:DerivedCrudOperation a rdfs:Class ; rdfs:subClassOf c:FieldGroup .
 c:ReadModel a rdfs:Class ; rdfs:subClassOf c:FieldGroup .
+c:Event a rdfs:Class ; rdfs:subClassOf c:FieldGroup .
 c:CollectionType a rdfs:Class ; rdfs:subClassOf c:Type .
 c:EntityReference a rdfs:Class ; rdfs:subClassOf c:Type .
 c:Field a rdfs:Class .
@@ -44,6 +45,7 @@ c:targetEntity a rdf:Property .
 c:limit a rdf:Property .
 c:expression a rdf:Property .
 c:result a rdf:Property .
+c:identifierUse a rdf:Property .
 m:operation a rdf:Property .
 m:when a rdf:Property .
 m:responseJson a rdf:Property .

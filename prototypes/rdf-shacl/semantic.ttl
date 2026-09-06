@@ -20,10 +20,15 @@ d:ShortTitleUse a c:FieldUse ; c:field d:Title ;
     c:name "tituloCorto" ; c:constraint d:Title60 .
 
 # Un mismo FieldUse nombrado se comparte entre dos agrupaciones.
-d:Client a c:Entity ; c:name "Cliente" ; c:uses d:TitleUse .
+d:Client a c:Entity ; c:name "Cliente" ; c:uses d:TitleUse, d:ClientIdUse ;
+    c:identifierUse d:ClientIdUse .
+d:ClientId a c:Field ; c:name "clienteId" ; c:valueType c:Identifier .
+d:ClientIdUse a c:FieldUse ; c:field d:ClientId .
 d:Project a c:Entity ; c:name "Proyecto" ;
     c:uses d:TitleUse, d:ShortTitleUse, d:PlannedPeriod, d:ActualPeriod,
-        d:ClientUse, d:TagsUse, _:amount .
+        d:ClientUse, d:TagsUse, _:amount, d:ProjectIdUse ;
+    c:identifierUse d:ProjectIdUse .
+d:ProjectIdUse a c:FieldUse ; c:field d:ProjectId .
 
 d:Start a c:Field ; c:name "inicio" ; c:valueType c:Date .
 d:End a c:Field ; c:name "fin" ; c:valueType c:Date .

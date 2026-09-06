@@ -40,6 +40,9 @@ inspeccionarlos sin servidor, pero los cambios en Turtle se verifican ejecutando
   Otras extensiones necesitan soporte explícito.
 - `ValueType` tiene una base primitiva o de otro tipo de valor y conserva sus restricciones.
   No se admiten ciclos. Una enumeración añade una restricción `OneOf`.
+- Cada entidad designa un único uso propio como identificador, de tipo `Identifier`
+  o de un tipo de valor derivado. El identificador es obligatorio y no nulo.
+- Una query exige un resultado; un comando admite cero o uno. Un evento no declara resultado.
 
 ## Propuesta concreta de propiedades y cardinalidades
 
@@ -51,6 +54,10 @@ Los namespaces `example.org` son marcadores del prototipo, no una decisión de p
 | `Field` | `name` 1, `valueType` 1, `constraint` 0..N, `normalizers` 0..1 lista |
 | `FieldUse` | `field` 1, `name` 0..1, `constraint` 0..N; `normalizers` prohibido |
 | `FieldGroup` | `name` 1, `uses` 0..N, `constraint` 0..N |
+| `Entity` | `identifierUse` 1, incluido entre sus `uses` y de tipo identificador |
+| `Command` | `result` 0..1 |
+| `Query` | `result` 1 |
+| `Event` | `result` prohibido |
 | `CollectionType` | `itemType` 1 |
 | `EntityReference` | `targetEntity` 1 |
 | `ValueType` | `baseType` 1 escalar, `constraint` 0..N |
@@ -59,7 +66,7 @@ Los namespaces `example.org` son marcadores del prototipo, no una decisión de p
 | `Assertion` | `expression` 1 cadena CEL no vacía |
 | `Scenario` | `operation` 1, `when` 1, exactamente una de `responseJson` / `errorJson` |
 
-`Entity`, `Command`, `Query` y `ReadModel` se representan aquí como especializaciones de
+`Entity`, `Command`, `Query`, `Event` y `ReadModel` se representan aquí como especializaciones de
 `FieldGroup`; la jerarquía completa también está pendiente de revisión.
 Los JSON se transportan aquí como cadenas Turtle; el tipo literal definitivo no está aprobado.
 Las shapes admiten referencias a comandos y queries explícitos. `DerivedCrudOperation`
@@ -71,7 +78,7 @@ derivados, que corresponde al ticket del modelo efectivo. No se ejecuta SQLite e
 
 Las shapes comprueban tipos RDF, presencia/cardinalidad de las propiedades anteriores,
 referencias declaradas, nombres efectivos duplicados y ciclos de composición.
-Dos shapes usan SHACL-SPARQL para estos últimos casos. Es una ubicación experimental:
+Algunas shapes usan SHACL-SPARQL para estos casos y la pertenencia del identificador. Es una ubicación experimental:
 no obliga a usar SPARQL en el verificador de producción. El script comprueba además
 separación de fuentes, propiedades desconocidas, listas de normalizadores bien formadas y sintaxis JSON.
 
@@ -86,6 +93,11 @@ o la validez de datos `Periodo`. Las dos restricciones de título se conservan e
 pero aún no se ejecutan sobre un payload.
 Se analiza JSON, **no se valida todavía contra el resultado o error de la operación**.
 Tampoco se ejecutan condiciones ni los casos de cero/una/varias coincidencias.
+Está pendiente concretar cómo expresa un escenario el éxito de un comando sin datos de resultado.
+La obligatoriedad y no nulabilidad del identificador son invariantes aprobados del contrato;
+el prototipo comprueba su designación y tipo, no valida todavía presencia/null en payloads
+ni contradicciones con restricciones explícitas de presencia. Su exposición en el modelo
+efectivo corresponde al ticket de ese modelo.
 
 Los tipos de valor y las enumeraciones se comprueban estructuralmente. Se verifica que
 la cadena de bases conserva las referencias a restricciones; no se ejecuta su conjunción.
@@ -93,7 +105,7 @@ Faltan la compatibilidad de cada restricción con el tipo base y la homogeneidad
 canonicalización e intersección de los valores de enumeraciones conforme al perfil aprobado.
 
 No se definen todavía módulo/features, presencia/null,
-identificadores de entidad completos, permisos, errores declarados, eventos, contratos completos de queries,
+formato completo de identificadores, permisos, errores declarados, metadatos de eventos, contratos completos de queries,
 CRUD, HTTP, SQLite ni el catálogo completo de restricciones. El ejemplo de entidad
 es deliberadamente incompleto; no constituye el caso de aceptación del servicio entero.
 Las shapes son abiertas: el script rechaza propiedades desconocidas, pero aún no se

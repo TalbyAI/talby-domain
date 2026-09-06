@@ -167,6 +167,29 @@ def main():
          remove=((D.StatusValues, C.allowedValue, None),))
     case("Los miembros de una enumeración son literales", False,
          add="d:StatusValues c:allowedValue d:Project .")
+    case("Una entidad debe señalar su identificador", False,
+         remove=((D.Project, C.identifierUse, None),))
+    case("Una entidad no admite dos identificadores", False,
+         add="d:Project c:uses d:ClientIdUse ; c:identifierUse d:ClientIdUse .")
+    case("El identificador debe pertenecer a la entidad", False,
+         remove=((D.Project, C.uses, D.ProjectIdUse),))
+    case("El identificador no puede ser de tipo texto", False,
+         remove=((D.ProjectId, C.valueType, None),), add="d:ProjectId c:valueType c:Text .")
+    case("El identificador admite tipos de valor derivados", True,
+         remove=((D.ProjectId, C.valueType, None),),
+         add="d:IdType a c:ValueType ; c:baseType c:Identifier . d:ProjectId c:valueType d:IdType .")
+    case("Un comando puede omitir resultado", True, no_mock=True,
+         remove=((D.ApproveProject, C.result, None),))
+    case("Un comando no admite dos resultados", False,
+         add="d:ApproveProject c:result d:ProjectSummary .")
+    case("Una query exige un resultado", False,
+         add='d:MissingResult a c:Query ; c:name "Consultar" .')
+    case("El resultado debe referenciar un tipo declarado", False,
+         remove=((D.ApproveProject, C.result, None),), add="d:ApproveProject c:result d:Missing .")
+    case("Un evento tiene datos pero no resultado de operación", True,
+         add='d:ApprovedEvent a c:Event ; c:name "ProyectoAprobado" ; c:uses d:ProjectIdUse .')
+    case("Un evento no admite resultado de operación", False,
+         add='d:ApprovedEvent a c:Event ; c:name "ProyectoAprobado" ; c:result d:ApprovalResult .')
 
     original = Graph().parse("semantic.ttl")
     # Conservación declarativa; la ejecución de las restricciones no forma parte de esta prueba.
