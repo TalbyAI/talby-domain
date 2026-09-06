@@ -6,7 +6,7 @@ Estado: requisitos aprobados por el usuario tras revisar el conjunto; entrevista
 
 Definir un contrato público en RDF/Turtle, comprobarlo mediante SHACL y verificación semántica, generar una biblioteca TypeScript y ejecutar un mock HTTP/JSON con SQLite. El caso de aceptación es gestión de proyectos. Se incluyen normalización y validación equivalentes entre cliente y motor, permisos de prueba, mocking declarativo y comparación de compatibilidad entre fuentes.
 
-Semántica, visualización y mocking se mantienen en fuentes separadas con ontologías propias. La primera entrega define el formato extensible; construir el editor visual completo queda para después. CEL se evaluará como candidato mediante un prototipo, sin dar por decidida su adopción.
+Semántica, visualización y mocking se mantienen en fuentes separadas con ontologías propias. La primera entrega define el formato extensible; construir el editor visual completo queda para después. Para sus aserciones se adopta el [perfil acotado de CEL con tipos del host y RE2JS para patrones](adr/0007-perfil-cel-acotado.md), respaldado por la evaluación de portabilidad.
 
 El diseño detallado posterior concretará shapes, propiedades RDF, firmas de funciones, contratos HTTP y pruebas ejecutables. Las decisiones sobre workflows durables, persistencia avanzada, migraciones y asentamiento se conservan como dirección futura, fuera de la implementación inicial.
 
@@ -117,7 +117,7 @@ Los normalizadores se ejecutan en orden declarado sobre valores compatibles. Una
 
 En payloads JSON de entrada se rechazan campos desconocidos. El cliente tolera propiedades adicionales en las respuestas y valida los campos que conoce. El mock debe comprobar que sus respuestas cumplen el contrato declarado. Esta política de payloads no decide cómo se preservan vocabularios de extensión en los documentos RDF.
 
-Debe existir un lenguaje de expresiones de escritura sencilla. El catálogo de reglas crecerá según las necesidades de expresividad. Se acepta un perfil acotado de CEL como primera aproximación para un prototipo de evaluación, no como elección definitiva del lenguaje. El prototipo deberá incluir funciones tipadas para decimales exactos y fechas sin convertir decimales a `double`, y comprobar su soporte en el cliente generado. La sintaxis concreta del perfil, sus límites y la decisión final dependen de esa evaluación.
+Debe existir un lenguaje de expresiones de escritura sencilla. El catálogo de reglas crecerá según las necesidades de expresividad. Para la primera entrega se adopta el [perfil CEL acotado](adr/0007-perfil-cel-acotado.md): tipos y comparadores explícitos del host para decimal exacto, fecha e instante, y RE2JS para patrones en TypeScript. Decimal no se convierte a `double`; los tipos opacos se comparan mediante sus comparadores, también para igualdad. El verificador rechaza funciones, tipos y sintaxis fuera del perfil antes de ejecutar. Sus límites operativos son explícitos e iguales en cliente y motor. La evaluación no decide el stack del motor ni adopta CEL para futuras capas o entregas.
 
 El pipeline completo de normalización debe ser determinista e idempotente: `N(N(x)) = N(x)`. No depende del reloj, azar ni consultas externas. Los casos compartidos deben comprobar esta propiedad del pipeline completo, además de la equivalencia entre runtimes.
 
@@ -179,7 +179,7 @@ Definir correctamente el DSL de la capa pública para alcanzar un primer objetiv
 
 La visión global conserva las tres capas, workflows, actividades externas, modalidades de persistencia, editor visual y asentamiento. Su implementación no es requisito de esta primera entrega. El trabajo actual consiste en definir la especificación.
 
-El primer transporte será HTTP con JSON, la biblioteca cliente se generará para TypeScript y el mock persistirá en SQLite. Los contratos permanecen independientes del transporte. Se usa Turtle para las fuentes RDF. Siguen pendientes las shapes concretas, la evaluación del perfil CEL y los detalles de los contratos de transporte y tipos.
+El primer transporte será HTTP con JSON, la biblioteca cliente se generará para TypeScript y el mock persistirá en SQLite. Los contratos permanecen independientes del transporte. Se usa Turtle para las fuentes RDF. El perfil CEL queda fijado en el ADR correspondiente; siguen pendientes las shapes concretas y los detalles de los contratos de transporte y tipos.
 
 ### Casos de aceptación derivados de los acuerdos
 
@@ -204,7 +204,7 @@ El servicio de ejemplo será gestión de proyectos, partiendo del contexto de `s
 | Actor carece de uno de los permisos exigidos | Se deniega el acceso aunque posea los demás. |
 | Demo ejecuta CRUD derivado | El actor de prueba dispone de concesiones visibles por operación. |
 | Importe decimal recorre cliente, HTTP, mock y SQLite | Conserva su valor exacto sin pasar implícitamente por `number`. |
-| CEL evalúa reglas de `Periodo` e importe decimal | El prototipo permite evaluar expresividad y equivalencia sin presuponer adopción definitiva de CEL. |
+| CEL evalúa reglas de `Periodo` e importe decimal | Cliente y motor producen resultados equivalentes bajo el perfil adoptado y sus comparadores tipados; se rechaza sintaxis no admitida. |
 | Listar proyectos mediante offset y mediante continuation token | Ambas modalidades están disponibles y respetan los límites declarados. |
 | Una petición mezcla offset y continuation token | Se rechaza con error explícito. |
 | Un token no corresponde a la consulta, filtros u orden de la petición | Se rechaza; no se reinicia silenciosamente el listado. |
@@ -239,9 +239,9 @@ Duodécima ronda resuelta: modalidades declaradas por listado con un default, CR
 
 La entrevista de requisitos queda cerrada con la aprobación del conjunto por el usuario. La siguiente etapa es el diseño detallado de la primera entrega: shapes, firmas de funciones, nombres de propiedades, contratos HTTP y casos ejecutables. Estos artefactos todavía no están implementados ni validados.
 
-La investigación factual sobre representación, conformidad y expresiones está recogida a continuación. RDF, SHACL y Turtle están elegidos; CEL se evaluará mediante un prototipo antes de decidir su adopción definitiva.
+La investigación factual sobre representación, conformidad y expresiones está recogida a continuación. RDF, SHACL y Turtle están elegidos. Tras la evaluación del prototipo se aprueba el perfil CEL de la primera entrega recogido en el ADR; las rondas anteriores conservan el estado histórico de la entrevista.
 
-Trabajo de diseño detallado: prototipo de evaluación de CEL; formas léxicas y funciones de tipos; reglas automatizables del informe de compatibilidad; contratos HTTP y errores; materialización de las modalidades de paginación; ejemplo Turtle completo y pruebas de aceptación ejecutables.
+Trabajo de diseño detallado: incorporar el perfil CEL evaluado; formas léxicas y funciones de tipos; reglas automatizables del informe de compatibilidad; contratos HTTP y errores; materialización de las modalidades de paginación; ejemplo Turtle completo y pruebas de aceptación ejecutables.
 
 Ramas reservadas para entregas posteriores: concurrencia y persistencia avanzada; resultados externos inciertos; procesos duraderos, compensaciones e intervención humana; ejecución de proyecciones y queries complejas; editor visual; operación; conformidad entre motor e implementación asentada; continuidad durante el asentamiento.
 
@@ -250,8 +250,8 @@ Ramas reservadas para entregas posteriores: concurrencia y persistencia avanzada
 - RDF ofrece el modelo de grafo y Turtle la sintaxis elegida para las fuentes. [W3C Turtle](https://www.w3.org/TR/turtle/).
 - SHACL, ya elegido, permite validar grafos mediante shapes. SHACL 1.0 exige que los grafos permanezcan inmutables durante la validación; inferimos que el pipeline que transforma datos mediante normalizadores necesita semántica adicional. Tampoco define el ejecutor de escenarios mock. [W3C SHACL](https://www.w3.org/TR/shacl/#validation).
 - Las IRIs permiten referenciar los mismos elementos desde distintas fuentes. RDF no define la carga automática de documentos por referenciarlos; habrá que especificar qué fuentes se cargan y validan juntas. [W3C RDF Concepts](https://www.w3.org/TR/rdf11-concepts/#referents).
-- CEL es candidato para expresiones comprobables contra un entorno de tipos y funciones, no una definición del DSL completo. Sus extensiones y la integración de datos requieren decisiones del host; inferimos que la equivalencia entre motor, clientes y código generado necesitaría un perfil fijado y pruebas de conformidad. [Descripción de CEL](https://cel.dev/overview/cel-overview), [definición del lenguaje](https://github.com/cel-expr/cel-spec/blob/master/doc/langdef.md#extension-functions).
-- CEL no tiene decimal exacto nativo: sus números estándar son `int`, `uint` y `double`. Su prototipo de evaluación debe definir el soporte de decimal exacto, fecha civil e identificadores mediante mapeos o extensiones y comprobar su portabilidad. Se ha aceptado evaluarlo, no adoptarlo definitivamente. [Tipos numéricos](https://github.com/cel-expr/cel-spec/blob/master/doc/langdef.md#numeric-values), [tipos abstractos](https://github.com/cel-expr/cel-spec/blob/master/doc/langdef.md#abstract-types).
+- CEL permite expresiones comprobables contra un entorno de tipos y funciones; no define el DSL completo. El perfil adoptado fija las extensiones y los límites necesarios para la primera entrega, con evidencia compartida entre hosts. [Descripción de CEL](https://cel.dev/overview/cel-overview), [definición del lenguaje](https://github.com/cel-expr/cel-spec/blob/master/doc/langdef.md#extension-functions).
+- CEL no tiene decimal exacto nativo: sus números estándar son `int`, `uint` y `double`. El perfil adoptado representa decimal exacto, fecha e instante mediante tipos y funciones explícitos del host, conforme al ADR. [Tipos numéricos](https://github.com/cel-expr/cel-spec/blob/master/doc/langdef.md#numeric-values), [tipos abstractos](https://github.com/cel-expr/cel-spec/blob/master/doc/langdef.md#abstract-types).
 - ULID codifica 128 bits en 26 caracteres y admite lectura sin distinción de mayúsculas. Validarlo requiere comprobar también su rango, no solo longitud y alfabeto. Los prefijos por entidad y la forma textual normalizada serían convenciones del proyecto adicionales al formato ULID. [Especificación ULID](https://github.com/ulid/spec#specification), [desbordamiento](https://github.com/ulid/spec#overflow-errors-when-parsing-base32-strings).
 - Para implementaciones numéricas binary64, JSON identifica como interoperable el rango entero ±9 007 199 254 740 991 y permite límites de precisión por implementación. El perfil elegido restringe el entero inicial a ese rango y representa decimales exactos como cadenas. [RFC 8259, sección 6](https://www.rfc-editor.org/rfc/rfc8259#section-6).
 - RFC 3339 define fecha completa `YYYY-MM-DD` e instantes con desplazamiento o `Z`, con fracción de segundo opcional. El perfil elegido utiliza salida UTC con `Z` y precisión de milisegundos. [RFC 3339, sección 5.6](https://www.rfc-editor.org/rfc/rfc3339#section-5.6).
