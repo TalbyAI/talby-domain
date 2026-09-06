@@ -1,0 +1,1 @@
+{"name":"cel-portable-prototype","private":true,"type":"module","dependencies":{"@marcbachmann/cel-js":"8.0.0","re2-wasm":"1.0.2"}}
