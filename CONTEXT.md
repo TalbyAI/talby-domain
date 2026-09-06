@@ -82,6 +82,9 @@ Caso que selecciona una operación y condiciones de entrada para producir una re
 **Permiso**:
 Concesión nombrada que una operación puede exigir para permitir su ejecución. Se requieren todas las concesiones declaradas; el acceso anónimo es una alternativa explícita y excluyente, y omitir ambas alternativas deniega el acceso.
 
+**Error de negocio declarado**:
+Resultado de error que una operación declara que puede producir, con código único dentro de su módulo y una vista de datos opcional para sus detalles. Es distinto de los fallos del motor.
+
 **Modelo privado**:
 Extensión del modelo público, definida en la capa de negocio, con campos y reglas no expuestos públicamente y mappings explícitos donde ambos modelos difieren.
 

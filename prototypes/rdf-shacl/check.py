@@ -136,11 +136,11 @@ def main():
     case("La fuente semántica no contiene escenarios", False,
          add="d:WrongSource a m:Scenario .")
     case("Una query explícita admite un escenario", True,
-         add='d:FindProject a c:Query ; c:name "BuscarProyecto" ; c:uses [ a c:FieldUse ; c:field d:ProjectId ] ; c:result d:ApprovalResult .',
+         add='d:FindProject a c:Query ; c:parent d:Service ; c:name "BuscarProyecto" ; c:uses [ a c:FieldUse ; c:field d:ProjectId ] ; c:result d:ApprovalResult .',
          mock_remove=((S.ApproveKnownProject, M.operation, None),),
          mock_add="s:ApproveKnownProject m:operation d:FindProject .")
     case("Un escenario no sustituye una operación CRUD derivada", False,
-         add='d:CreateProject a c:Command, c:DerivedCrudOperation ; c:name "CrearProyecto" .',
+         add='d:CreateProject a c:Command, c:DerivedCrudOperation ; c:parent d:Service ; c:name "CrearProyecto" .',
          mock_remove=((S.ApproveKnownProject, M.operation, None),),
          mock_add="s:ApproveKnownProject m:operation d:CreateProject .")
     case("Una entidad no es una operación simulable", False,
@@ -183,7 +183,7 @@ def main():
     case("Un comando no admite dos resultados", False,
          add="d:ApproveProject c:result d:ProjectSummary .")
     case("Una query exige un resultado", False,
-         add='d:MissingResult a c:Query ; c:name "Consultar" .')
+         add='d:MissingResult a c:Query ; c:parent d:Service ; c:name "Consultar" .')
     case("El resultado debe referenciar un tipo declarado", False,
          remove=((D.ApproveProject, C.result, None),), add="d:ApproveProject c:result d:Missing .")
     case("Un evento tiene datos pero no resultado de operación", True,
@@ -218,6 +218,26 @@ def main():
          remove=((D.ApproveProject, C.requiresPermission, None),))
     case("Los permisos no son datos de un campo", False,
          add="d:Title c:requiresPermission d:ApprovePermission .")
+    case("Una operación necesita ubicación organizativa", False,
+         remove=((D.ApproveProject, C.parent, None),))
+    case("La ubicación organizativa es única", False,
+         add="d:Project c:parent d:Service .")
+    case("Un módulo no tiene padre", False, add="d:Service c:parent d:ProjectsFeature .")
+    case("Una entidad no es un padre organizativo", False,
+         remove=((D.ApproveProject, C.parent, None),), add="d:ApproveProject c:parent d:Project .")
+    case("Las features no forman ciclos", False,
+         remove=((D.ProjectsFeature, C.parent, None),),
+         add='d:ProjectsFeature c:parent d:OtherFeature . d:OtherFeature a c:Feature ; c:name "Otra" ; c:parent d:ProjectsFeature .')
+    case("Los códigos de error son únicos dentro del módulo", False,
+         add='d:DuplicateError a c:BusinessError ; c:module d:Service ; c:code "PROYECTO_NO_APROBABLE" .')
+    case("Dos módulos pueden usar el mismo código de error", True,
+         add='d:OtherModule a c:Module ; c:name "Otro" . d:OtherError a c:BusinessError ; c:module d:OtherModule ; c:code "PROYECTO_NO_APROBABLE" .')
+    case("Los detalles de un error son opcionales", True,
+         remove=((D.CannotApprove, C.detailsType, None),))
+    case("Los detalles deben referenciar una agrupación", False,
+         remove=((D.CannotApprove, C.detailsType, None),), add="d:CannotApprove c:detailsType c:Text .")
+    case("El error referenciado debe estar declarado", False,
+         add="d:ApproveProject c:errors d:Missing .")
 
     original = Graph().parse("semantic.ttl")
     # Conservación declarativa; la ejecución de las restricciones no forma parte de esta prueba.

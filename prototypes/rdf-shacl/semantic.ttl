@@ -2,6 +2,15 @@
 @prefix d: <urn:talby:prototype:declaration:> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 
+d:Service a c:Module ; c:name "GestionProyectos" .
+d:ProjectsFeature a c:Feature ; c:name "Proyectos" ; c:parent d:Service .
+d:Client c:parent d:Service .
+d:Project c:parent d:ProjectsFeature .
+d:ApproveProject c:parent d:ProjectsFeature ; c:errors d:CannotApprove .
+d:CannotApprove a c:BusinessError ; c:module d:Service ;
+    c:code "PROYECTO_NO_APROBABLE" ; c:detailsType d:RejectionDetails .
+d:RejectionDetails a c:FieldGroup ; c:name "DetalleRechazo" ; c:uses d:ProjectIdUse .
+
 d:Title rdfs:label "Título"@es ; rdfs:comment "Nombre público del cliente o proyecto."@es .
 
 # Tipos de ejemplo: la restricción heredada no se elimina al añadir otra.

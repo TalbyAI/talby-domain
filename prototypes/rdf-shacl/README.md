@@ -47,6 +47,10 @@ inspeccionarlos sin servidor, pero los cambios en Turtle se verifican ejecutando
   es excluyente con respuesta JSON y error.
 - Los permisos tienen IRI y nombre. `requiresPermission` exige todos los permisos referenciados;
   `allowAnonymous true` permite anonimato y no se combina con permisos. Omitir ambos deniega acceso.
+- Features, entidades, comandos y queries tienen un único `parent`, módulo o feature;
+  el módulo no tiene padre y la jerarquía no forma ciclos.
+- Los errores de negocio tienen IRI y código único dentro de un módulo. Pueden declarar
+  una agrupación para sus detalles; comandos y queries referencian los errores que pueden producir.
 
 ## Propuesta concreta de propiedades y cardinalidades
 
@@ -71,6 +75,10 @@ Los namespaces `example.org` son marcadores del prototipo, no una decisión de p
 | `Scenario` | `operation` 1, `when` 1, exactamente una de `responseJson` / `errorJson` / `success true` |
 | `Permission` | `name` 1 |
 | Acceso de comandos/queries | `requiresPermission` 0..N, `allowAnonymous` 0..1 booleano; true excluye permisos |
+| `Module` | `name` 1, `parent` prohibido |
+| `Feature`, `Entity`, `Command`, `Query` | `parent` 1, módulo o feature |
+| `BusinessError` | `module` 1, `code` 1, `detailsType` 0..1 agrupación |
+| Errores de comandos/queries | `errors` 0..N referencias a errores declarados |
 
 `Entity`, `Command`, `Query`, `Event` y `ReadModel` se representan aquí como especializaciones de
 `FieldGroup`; la jerarquía completa también está pendiente de revisión.
@@ -113,8 +121,12 @@ la cadena de bases conserva las referencias a restricciones; no se ejecuta su co
 Faltan la compatibilidad de cada restricción con el tipo base y la homogeneidad,
 canonicalización e intersección de los valores de enumeraciones conforme al perfil aprobado.
 
-No se definen todavía módulo/features, presencia/null,
-formato completo de identificadores, actores de prueba, errores declarados, metadatos de eventos, contratos completos de queries,
+Se comprueban la jerarquía organizativa y las declaraciones de errores; no se generan
+namespaces/rutas ni se verifica aún el código y los detalles de un JSON de error contra
+las declaraciones de la operación. El envoltorio HTTP corresponde a su ticket.
+
+No se definen todavía presencia/null,
+formato completo de identificadores, actores de prueba, metadatos de eventos, contratos completos de queries,
 CRUD, HTTP, SQLite ni el catálogo completo de restricciones. El ejemplo de entidad
 es deliberadamente incompleto; no constituye el caso de aceptación del servicio entero.
 Las shapes son abiertas: el script rechaza propiedades desconocidas, pero aún no se
