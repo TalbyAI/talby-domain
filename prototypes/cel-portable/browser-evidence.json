@@ -1,10 +1,10 @@
 {
   "status": "passed",
-  "cases": 219,
-  "casesSha256": "5df249e2240b907d5c25abb272d9f9104f2b4a89998706977709be76228da2b6",
+  "cases": 220,
+  "casesSha256": "0f677d601c76847958dc49b562998b510be440c0f1c650d2f161c80368c3ba79",
   "failures": [],
-  "elapsedMs": 52.5,
-  "startupAndRunMs": 91.70000004768372,
+  "elapsedMs": 55,
+  "startupAndRunMs": 93.29999995231628,
   "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/152.0.0.0 Safari/537.36",
   "requests": [
     "http://127.0.0.1:4178/no-wasm/index.html",

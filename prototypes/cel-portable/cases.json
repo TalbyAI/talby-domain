@@ -2780,6 +2780,26 @@
     }
   },
   {
+    "name": "host reject model non-array oneOf",
+    "fields": [
+      {
+        "name": "x",
+        "type": "string",
+        "rules": [
+          {
+            "oneOf": null
+          }
+        ]
+      }
+    ],
+    "input": {
+      "x": "a"
+    },
+    "expected": {
+      "status": "model-error"
+    }
+  },
+  {
     "name": "host two independent Periodo inclusions",
     "fields": [
       {

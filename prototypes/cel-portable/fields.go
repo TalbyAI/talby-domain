@@ -157,7 +157,11 @@ func validateFields(spec []fieldSpec, raw json.RawMessage, inputOrder []string) 
 			if choices, exists := r["oneOf"]; exists {
 				values := []any{}
 				seen := map[any]bool{}
-				for _, x := range choices.([]any) {
+				items, ok := choices.([]any)
+				if !ok {
+					return map[string]any{"status": "model-error"}
+				}
+				for _, x := range items {
 					v, e := normalize(f.Type, x)
 					if e != nil || seen[v] {
 						return map[string]any{"status": "model-error"}
@@ -211,12 +215,23 @@ func validateFields(spec []fieldSpec, raw json.RawMessage, inputOrder []string) 
 	keys := inputOrder
 	if keys == nil {
 		dec := json.NewDecoder(strings.NewReader(string(raw)))
-		dec.Token()
+		if _, err := dec.Token(); err != nil {
+			return map[string]any{"status": "validation-error", "value": value, "issues": []map[string]string{{"field": "", "rule": "type"}}}
+		}
 		for dec.More() {
-			k, _ := dec.Token()
-			keys = append(keys, k.(string))
+			token, err := dec.Token()
+			if err != nil {
+				return map[string]any{"status": "validation-error", "value": value, "issues": []map[string]string{{"field": "", "rule": "type"}}}
+			}
+			k, ok := token.(string)
+			if !ok {
+				return map[string]any{"status": "validation-error", "value": value, "issues": []map[string]string{{"field": "", "rule": "type"}}}
+			}
 			var ignored json.RawMessage
-			dec.Decode(&ignored)
+			if err := dec.Decode(&ignored); err != nil {
+				return map[string]any{"status": "validation-error", "value": value, "issues": []map[string]string{{"field": "", "rule": "type"}}}
+			}
+			keys = append(keys, k)
 		}
 	}
 	for _, k := range keys {

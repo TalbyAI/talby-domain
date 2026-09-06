@@ -76,6 +76,7 @@ host('independent errors',[{name:'a',type:'decimal'},{name:'b',type:'date'}],{a:
 host('unknown input',f('string'),{x:'a',extra:1},{x:'a'},[err('unknown','extra')]);
 host('unknown numeric input order',f('string'),{'10':'a','2':'b'},{},[err('unknown','10'),err('unknown','2')],['10','2']);
 cases.push({name:'host reject model length on integer',fields:f('integer',[{minLength:1,maxLength:2}]),input:{x:1},expected:{status:'model-error'}});
+cases.push({name:'host reject model non-array oneOf',fields:f('string',[{oneOf:null}]),input:{x:'a'},expected:{status:'model-error'}});
 const periods=[{name:'a',type:'period'},{name:'b',type:'period'}];
 const inputPeriods={a:{inicio:'2026-01-01',fin:'2026-02-01'},b:{inicio:'2026-03-01',fin:'2026-02-01'}};
 host('two independent Periodo inclusions',periods,inputPeriods,inputPeriods,[err('period','b.inicio'),err('period','b.fin')]);
