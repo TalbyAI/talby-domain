@@ -1,0 +1,182 @@
+@prefix c: <https://github.com/TalbyAI/talby-domain/vocab/contract#> .
+@prefix m: <https://github.com/TalbyAI/talby-domain/vocab/mocking#> .
+@prefix s: <https://github.com/TalbyAI/talby-domain/vocab/shapes#> .
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+# PROTOTIPO PARCIAL: check.py rechaza predicados desconocidos; las shapes aún son abiertas.
+s:Module a sh:NodeShape ; sh:targetClass c:Module ; sh:nodeKind sh:IRI ;
+    sh:property [ sh:path c:name ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ; sh:minLength 1 ],
+    [ sh:path c:parent ; sh:maxCount 0 ] .
+s:Organization a sh:NodeShape ; sh:targetClass c:Feature, c:Entity, c:Command, c:Query, c:Event, c:ReadModel ;
+    sh:nodeKind sh:IRI ;
+    sh:property [ sh:path c:name ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ; sh:minLength 1 ],
+    [ sh:path c:parent ; sh:minCount 1 ; sh:maxCount 1 ;
+        sh:or ( [ sh:class c:Module ] [ sh:class c:Feature ] ) ] ;
+    sh:sparql [ sh:message "Ciclo de jerarquía organizativa" ; sh:select """
+        PREFIX c: <https://github.com/TalbyAI/talby-domain/vocab/contract#>
+        SELECT $this WHERE { $this c:parent+ $this }
+    """ ] .
+s:BusinessError a sh:NodeShape ; sh:targetClass c:BusinessError ; sh:nodeKind sh:IRI ;
+    sh:property [ sh:path c:module ; sh:minCount 1 ; sh:maxCount 1 ; sh:class c:Module ],
+    [ sh:path c:code ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ; sh:minLength 1 ],
+    [ sh:path c:detailsType ; sh:maxCount 1 ; sh:class c:FieldGroup ] ;
+    sh:sparql [ sh:message "Código de error duplicado dentro del módulo" ; sh:select """
+        PREFIX c: <https://github.com/TalbyAI/talby-domain/vocab/contract#>
+        SELECT $this WHERE {
+            $this c:module ?module ; c:code ?code .
+            ?other a c:BusinessError ; c:module ?module ; c:code ?code .
+            FILTER($this != ?other)
+        }
+    """ ] .
+s:SiblingNames a sh:NodeShape ; sh:targetSubjectsOf c:parent ;
+    sh:sparql [ sh:message "Nombre duplicado entre elementos con el mismo padre" ; sh:select """
+        PREFIX c: <https://github.com/TalbyAI/talby-domain/vocab/contract#>
+        SELECT $this WHERE {
+            $this c:parent ?parent ; c:name ?name .
+            ?other c:parent ?parent ; c:name ?name . FILTER($this != ?other)
+        }
+    """ ] .
+s:OperationErrors a sh:NodeShape ; sh:targetSubjectsOf c:errors ;
+    sh:or ( [ sh:class c:Command ] [ sh:class c:Query ] ) ;
+    sh:property [ sh:path c:errors ; sh:class c:BusinessError ] .
+
+s:Field a sh:NodeShape ; sh:targetClass c:Field ; sh:nodeKind sh:IRI ;
+    sh:property [ sh:path c:name ; sh:minCount 1 ; sh:maxCount 1 ;
+        sh:datatype xsd:string ; sh:minLength 1 ],
+    [ sh:path c:valueType ; sh:minCount 1 ; sh:maxCount 1 ; sh:class c:Type ],
+    [ sh:path c:constraint ; sh:class c:Constraint ],
+    [ sh:path c:normalizers ; sh:maxCount 1 ; sh:nodeKind sh:BlankNodeOrIRI ],
+    [ sh:path ( c:normalizers [ sh:zeroOrMorePath rdf:rest ] rdf:first ) ;
+        sh:class c:Normalizer ] .
+
+s:FieldUse a sh:NodeShape ; sh:targetClass c:FieldUse ;
+    sh:nodeKind sh:BlankNodeOrIRI ;
+    sh:property [ sh:path c:field ; sh:minCount 1 ; sh:maxCount 1 ; sh:class c:Field ],
+    [ sh:path c:name ; sh:maxCount 1 ; sh:datatype xsd:string ; sh:minLength 1 ],
+    [ sh:path c:constraint ; sh:class c:Constraint ],
+    [ sh:path c:normalizers ; sh:maxCount 0 ] .
+
+s:Group a sh:NodeShape ; sh:targetClass c:FieldGroup ; sh:nodeKind sh:IRI ;
+    sh:property [ sh:path c:name ; sh:minCount 1 ; sh:maxCount 1 ;
+        sh:datatype xsd:string ; sh:minLength 1 ],
+    [ sh:path c:uses ; sh:class c:FieldUse ],
+    [ sh:path c:constraint ; sh:class c:Constraint ] ;
+    sh:sparql [ sh:message "Nombres efectivos duplicados en la agrupación" ;
+        sh:select """
+        PREFIX c: <https://github.com/TalbyAI/talby-domain/vocab/contract#>
+        SELECT $this WHERE {
+            $this c:uses ?left, ?right . FILTER(?left != ?right)
+            ?left c:field/c:name ?defaultLeft .
+            ?right c:field/c:name ?defaultRight .
+            OPTIONAL { ?left c:name ?localLeft }
+            OPTIONAL { ?right c:name ?localRight }
+            FILTER(COALESCE(?localLeft, ?defaultLeft) = COALESCE(?localRight, ?defaultRight))
+        }
+        """ ] .
+
+s:Type a sh:NodeShape ; sh:targetClass c:Type ; sh:nodeKind sh:IRI ;
+    sh:xone ( [ sh:class c:PrimitiveType ] [ sh:class c:ValueType ] [ sh:class c:FieldGroup ]
+        [ sh:class c:CollectionType ] [ sh:class c:EntityReference ] ) ;
+    sh:sparql [ sh:message "Ciclo de composición anidada" ; sh:select """
+        PREFIX c: <https://github.com/TalbyAI/talby-domain/vocab/contract#>
+        SELECT $this WHERE {
+            $this (c:uses/c:field/c:valueType|c:itemType|c:baseType)+ $this .
+        }
+    """ ] .
+
+s:Collection a sh:NodeShape ; sh:targetClass c:CollectionType ;
+    sh:property [ sh:path c:itemType ; sh:minCount 1 ; sh:maxCount 1 ; sh:class c:Type ],
+    [ sh:path c:itemNullable ; sh:maxCount 1 ; sh:datatype xsd:boolean ],
+    [ sh:path c:constraint ; sh:class c:Constraint ] .
+s:PresenceRule a sh:NodeShape ; sh:targetClass c:Required, c:Nullable ;
+    sh:property [ sh:path c:enabled ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:boolean ] .
+s:Reference a sh:NodeShape ; sh:targetClass c:EntityReference ;
+    sh:property [ sh:path c:targetEntity ; sh:minCount 1 ; sh:maxCount 1 ; sh:class c:Entity ] .
+s:ValueType a sh:NodeShape ; sh:targetClass c:ValueType ;
+    sh:property [ sh:path c:baseType ; sh:minCount 1 ; sh:maxCount 1 ;
+        sh:or ( [ sh:class c:PrimitiveType ] [ sh:class c:ValueType ] ) ],
+    [ sh:path c:constraint ; sh:class c:Constraint ] .
+s:OneOf a sh:NodeShape ; sh:targetClass c:OneOf ;
+    sh:property [ sh:path c:allowedValue ; sh:minCount 1 ; sh:nodeKind sh:Literal ] .
+s:Metadata a sh:NodeShape ; sh:targetSubjectsOf rdfs:label, rdfs:comment ;
+    sh:property [ sh:path rdfs:label ; sh:or ( [ sh:datatype xsd:string ] [ sh:datatype rdf:langString ] ) ],
+    [ sh:path rdfs:comment ; sh:or ( [ sh:datatype xsd:string ] [ sh:datatype rdf:langString ] ) ] .
+s:Constraint a sh:NodeShape ; sh:targetClass c:Constraint ; sh:nodeKind sh:IRI .
+s:Entity a sh:NodeShape ; sh:targetClass c:Entity ;
+    sh:property [ sh:path c:identifierUse ; sh:minCount 1 ; sh:maxCount 1 ; sh:class c:FieldUse ;
+        sh:node [ sh:property [ sh:path (c:field c:valueType [ sh:zeroOrMorePath c:baseType ]) ;
+            sh:hasValue c:Identifier ] ] ] ;
+    sh:sparql [ sh:message "El identificador debe ser un uso de la propia entidad" ; sh:select """
+        PREFIX c: <https://github.com/TalbyAI/talby-domain/vocab/contract#>
+        SELECT $this WHERE {
+            $this c:identifierUse ?use . FILTER NOT EXISTS { $this c:uses ?use }
+        }
+    """ ] .
+s:Command a sh:NodeShape ; sh:targetClass c:Command ;
+    sh:property [ sh:path c:result ; sh:maxCount 1 ; sh:class c:Type ] .
+s:Query a sh:NodeShape ; sh:targetClass c:Query ;
+    sh:property [ sh:path c:result ; sh:minCount 1 ; sh:maxCount 1 ; sh:class c:Type ] .
+s:Event a sh:NodeShape ; sh:targetClass c:Event ;
+    sh:property [ sh:path c:result ; sh:maxCount 0 ],
+    [ sh:path c:eventKind ; sh:minCount 1 ; sh:maxCount 1 ; sh:in (c:Domain c:Integration) ] .
+s:Permission a sh:NodeShape ; sh:targetClass c:Permission ; sh:nodeKind sh:IRI ;
+    sh:property [ sh:path c:name ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ; sh:minLength 1 ] .
+s:Access a sh:NodeShape ; sh:targetClass c:Command, c:Query ;
+    sh:targetSubjectsOf c:requiresPermission, c:allowAnonymous ;
+    sh:or ( [ sh:class c:Command ] [ sh:class c:Query ] ) ;
+    sh:property [ sh:path c:requiresPermission ; sh:class c:Permission ],
+    [ sh:path c:allowAnonymous ; sh:maxCount 1 ; sh:datatype xsd:boolean ] ;
+    sh:not [ sh:and (
+        [ sh:property [ sh:path c:allowAnonymous ; sh:hasValue true ] ]
+        [ sh:property [ sh:path c:requiresPermission ; sh:minCount 1 ] ]
+    ) ] .
+s:NonNegativeLimit a sh:NodeShape ; sh:targetClass c:MinLength, c:MaxLength, c:MinItems, c:MaxItems ;
+    sh:property [ sh:path c:limit ; sh:minCount 1 ; sh:maxCount 1 ;
+        sh:datatype xsd:integer ; sh:minInclusive 0 ] .
+s:Precision a sh:NodeShape ; sh:targetClass c:Precision ;
+    sh:property [ sh:path c:limit ; sh:minCount 1 ; sh:maxCount 1 ;
+        sh:datatype xsd:integer ; sh:minInclusive 1 ; sh:maxInclusive 4096 ] .
+s:Scale a sh:NodeShape ; sh:targetClass c:Scale ;
+    sh:property [ sh:path c:limit ; sh:minCount 1 ; sh:maxCount 1 ;
+        sh:datatype xsd:integer ; sh:minInclusive 0 ; sh:maxInclusive 4096 ] .
+s:Pattern a sh:NodeShape ; sh:targetClass c:Pattern ;
+    sh:property [ sh:path c:pattern ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ] .
+s:Affix a sh:NodeShape ; sh:targetClass c:Prefix, c:Suffix ;
+    sh:property [ sh:path c:text ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ] .
+s:Range a sh:NodeShape ; sh:targetClass c:Range ;
+    sh:property [ sh:path c:lower ; sh:maxCount 1 ; sh:node s:Bound ],
+    [ sh:path c:upper ; sh:maxCount 1 ; sh:node s:Bound ],
+    [ sh:path c:lowerInclusive ; sh:maxCount 1 ; sh:datatype xsd:boolean ],
+    [ sh:path c:upperInclusive ; sh:maxCount 1 ; sh:datatype xsd:boolean ] ;
+    sh:or ( [ sh:property [ sh:path c:lower ; sh:minCount 1 ] ]
+        [ sh:property [ sh:path c:upper ; sh:minCount 1 ] ] ) .
+s:Bound a sh:NodeShape ; sh:or ( [ sh:datatype xsd:integer ] [ sh:datatype xsd:decimal ]
+    [ sh:datatype xsd:date ] [ sh:datatype xsd:dateTime ] ) .
+s:Primitive a sh:NodeShape ; sh:targetClass c:PrimitiveType ;
+    sh:in (c:Text c:Boolean c:Integer c:Decimal c:Date c:Instant c:Identifier) .
+s:Assertion a sh:NodeShape ; sh:targetClass c:Assertion ;
+    sh:property [ sh:path c:expression ; sh:minCount 1 ; sh:maxCount 1 ;
+        sh:datatype xsd:string ; sh:minLength 1 ] .
+
+s:Scenario a sh:NodeShape ; sh:targetClass m:Scenario ; sh:nodeKind sh:IRI ;
+    sh:property [ sh:path m:operation ; sh:minCount 1 ; sh:maxCount 1 ;
+        sh:or ( [ sh:class c:Command ] [ sh:class c:Query ] ) ;
+        sh:not [ sh:class c:DerivedCrudOperation ] ],
+    [ sh:path m:when ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ; sh:minLength 1 ],
+    [ sh:path m:responseJson ; sh:maxCount 1 ; sh:datatype xsd:string ],
+    [ sh:path m:errorJson ; sh:maxCount 1 ; sh:datatype xsd:string ],
+    [ sh:path m:success ; sh:maxCount 1 ; sh:in (true) ] ;
+    sh:xone (
+        [ sh:property [ sh:path m:responseJson ; sh:minCount 1 ],
+            [ sh:path m:errorJson ; sh:maxCount 0 ], [ sh:path m:success ; sh:maxCount 0 ],
+            [ sh:path m:operation ; sh:node [ sh:property [ sh:path c:result ; sh:minCount 1 ] ] ] ]
+        [ sh:property [ sh:path m:errorJson ; sh:minCount 1 ],
+            [ sh:path m:responseJson ; sh:maxCount 0 ], [ sh:path m:success ; sh:maxCount 0 ] ]
+        [ sh:property [ sh:path m:success ; sh:minCount 1 ],
+            [ sh:path m:responseJson ; sh:maxCount 0 ], [ sh:path m:errorJson ; sh:maxCount 0 ],
+            [ sh:path m:operation ; sh:class c:Command ;
+                sh:node [ sh:property [ sh:path c:result ; sh:maxCount 0 ] ] ] ]
+    ) .

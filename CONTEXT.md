@@ -11,13 +11,13 @@ Transición de un servicio definido en el DSL a una implementación en un stack 
 Nivel que describe el modelo de datos público y sus reglas de validación estructural y normalización tal como los percibe un consumidor del servicio.
 
 **Vista de datos**:
-Agrupación de campos y de otras agrupaciones para describir un contrato, como un comando, un evento o un modelo de lectura. Los modelos de entrada pueden añadir validaciones que relacionen varios campos.
+Agrupación de usos de campo para describir un contrato, como un comando, un evento o un modelo de lectura, incluida la composición anidada de otras agrupaciones. Puede declarar reglas que combinen varios usos de campo.
 
 **Comando**:
-Especialización de una agrupación de campos con reglas, permisos, configuración API y referencias a resultados y errores. Sus metadatos describen el contrato y no forman parte de los datos enviados.
+Especialización de una agrupación de campos con reglas, permisos, configuración API y referencias a resultados y errores. Puede declarar un resultado u omitirlo para indicar que no devuelve datos. Sus metadatos describen el contrato y no forman parte de los datos enviados.
 
 **Query**:
-Agrupación especializada de parámetros para una consulta, con permisos, configuración API y un resultado asociado.
+Agrupación especializada de parámetros para una consulta, con permisos, configuración API y exactamente un resultado declarado.
 
 **Continuation token**:
 Valor opaco devuelto por un listado para continuar desde la última posición, vinculado a su consulta, filtros y orden. Se utiliza junto con un límite de resultados y no se combina con `offset`.
@@ -59,10 +59,31 @@ Datos RDF opcionales que enriquecen la simulación de operaciones conforme a una
 Identidad estable de un elemento de la especificación, independiente de su nombre y namespace. Permite reconocer el mismo elemento al reorganizarlo y rastrear sus representaciones derivadas.
 
 **Identificador de entidad**:
-Valor que identifica una instancia de entidad, sujeto a reglas del modelo sobre caracteres, longitud, prefijo y sufijo, sin quedar ligado a un generador concreto. Es distinto del identificador de la declaración que describe su tipo.
+Valor obligatorio y no nulo que identifica una instancia de entidad, sujeto a reglas del modelo sobre caracteres, longitud, prefijo y sufijo, sin quedar ligado a un generador concreto. Cada entidad señala un único uso de campo propio como identificador. Es distinto del identificador de la declaración que describe su tipo.
+
+**Campo**:
+Definición reutilizable de un dato, con nombre por defecto, tipo, normalizadores y restricciones originales. Su nombre se aplica a los usos que no declaran uno propio.
+
+**Uso de campo**:
+Declaración reutilizable que incorpora un campo a una o varias vistas de datos, con nombre opcional que sustituye al nombre por defecto en esos usos. Conserva la secuencia de normalizadores del campo sin añadir normalizadores locales y permite añadir restricciones sin sustituir ni debilitar las originales; un mismo campo puede tener varios usos en una misma vista o en vistas diferentes.
+
+**Referencia a entidad**:
+Tipo de dato cuyo valor identifica una instancia de la entidad destino, sin incorporar sus datos. Valida el tipo y formato de su identificador; la existencia del destino requiere una regla de negocio adicional.
+
+**Colección**:
+Tipo de dato que describe una lista ordenada de elementos de un tipo declarado. En los cambios parciales, una colección aportada sustituye la lista completa.
+
+**Tipo de valor**:
+Tipo escalar definido a partir de un primitivo u otro tipo de valor, conservando sus restricciones y añadiendo otras. Las cadenas de tipos base no forman ciclos; una enumeración es un tipo de valor con una restricción de pertenencia.
 
 **Escenario de mocking**:
-Caso que selecciona una operación y condiciones de entrada para producir una respuesta o error declarado. Forma parte de una fuente de mocking.
+Caso que selecciona una operación y condiciones de entrada para producir una respuesta, un error declarado o éxito sin datos para un comando sin resultado. Forma parte de una fuente de mocking.
+
+**Permiso**:
+Concesión nombrada que una operación puede exigir para permitir su ejecución. Se requieren todas las concesiones declaradas; el acceso anónimo es una alternativa explícita y excluyente, y omitir ambas alternativas deniega el acceso.
+
+**Error de negocio declarado**:
+Resultado de error que una operación declara que puede producir, con código único dentro de su módulo y una vista de datos opcional para sus detalles. Es distinto de los fallos del motor.
 
 **Modelo privado**:
 Extensión del modelo público, definida en la capa de negocio, con campos y reglas no expuestos públicamente y mappings explícitos donde ambos modelos difieren.

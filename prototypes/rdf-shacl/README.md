@@ -1,0 +1,186 @@
+# Prototipo desechable: vocabulario RDF y shapes SHACL
+
+Estado: **decisión de vocabulario aprobada por el usuario**; el prototipo es evidencia
+experimental parcial, no un cargador completo ni un motor de producción.
+Pregunta: ¿la estructura expresa campos reutilizables, usos compartidos o anónimos,
+composición anidada y fuentes de mocking separadas conforme a las decisiones acordadas?
+
+Ticket: [Concretar los vocabularios RDF y las shapes SHACL de la primera entrega](https://github.com/TalbyAI/talby-domain/issues/4).
+
+## Ejecutar
+
+Entrar primero en esta carpeta. Todos los comandos siguientes se ejecutan aquí:
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\python -m pip install -r requirements.txt
+.\.venv\Scripts\python check.py
+```
+
+Abrir `report.html` con doble clic. Contiene casos y grafos registrados: permite
+inspeccionarlos sin servidor, pero los cambios en Turtle se verifican ejecutando de nuevo el comando.
+`results/` y `.venv/` son locales y desechables. No hay dependencias de otros prototipos.
+
+## Decisiones que representa
+
+- IRIs estables independientes del nombre para declaraciones nombradas.
+- `Field`: nombre por defecto, un tipo, restricciones y secuencia de normalizadores.
+- `FieldUse`: referencia a un campo, nombre opcional y restricciones adicionales;
+  reutilizable entre agrupaciones, sin normalizadores locales.
+- Usos y restricciones sin orden semántico; normalizadores en una lista RDF.
+- Blank nodes admitidos para usos, incluso compartidos. La fuente canónica les asigna
+  IRIs que quedan guardadas; recargar esa fuente conserva identidad y reutilización.
+  Volver a generar desde el original anónimo no garantiza las mismas IRIs.
+- Nombres efectivos únicos dentro de cada agrupación; ejemplos de reglas sobre nombres locales.
+- Referencias y colecciones con tipos explícitos. Ciclos de composición prohibidos;
+  los ciclos mediante referencias a entidades están permitidos.
+- Mocking opcional separado, con condición CEL y una respuesta o error JSON fijo.
+- Escenarios para comandos y queries explícitos; CRUD conserva su comportamiento derivado.
+- Propiedades no reconocidas rechazadas. `rdfs:label` y `rdfs:comment` admiten texto,
+  con o sin idioma, en ambas fuentes; se conservan y no alteran el comportamiento.
+  Otras extensiones necesitan soporte explícito.
+- `ValueType` tiene una base primitiva o de otro tipo de valor y conserva sus restricciones.
+  No se admiten ciclos. Una enumeración añade una restricción `OneOf`.
+- Cada entidad designa un único uso propio como identificador, de tipo `Identifier`
+  o de un tipo de valor derivado. El identificador es obligatorio y no nulo.
+- Una query exige un resultado; un comando admite cero o uno. Un evento no declara resultado.
+- `success true` expresa éxito sin datos exclusivamente para comandos sin resultado;
+  es excluyente con respuesta JSON y error.
+- Los permisos tienen IRI y nombre. `requiresPermission` exige todos los permisos referenciados;
+  `allowAnonymous true` permite anonimato y no se combina con permisos. Omitir ambos deniega acceso.
+- Features, entidades, comandos y queries tienen un único `parent`, módulo o feature;
+  el módulo no tiene padre y la jerarquía no forma ciclos.
+- Los nombres son únicos entre elementos con el mismo `parent`, independientemente
+  de su clase. Pueden repetirse bajo padres diferentes.
+- Los campos afectados por una aserción se deducen de las referencias de su expresión
+  CEL, resueltas en la agrupación; no se exige una lista manual redundante.
+- Eventos y modelos de lectura también tienen `parent`. Cada evento declara
+  `eventKind` como dominio o integración; esto no ejecuta ni publica eventos.
+- El catálogo incluye mínimos/máximos de longitud y cardinalidad, rango, patrón,
+  precisión, escala, prefijo y sufijo, con parámetros tipados y restricciones con IRI.
+- Respuestas y errores JSON de mocking se guardan como `xsd:string` y se validan aparte.
+- Los errores de negocio tienen IRI y código único dentro de un módulo. Pueden declarar
+  una agrupación para sus detalles; comandos y queries referencian los errores que pueden producir.
+- El perfil aplica `required=true` y `nullable=false` al campo cuando no se declaran.
+  Las declaraciones del campo pueden seleccionar otros valores; un uso conserva las
+  restricciones del campo y solo añade restricciones acumulativas.
+- `itemNullable` es independiente de `nullable` del campo; su default es false.
+
+## Propiedades y cardinalidades aprobadas
+
+Los nombres, cardinalidades y bases de IRI han sido aprobados. La ubicación experimental
+de algunas comprobaciones en SHACL-SPARQL no obliga a utilizarlo en producción.
+Las bases de contrato, mocking y shapes son respectivamente
+`https://github.com/TalbyAI/talby-domain/vocab/contract#`,
+`https://github.com/TalbyAI/talby-domain/vocab/mocking#` y
+`https://github.com/TalbyAI/talby-domain/vocab/shapes#`.
+
+| Declaración | Propiedades |
+| --- | --- |
+| `Field` | `name` 1, `valueType` 1, `constraint` 0..N, `normalizers` 0..1 lista |
+| `FieldUse` | `field` 1, `name` 0..1, `constraint` 0..N; `normalizers` prohibido |
+| `FieldGroup` | `name` 1, `uses` 0..N, `constraint` 0..N |
+| `Entity` | `identifierUse` 1, incluido entre sus `uses` y de tipo identificador |
+| `Command` | `result` 0..1 |
+| `Query` | `result` 1 |
+| `Event` | `result` prohibido, `eventKind` 1: `Domain` o `Integration` |
+| `CollectionType` | `itemType` 1, `constraint` 0..N |
+| `EntityReference` | `targetEntity` 1 |
+| `ValueType` | `baseType` 1 escalar, `constraint` 0..N |
+| `OneOf` | `allowedValue` 1..N literales |
+| `Required`, `Nullable` | `enabled` 1 booleano; recursos de restricción con IRI |
+| Nulabilidad de colección | `itemNullable` 0..1 booleano en `CollectionType`, default false |
+| `MinLength`, `MaxLength`, `MinItems`, `MaxItems` | `limit` 1 entero no negativo |
+| `Precision`, `Scale` | `limit` 1 entero; precisión 1..4096, escala 0..4096 |
+| `Range` | `lower` / `upper` 0..1 cada uno, al menos uno; flags `lowerInclusive` / `upperInclusive` 0..1, default true |
+| `Pattern` | `pattern` 1 cadena |
+| `Prefix`, `Suffix` | `text` 1 cadena literal, puede estar vacía |
+| `Assertion` | `expression` 1 cadena CEL no vacía |
+| `Scenario` | `operation` 1, `when` 1, exactamente una de `responseJson` / `errorJson` / `success true` |
+| `Permission` | `name` 1 |
+| Acceso de comandos/queries | `requiresPermission` 0..N, `allowAnonymous` 0..1 booleano; true excluye permisos |
+| `Module` | `name` 1, `parent` prohibido |
+| `Feature`, `Entity`, `Command`, `Query`, `Event`, `ReadModel` | `parent` 1, módulo o feature |
+| `BusinessError` | `module` 1, `code` 1, `detailsType` 0..1 agrupación |
+| Errores de comandos/queries | `errors` 0..N referencias a errores declarados |
+
+`Command`, `Query`, `Event` y `ReadModel` especializan `FieldGroup` conforme a la
+especificación aprobada. El prototipo representa también `Entity` como agrupación de datos
+con un identificador designado.
+Los JSON se transportan como literales `xsd:string`, conforme a la decisión aprobada.
+Los extremos de rango se declaran como literales RDF `xsd:integer`, `xsd:decimal`,
+`xsd:date` o `xsd:dateTime`; esto no cambia sus representaciones HTTP/JSON.
+Las shapes admiten referencias a comandos y queries explícitos. `DerivedCrudOperation`
+es un marcador experimental usado para comprobar la exclusión de CRUD, incluso cuando
+la operación también está tipada como comando; no decide la representación de los contratos
+derivados, que corresponde al ticket del modelo efectivo. No se ejecuta SQLite en esta prueba.
+
+## Qué comprueba y qué no
+
+Las shapes comprueban tipos RDF, presencia/cardinalidad de las propiedades anteriores,
+referencias declaradas, nombres efectivos duplicados y ciclos de composición.
+Algunas shapes usan SHACL-SPARQL para estos casos y la pertenencia del identificador. Es una ubicación experimental:
+no obliga a usar SPARQL en el verificador de producción. El script comprueba además
+separación de fuentes, propiedades desconocidas, listas de normalizadores bien formadas y sintaxis JSON.
+
+El paso canónico sustituye únicamente blank nodes tipados `FieldUse`; las celdas
+auxiliares de listas RDF siguen siendo anónimas. No es canonicalización de grafos
+para hashing ni un algoritmo de identidad por contenido. La identidad exige conservar
+el artefacto producido, sin sobrescribir el original.
+La salida canónica del experimento usa [N-Triples](https://www.w3.org/TR/n-triples/), un subconjunto de Turtle,
+para conservar los literales: el serializador Turtle abreviado de la biblioteca
+reescribía `"0"^^xsd:decimal` como `0.0`. La prueba verifica isomorfismo tras recargar.
+
+No se evalúa CEL ni se verifica todavía su entorno de nombres, funciones o tipos.
+La deducción de campos afectados está acordada, pero no se implementa en este prototipo:
+requiere el árbol de la expresión comprobada, no una extracción por expresiones regulares.
+No se ejecuta normalización ni se comprueba la acumulación general de restricciones
+o la validez de datos `Periodo`. Las dos restricciones de longitud de título se conservan en el grafo,
+pero aún no se ejecutan sobre un payload.
+Se analiza JSON, **no se valida todavía contra el resultado o error de la operación**.
+Tampoco se ejecutan condiciones ni los casos de cero/una/varias coincidencias.
+Se comprueba que `success true` solo se aplica a un comando sin resultado y que este no
+declara una respuesta JSON. No se traduce todavía a HTTP.
+Las reglas de acceso se comprueban estructuralmente; no se ejecuta autorización de actores,
+incluida la denegación por defecto y la exigencia de todos los permisos.
+Un experimento adicional comprueba presencia/null en un campo y null de los elementos
+directos de una colección. Calcula los defaults del campo, acumula restricciones de su uso
+y aplica la obligatoriedad/no nulabilidad del identificador únicamente en el contexto de
+la entidad. Se comprueba que reutilizar ese uso fuera de la entidad no le impone esas
+invariantes contextuales. Una regla local neutral no anula una restricción heredada.
+No es un validador completo de payloads: no comprueba tipos ni colecciones anidadas,
+no ejecuta PATCH y no materializa el modelo efectivo completo. Los defaults deberán
+ser visibles en ese modelo conforme a la decisión aprobada.
+
+Los tipos de valor y las enumeraciones se comprueban estructuralmente. Se verifica que
+la cadena de bases conserva las referencias a restricciones; no se ejecuta su conjunción.
+Faltan la compatibilidad de cada restricción con el tipo base y la homogeneidad,
+canonicalización e intersección de los valores de enumeraciones conforme al perfil aprobado.
+
+Se comprueban la jerarquía organizativa y las declaraciones de errores; no se generan
+namespaces/rutas ni se verifica aún el código y los detalles de un JSON de error contra
+las declaraciones de la operación. El envoltorio HTTP corresponde a su ticket.
+
+El vocabulario representa el catálogo de restricciones acordado, pero no ejecuta su
+semántica completa. En particular, las shapes de rango no comparan extremos ni verifican
+su correspondencia con el tipo de uso; las de patrón no validan su subconjunto portable;
+los prefijos/sufijos no comprueban todavía alfabeto, solapamiento ni satisfacibilidad.
+El perfil de identificador conserva ASCII, longitud 1..128 por defecto, prefijo explícito
+(puede ser vacío) y sufijo vacío por defecto, conforme al anexo léxico aprobado.
+
+No se definen todavía actores de prueba, contratos CRUD efectivos, HTTP ni SQLite.
+El ejemplo no constituye el caso de aceptación ejecutable del servicio entero.
+Las shapes son abiertas: el script rechaza propiedades desconocidas, pero aún no se
+detectan todas las propiedades conocidas fuera de lugar.
+
+La decisión conjunta de nombres, tipos literales y responsabilidades está en
+[`review.md`](review.md). Su aprobación no implica considerar implementadas las comprobaciones pendientes.
+
+## Fuentes técnicas
+
+- [SHACL, W3C](https://www.w3.org/TR/shacl/): formas estructurales y restricciones SPARQL.
+- [RDF 1.1: sustitución de blank nodes por IRIs](https://www.w3.org/TR/rdf11-concepts/#section-skolemization).
+- [pySHACL](https://github.com/RDFLib/pySHACL): validador usado únicamente en este prototipo.
+
+La forma de autoría, las cardinalidades y las políticas del contrato son
+elecciones de este proyecto, no requisitos impuestos por estos estándares.
