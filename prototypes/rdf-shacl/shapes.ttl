@@ -81,6 +81,17 @@ s:Query a sh:NodeShape ; sh:targetClass c:Query ;
     sh:property [ sh:path c:result ; sh:minCount 1 ; sh:maxCount 1 ; sh:class c:Type ] .
 s:Event a sh:NodeShape ; sh:targetClass c:Event ;
     sh:property [ sh:path c:result ; sh:maxCount 0 ] .
+s:Permission a sh:NodeShape ; sh:targetClass c:Permission ; sh:nodeKind sh:IRI ;
+    sh:property [ sh:path c:name ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ; sh:minLength 1 ] .
+s:Access a sh:NodeShape ; sh:targetClass c:Command, c:Query ;
+    sh:targetSubjectsOf c:requiresPermission, c:allowAnonymous ;
+    sh:or ( [ sh:class c:Command ] [ sh:class c:Query ] ) ;
+    sh:property [ sh:path c:requiresPermission ; sh:class c:Permission ],
+    [ sh:path c:allowAnonymous ; sh:maxCount 1 ; sh:datatype xsd:boolean ] ;
+    sh:not [ sh:and (
+        [ sh:property [ sh:path c:allowAnonymous ; sh:hasValue true ] ]
+        [ sh:property [ sh:path c:requiresPermission ; sh:minCount 1 ] ]
+    ) ] .
 s:MaxLength a sh:NodeShape ; sh:targetClass c:MaxLength ;
     sh:property [ sh:path c:limit ; sh:minCount 1 ; sh:maxCount 1 ;
         sh:datatype xsd:integer ; sh:minInclusive 0 ] .
@@ -94,8 +105,16 @@ s:Scenario a sh:NodeShape ; sh:targetClass m:Scenario ; sh:nodeKind sh:IRI ;
         sh:not [ sh:class c:DerivedCrudOperation ] ],
     [ sh:path m:when ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ; sh:minLength 1 ],
     [ sh:path m:responseJson ; sh:maxCount 1 ; sh:datatype xsd:string ],
-    [ sh:path m:errorJson ; sh:maxCount 1 ; sh:datatype xsd:string ] ;
+    [ sh:path m:errorJson ; sh:maxCount 1 ; sh:datatype xsd:string ],
+    [ sh:path m:success ; sh:maxCount 1 ; sh:in (true) ] ;
     sh:xone (
-        [ sh:property [ sh:path m:responseJson ; sh:minCount 1 ], [ sh:path m:errorJson ; sh:maxCount 0 ] ]
-        [ sh:property [ sh:path m:errorJson ; sh:minCount 1 ], [ sh:path m:responseJson ; sh:maxCount 0 ] ]
+        [ sh:property [ sh:path m:responseJson ; sh:minCount 1 ],
+            [ sh:path m:errorJson ; sh:maxCount 0 ], [ sh:path m:success ; sh:maxCount 0 ],
+            [ sh:path m:operation ; sh:node [ sh:property [ sh:path c:result ; sh:minCount 1 ] ] ] ]
+        [ sh:property [ sh:path m:errorJson ; sh:minCount 1 ],
+            [ sh:path m:responseJson ; sh:maxCount 0 ], [ sh:path m:success ; sh:maxCount 0 ] ]
+        [ sh:property [ sh:path m:success ; sh:minCount 1 ],
+            [ sh:path m:responseJson ; sh:maxCount 0 ], [ sh:path m:errorJson ; sh:maxCount 0 ],
+            [ sh:path m:operation ; sh:class c:Command ;
+                sh:node [ sh:property [ sh:path c:result ; sh:maxCount 0 ] ] ] ]
     ) .

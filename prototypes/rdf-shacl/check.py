@@ -190,6 +190,34 @@ def main():
          add='d:ApprovedEvent a c:Event ; c:name "ProyectoAprobado" ; c:uses d:ProjectIdUse .')
     case("Un evento no admite resultado de operación", False,
          add='d:ApprovedEvent a c:Event ; c:name "ProyectoAprobado" ; c:result d:ApprovalResult .')
+    case("Un comando sin resultado admite éxito sin datos", True,
+         remove=((D.ApproveProject, C.result, None),),
+         mock_remove=((S.ApproveKnownProject, M.responseJson, None),),
+         mock_add="s:ApproveKnownProject m:success true .")
+    case("Éxito sin datos no satisface un resultado declarado", False,
+         mock_remove=((S.ApproveKnownProject, M.responseJson, None),),
+         mock_add="s:ApproveKnownProject m:success true .")
+    case("Éxito sin datos y respuesta JSON son excluyentes", False,
+         mock_add="s:ApproveKnownProject m:success true .")
+    case("success false no es un resultado de escenario", False,
+         remove=((D.ApproveProject, C.result, None),),
+         mock_remove=((S.ApproveKnownProject, M.responseJson, None),),
+         mock_add="s:ApproveKnownProject m:success false .")
+    case("Un comando sin resultado no devuelve JSON", False,
+         remove=((D.ApproveProject, C.result, None),))
+    case("Acceso anónimo explícito sin permisos requeridos", True,
+         remove=((D.ApproveProject, C.requiresPermission, None),),
+         add="d:ApproveProject c:allowAnonymous true .")
+    case("Acceso anónimo y permisos requeridos son excluyentes", False,
+         add="d:ApproveProject c:allowAnonymous true .")
+    case("El permiso requerido debe estar declarado", False,
+         add="d:ApproveProject c:requiresPermission d:Missing .")
+    case("Una operación puede declarar varios permisos requeridos", True,
+         add='d:ReadPermission a c:Permission ; c:name "leerProyecto" . d:ApproveProject c:requiresPermission d:ReadPermission .')
+    case("Omitir acceso es una declaración válida con denegación por defecto", True,
+         remove=((D.ApproveProject, C.requiresPermission, None),))
+    case("Los permisos no son datos de un campo", False,
+         add="d:Title c:requiresPermission d:ApprovePermission .")
 
     original = Graph().parse("semantic.ttl")
     # Conservación declarativa; la ejecución de las restricciones no forma parte de esta prueba.

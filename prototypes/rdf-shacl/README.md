@@ -43,6 +43,10 @@ inspeccionarlos sin servidor, pero los cambios en Turtle se verifican ejecutando
 - Cada entidad designa un único uso propio como identificador, de tipo `Identifier`
   o de un tipo de valor derivado. El identificador es obligatorio y no nulo.
 - Una query exige un resultado; un comando admite cero o uno. Un evento no declara resultado.
+- `success true` expresa éxito sin datos exclusivamente para comandos sin resultado;
+  es excluyente con respuesta JSON y error.
+- Los permisos tienen IRI y nombre. `requiresPermission` exige todos los permisos referenciados;
+  `allowAnonymous true` permite anonimato y no se combina con permisos. Omitir ambos deniega acceso.
 
 ## Propuesta concreta de propiedades y cardinalidades
 
@@ -64,7 +68,9 @@ Los namespaces `example.org` son marcadores del prototipo, no una decisión de p
 | `OneOf` | `allowedValue` 1..N literales |
 | `MaxLength` | `limit` 1 entero no negativo |
 | `Assertion` | `expression` 1 cadena CEL no vacía |
-| `Scenario` | `operation` 1, `when` 1, exactamente una de `responseJson` / `errorJson` |
+| `Scenario` | `operation` 1, `when` 1, exactamente una de `responseJson` / `errorJson` / `success true` |
+| `Permission` | `name` 1 |
+| Acceso de comandos/queries | `requiresPermission` 0..N, `allowAnonymous` 0..1 booleano; true excluye permisos |
 
 `Entity`, `Command`, `Query`, `Event` y `ReadModel` se representan aquí como especializaciones de
 `FieldGroup`; la jerarquía completa también está pendiente de revisión.
@@ -93,7 +99,10 @@ o la validez de datos `Periodo`. Las dos restricciones de título se conservan e
 pero aún no se ejecutan sobre un payload.
 Se analiza JSON, **no se valida todavía contra el resultado o error de la operación**.
 Tampoco se ejecutan condiciones ni los casos de cero/una/varias coincidencias.
-Está pendiente concretar cómo expresa un escenario el éxito de un comando sin datos de resultado.
+Se comprueba que `success true` solo se aplica a un comando sin resultado y que este no
+declara una respuesta JSON. No se traduce todavía a HTTP.
+Las reglas de acceso se comprueban estructuralmente; no se ejecuta autorización de actores,
+incluida la denegación por defecto y la exigencia de todos los permisos.
 La obligatoriedad y no nulabilidad del identificador son invariantes aprobados del contrato;
 el prototipo comprueba su designación y tipo, no valida todavía presencia/null en payloads
 ni contradicciones con restricciones explícitas de presencia. Su exposición en el modelo
@@ -105,7 +114,7 @@ Faltan la compatibilidad de cada restricción con el tipo base y la homogeneidad
 canonicalización e intersección de los valores de enumeraciones conforme al perfil aprobado.
 
 No se definen todavía módulo/features, presencia/null,
-formato completo de identificadores, permisos, errores declarados, metadatos de eventos, contratos completos de queries,
+formato completo de identificadores, actores de prueba, errores declarados, metadatos de eventos, contratos completos de queries,
 CRUD, HTTP, SQLite ni el catálogo completo de restricciones. El ejemplo de entidad
 es deliberadamente incompleto; no constituye el caso de aceptación del servicio entero.
 Las shapes son abiertas: el script rechaza propiedades desconocidas, pero aún no se

@@ -77,7 +77,10 @@ Tipo de dato que describe una lista ordenada de elementos de un tipo declarado. 
 Tipo escalar definido a partir de un primitivo u otro tipo de valor, conservando sus restricciones y añadiendo otras. Las cadenas de tipos base no forman ciclos; una enumeración es un tipo de valor con una restricción de pertenencia.
 
 **Escenario de mocking**:
-Caso que selecciona una operación y condiciones de entrada para producir una respuesta o error declarado. Forma parte de una fuente de mocking.
+Caso que selecciona una operación y condiciones de entrada para producir una respuesta, un error declarado o éxito sin datos para un comando sin resultado. Forma parte de una fuente de mocking.
+
+**Permiso**:
+Concesión nombrada que una operación puede exigir para permitir su ejecución. Se requieren todas las concesiones declaradas; el acceso anónimo es una alternativa explícita y excluyente, y omitir ambas alternativas deniega el acceso.
 
 **Modelo privado**:
 Extensión del modelo público, definida en la capa de negocio, con campos y reglas no expuestos públicamente y mappings explícitos donde ambos modelos difieren.

@@ -55,7 +55,9 @@ _:amount a c:FieldUse ; c:field d:Amount .
 d:ProjectSummary a c:ReadModel ; c:name "ResumenProyecto" ; c:uses _:amount .
 d:ProjectId a c:Field ; c:name "proyectoId" ; c:valueType c:Identifier .
 d:ApproveProject a c:Command ; c:name "AprobarProyecto" ;
-    c:uses [ a c:FieldUse ; c:field d:ProjectId ] ; c:result d:ApprovalResult .
+    c:uses [ a c:FieldUse ; c:field d:ProjectId ] ; c:result d:ApprovalResult ;
+    c:requiresPermission d:ApprovePermission .
+d:ApprovePermission a c:Permission ; c:name "aprobarProyecto" .
 d:Approved a c:Field ; c:name "aprobado" ; c:valueType c:Boolean .
 d:ApprovalResult a c:ReadModel ; c:name "ResultadoAprobacion" ;
     c:uses [ a c:FieldUse ; c:field d:ProjectId ],

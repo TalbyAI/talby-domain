@@ -19,6 +19,7 @@ c:CollectionType a rdfs:Class ; rdfs:subClassOf c:Type .
 c:EntityReference a rdfs:Class ; rdfs:subClassOf c:Type .
 c:Field a rdfs:Class .
 c:FieldUse a rdfs:Class .
+c:Permission a rdfs:Class .
 c:Constraint a rdfs:Class .
 c:MaxLength a rdfs:Class ; rdfs:subClassOf c:Constraint .
 c:OneOf a rdfs:Class ; rdfs:subClassOf c:Constraint .
@@ -46,9 +47,12 @@ c:limit a rdf:Property .
 c:expression a rdf:Property .
 c:result a rdf:Property .
 c:identifierUse a rdf:Property .
+c:requiresPermission a rdf:Property .
+c:allowAnonymous a rdf:Property .
 m:operation a rdf:Property .
 m:when a rdf:Property .
 m:responseJson a rdf:Property .
 m:errorJson a rdf:Property .
+m:success a rdf:Property .
 rdfs:label a rdf:Property .
 rdfs:comment a rdf:Property .
