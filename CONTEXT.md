@@ -73,6 +73,9 @@ Tipo de dato cuyo valor identifica una instancia de la entidad destino, sin inco
 **Colección**:
 Tipo de dato que describe una lista ordenada de elementos de un tipo declarado. En los cambios parciales, una colección aportada sustituye la lista completa.
 
+**Tipo de valor**:
+Tipo escalar definido a partir de un primitivo u otro tipo de valor, conservando sus restricciones y añadiendo otras. Las cadenas de tipos base no forman ciclos; una enumeración es un tipo de valor con una restricción de pertenencia.
+
 **Escenario de mocking**:
 Caso que selecciona una operación y condiciones de entrada para producir una respuesta o error declarado. Forma parte de una fuente de mocking.
 

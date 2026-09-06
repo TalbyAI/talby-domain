@@ -1,5 +1,14 @@
 @prefix c: <https://example.org/talby/contract#> .
 @prefix d: <urn:talby:prototype:declaration:> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+d:Title rdfs:label "Título"@es ; rdfs:comment "Nombre público del cliente o proyecto."@es .
+
+# Tipos de ejemplo: la restricción heredada no se elimina al añadir otra.
+d:ShortText a c:ValueType ; c:baseType c:Text ; c:constraint d:Title100 .
+d:CompactText a c:ValueType ; c:baseType d:ShortText ; c:constraint d:Title60 .
+d:Status a c:ValueType ; c:baseType c:Text ; c:constraint d:StatusValues .
+d:StatusValues a c:OneOf ; c:allowedValue "borrador", "aprobado" .
 
 # IRIs de muestra fijas: no se regeneran al cambiar c:name o la agrupación.
 d:Title a c:Field ; c:name "titulo" ; c:valueType c:Text ;

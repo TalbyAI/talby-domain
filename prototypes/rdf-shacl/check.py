@@ -5,7 +5,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from pyshacl import validate
-from rdflib import BNode, Graph, Namespace, RDF, URIRef
+from rdflib import BNode, Graph, Namespace, RDF, RDFS, URIRef
 from rdflib.compare import isomorphic
 
 C = Namespace("https://example.org/talby/contract#")
@@ -150,8 +150,29 @@ def main():
     case("Propiedad desconocida de mocking", False, mock_add="s:ApproveKnownProject m:priority 1 .")
     case("Un vocabulario externo no habilita propiedades por sí solo", False,
          add='d:Title <https://example.org/extension#rule> "ignorar" .')
+    case("Metadatos descriptivos en ambas fuentes", True,
+         add=f'd:Title <{RDFS.label}> "Title"@en .',
+         mock_add=f's:ApproveKnownProject <{RDFS.comment}> "Caso de demostración"@es .')
+    case("Una etiqueta descriptiva no puede ser un recurso", False,
+         add=f'd:Title <{RDFS.label}> d:Project .')
+    case("Un campo puede usar un tipo de valor derivado", True,
+         remove=((D.Title, C.valueType, None),), add="d:Title c:valueType d:CompactText .")
+    case("Ciclo indirecto entre tipos de valor", False,
+         remove=((D.ShortText, C.baseType, None),), add="d:ShortText c:baseType d:CompactText .")
+    case("El tipo base de un tipo de valor debe ser escalar", False,
+         remove=((D.ShortText, C.baseType, None),), add="d:ShortText c:baseType d:Project .")
+    case("Un tipo de valor declara exactamente una base", False,
+         add="d:ShortText c:baseType c:Decimal .")
+    case("Una enumeración no puede estar vacía", False,
+         remove=((D.StatusValues, C.allowedValue, None),))
+    case("Los miembros de una enumeración son literales", False,
+         add="d:StatusValues c:allowedValue d:Project .")
 
     original = Graph().parse("semantic.ttl")
+    # Conservación declarativa; la ejecución de las restricciones no forma parte de esta prueba.
+    inherited = {row.rule for row in original.query(
+        f"SELECT ?rule WHERE {{ <{D.CompactText}> <{C.baseType}>*/<{C.constraint}> ?rule }}")}
+    assert inherited == {D.Title100, D.Title60}
     assert len(list(original.subjects(C.uses, D.TitleUse))) == 2
     shared = next(node for node in original.subjects(RDF.type, C.FieldUse)
                   if isinstance(node, BNode) and len(list(original.subjects(C.uses, node))) == 2)

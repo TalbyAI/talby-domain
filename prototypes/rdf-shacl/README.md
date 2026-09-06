@@ -35,8 +35,11 @@ inspeccionarlos sin servidor, pero los cambios en Turtle se verifican ejecutando
   los ciclos mediante referencias a entidades están permitidos.
 - Mocking opcional separado, con condición CEL y una respuesta o error JSON fijo.
 - Escenarios para comandos y queries explícitos; CRUD conserva su comportamiento derivado.
-- Propiedades no reconocidas rechazadas. Los puntos explícitos de extensión para metadatos
-  están aprobados como política, pero su forma RDF sigue pendiente; aún no se admiten en este borrador.
+- Propiedades no reconocidas rechazadas. `rdfs:label` y `rdfs:comment` admiten texto,
+  con o sin idioma, en ambas fuentes; se conservan y no alteran el comportamiento.
+  Otras extensiones necesitan soporte explícito.
+- `ValueType` tiene una base primitiva o de otro tipo de valor y conserva sus restricciones.
+  No se admiten ciclos. Una enumeración añade una restricción `OneOf`.
 
 ## Propuesta concreta de propiedades y cardinalidades
 
@@ -50,6 +53,8 @@ Los namespaces `example.org` son marcadores del prototipo, no una decisión de p
 | `FieldGroup` | `name` 1, `uses` 0..N, `constraint` 0..N |
 | `CollectionType` | `itemType` 1 |
 | `EntityReference` | `targetEntity` 1 |
+| `ValueType` | `baseType` 1 escalar, `constraint` 0..N |
+| `OneOf` | `allowedValue` 1..N literales |
 | `MaxLength` | `limit` 1 entero no negativo |
 | `Assertion` | `expression` 1 cadena CEL no vacía |
 | `Scenario` | `operation` 1, `when` 1, exactamente una de `responseJson` / `errorJson` |
@@ -82,13 +87,17 @@ pero aún no se ejecutan sobre un payload.
 Se analiza JSON, **no se valida todavía contra el resultado o error de la operación**.
 Tampoco se ejecutan condiciones ni los casos de cero/una/varias coincidencias.
 
-No se definen todavía módulo/features, tipos de valor, enumeraciones, presencia/null,
+Los tipos de valor y las enumeraciones se comprueban estructuralmente. Se verifica que
+la cadena de bases conserva las referencias a restricciones; no se ejecuta su conjunción.
+Faltan la compatibilidad de cada restricción con el tipo base y la homogeneidad,
+canonicalización e intersección de los valores de enumeraciones conforme al perfil aprobado.
+
+No se definen todavía módulo/features, presencia/null,
 identificadores de entidad completos, permisos, errores declarados, eventos, contratos completos de queries,
 CRUD, HTTP, SQLite ni el catálogo completo de restricciones. El ejemplo de entidad
 es deliberadamente incompleto; no constituye el caso de aceptación del servicio entero.
 Las shapes son abiertas: el script rechaza propiedades desconocidas, pero aún no se
-detectan todas las propiedades conocidas fuera de lugar. La representación de los puntos
-de extensión debe concretarse antes de considerar completo el vocabulario.
+detectan todas las propiedades conocidas fuera de lugar.
 
 ## Fuentes técnicas
 
