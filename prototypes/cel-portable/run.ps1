@@ -7,7 +7,7 @@ try {
     $env:GOCACHE = Join-Path $PSScriptRoot '.cache/go-build'
     node cases.mjs
     if ($LASTEXITCODE) { throw 'No se pudieron generar los casos.' }
-    node probe.ts
+    node node.mjs
     if ($LASTEXITCODE) { throw 'Falló TypeScript.' }
     go run .
     if ($LASTEXITCODE) { throw 'Falló Go.' }

@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/common/types"
@@ -100,6 +101,7 @@ func date(v ref.Val) ref.Val {
 func main() {
 	dec, day, inst := cel.OpaqueType("Decimal"), cel.OpaqueType("CivilDate"), cel.OpaqueType("Instant")
 	env, err := cel.NewEnv(
+		cel.ParserExpressionSizeLimit(65536), cel.ParserRecursionLimit(64),
 		cel.Variable("m", cel.MapType(cel.StringType, cel.DynType)),
 		cel.Function("instant", cel.Overload("instant_string", []*cel.Type{cel.StringType}, inst, cel.UnaryBinding(instant))),
 		cel.Function("instantCanon", cel.Overload("instant_canon", []*cel.Type{inst}, cel.StringType, cel.UnaryBinding(func(v ref.Val) ref.Val { return types.String(v.(scalar).value) }))),
@@ -134,7 +136,15 @@ func main() {
 		}))),
 		cel.Function("compareDate", cel.Overload("compare_date", []*cel.Type{day, day}, cel.IntType, cel.BinaryBinding(func(a, b ref.Val) ref.Val { return types.Int(strings.Compare(a.(scalar).value, b.(scalar).value)) }))),
 		cel.Function("fullMatch", cel.Overload("full_match", []*cel.Type{cel.StringType, cel.StringType}, cel.BoolType, cel.BinaryBinding(func(a, b ref.Val) ref.Val {
-			r, e := regexp.Compile(`\A(?:` + string(b.(types.String)) + `)\z`)
+			text := string(a.(types.String))
+			if !utf8.ValidString(text) || utf8.RuneCountInString(text) > 65536 {
+				return types.NewErr("text-limit-or-unicode")
+			}
+			compiled, e := pattern(string(b.(types.String)))
+			if e != nil {
+				return types.NewErr("pattern")
+			}
+			r, e := regexp.Compile(compiled)
 			if e != nil {
 				return types.NewErr("pattern")
 			}
@@ -149,10 +159,12 @@ func main() {
 		panic(err)
 	}
 	var cases []struct {
-		Name       string         `json:"name"`
-		Expression string         `json:"expression"`
-		Input      map[string]any `json:"input"`
-		Expected   map[string]any `json:"expected"`
+		Name       string          `json:"name"`
+		Expression string          `json:"expression"`
+		Input      json.RawMessage `json:"input"`
+		Fields     []fieldSpec     `json:"fields"`
+		Assert     bool            `json:"assert"`
+		Expected   map[string]any  `json:"expected"`
 	}
 	if err = json.Unmarshal(data, &cases); err != nil {
 		panic(err)
@@ -161,16 +173,23 @@ func main() {
 	failures := 0
 	for _, c := range cases {
 		actual := map[string]any{"status": "check-error"}
-		ast, issues := env.Compile(c.Expression)
-		if issues.Err() == nil {
-			p, e := env.Program(ast)
-			if e != nil {
-				panic(e)
-			}
-			v, _, e := p.Eval(c.Input)
-			actual = map[string]any{"status": "eval-error"}
-			if e == nil {
-				actual = map[string]any{"status": "ok", "value": v.Value()}
+		if c.Fields != nil {
+			actual = validateFields(c.Fields, c.Input)
+			c.Expression = "(host pipeline)"
+		} else {
+			ast, issues := env.Compile(c.Expression)
+			if issues.Err() == nil && allowedSource(c.Expression) && allowedExpression(ast.NativeRep()) && (!c.Assert || ast.OutputType().TypeName() == "bool") {
+				p, e := env.Program(ast)
+				if e != nil {
+					panic(e)
+				}
+				var input map[string]any
+				json.Unmarshal(c.Input, &input)
+				v, _, e := p.Eval(input)
+				actual = map[string]any{"status": "eval-error"}
+				if e == nil {
+					actual = map[string]any{"status": "ok", "value": v.Value()}
+				}
 			}
 		}
 		raw, _ := json.Marshal(actual)

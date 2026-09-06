@@ -1,0 +1,10 @@
+import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import assert from 'node:assert/strict';
+import { run } from './probe.ts';
+import {fields} from './fields.ts';
+const cases = JSON.parse(readFileSync('cases.json', 'utf8'));
+const results = cases.map(c => ({ name: c.name, expression: c.expression??'(host pipeline)', expected: c.expected, actual: c.fields?fields(c.fields,c.input):run(c.expression, c.input,c.assert) }));
+mkdirSync('results', { recursive: true });
+writeFileSync('results/typescript.json', JSON.stringify(results, null, 2));
+for (const r of results) assert.deepEqual(r.actual, r.expected, r.name);
+console.log(`TypeScript: ${results.length} checks passed`);

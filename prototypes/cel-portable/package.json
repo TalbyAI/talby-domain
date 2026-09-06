@@ -1,1 +1,1 @@
-{"name":"cel-portable-prototype","private":true,"type":"module","dependencies":{"@marcbachmann/cel-js":"8.0.0","re2-wasm":"1.0.2"}}
+{"name":"cel-portable-prototype","private":true,"type":"module","dependencies":{"@marcbachmann/cel-js":"8.0.0","re2-wasm":"1.0.2","re2js":"2.8.6"},"devDependencies":{"esbuild":"0.28.2"}}

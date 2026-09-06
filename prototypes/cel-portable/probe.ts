@@ -1,7 +1,6 @@
 import { Environment } from '@marcbachmann/cel-js';
-import { RE2 } from 're2-wasm';
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
-import assert from 'node:assert/strict';
+import { matches } from './regex.ts';
+import { pattern } from './pattern.ts';
 
 // PROTOTYPE: independent host implementation, not a contract runtime.
 class Decimal { value: string; constructor(value: string) { this.value = value; } }
@@ -51,7 +50,22 @@ function compare(a: Decimal, b: Decimal): bigint {
   const x = integer(a.value), y = integer(b.value);
   return x < y ? -1n : x > y ? 1n : 0n;
 }
-const env = new Environment({ unlistedVariablesAreDyn: false })
+export function normalize(type: string, value: any): any {
+  if (type === 'integer') {if (typeof value !== 'number' || !Number.isSafeInteger(value)) throw Error('type');return Object.is(value,-0)?0:value;}
+  if (type === 'boolean') {if(typeof value !== 'boolean') throw Error('type');return value;}
+  if(typeof value !== 'string' || !value.isWellFormed()) throw Error('type');
+  switch(type) {
+    case 'decimal':return decimal(value).value;
+    case 'date':return date(value).value;
+    case 'instant':return instant(value).value;
+    case 'id':if(!/^[A-Za-z0-9_-]+$/.test(value)||value.endsWith('\n')) throw Error('format');return value;
+    case 'string':return value;
+    default:throw Error('type');
+  }
+}
+export const trimValue = trim;
+export const order = (type: string, a: any, b: any) => type === 'decimal' ? Number(compare(new Decimal(a),new Decimal(b))) : a < b ? -1 : a > b ? 1 : 0;
+const env = new Environment({ unlistedVariablesAreDyn: false, limits: {maxAstNodes: 1024, maxDepth: 64} })
   .registerVariable('m', 'map<string, dyn>')
   .registerType('Decimal', Decimal).registerType('CivilDate', CivilDate)
   .registerType('Instant', Instant)
@@ -66,19 +80,41 @@ const env = new Environment({ unlistedVariablesAreDyn: false })
   .registerFunction('canon(Decimal): string', x => x.value)
   .registerFunction('compareDecimal(Decimal, Decimal): int', compare)
   .registerFunction('compareDate(CivilDate, CivilDate): int', (a, b) => a.value < b.value ? -1n : a.value > b.value ? 1n : 0n)
-  .registerFunction('fullMatch(string, string): bool', (s, p) => new RE2('\\A(?:' + p + ')\\z', 'u').test(s));
+  .registerFunction('fullMatch(string, string): bool', (s, p) => {
+    if (!s.isWellFormed() || [...s].length > 65536) throw Error('text-limit-or-unicode');
+    return matches(s, pattern(p));
+  });
 
-export function run(expression: string, input: any) {
-  const check = env.check(expression);
-  if (!check.valid) return { status: 'check-error' };
+export function run(expression: string, input: any, assertion = false) {
+  try {
+    if ([...expression].length > 65536) throw Error('expression-size');
+    let quote = '', escaped = false, prefix = 0, depth = 0;
+    for (const c of expression) {
+      if (quote) {if (escaped) escaped = false; else if (c === '\\') escaped = true; else if(c === quote) quote = ''; continue;}
+      if (c === '"' || c === "'") {quote = c; prefix = 0; continue;}
+      if (c === '!' || c === '-') prefix++; else if (!' \t\n\r'.includes(c)) prefix = 0;
+      if (c === '(') depth++; if (c === ')') depth--;
+      if (prefix > 64 || depth > 64) throw Error('source-limit');
+    }
+    const allowed = new Set(['has','instant','instantCanon','trim','decimalScale','decimalPrecision','compareInstant','decimal','date','canon','compareDecimal','compareDate','fullMatch']);
+    let count = 0;
+    const visit = (node: any, depth = 0) => {
+      if (++count > 1024 || depth > 64) throw Error('expression-limit');
+      const descend = (n: any) => visit(n, depth + 1);
+      if (node.op === 'call') {if (!allowed.has(node.args[0])) throw Error('function');node.args[1].forEach(descend);}
+      else if (node.op === '.') descend(node.args[0]);
+      else if (node.op === '!_' || node.op === '-_') descend(node.args);
+      else if (['&&','||','==','!=','<','<=','>','>='].includes(node.op)) node.args.forEach(descend);
+      else if (node.op === 'id') {if(node.args !== 'm') throw Error('variable');}
+      else if (node.op === 'value') {if (!['string','bigint','boolean'].includes(typeof node.args) && node.args !== null) throw Error('literal');}
+      else throw Error('syntax');
+    };
+    visit(env.parse(expression).ast);
+    const checked=env.check(expression);
+    if (!checked.valid || assertion && checked.type !== 'bool') throw Error('type');
+  } catch { return {status:'check-error'}; }
   try {
     const value = env.evaluate(expression, input);
     return { status: 'ok', value: typeof value === 'bigint' ? Number(value) : value };
   } catch { return { status: 'eval-error' }; }
 }
-const cases = JSON.parse(readFileSync('cases.json', 'utf8'));
-const results = cases.map((c: any) => ({ name: c.name, expression: c.expression, expected: c.expected, actual: run(c.expression, c.input) }));
-mkdirSync('results', { recursive: true });
-writeFileSync('results/typescript.json', JSON.stringify(results, null, 2));
-for (const r of results) assert.deepEqual(r.actual, r.expected, r.name);
-console.log(`TypeScript: ${results.length} checks passed`);

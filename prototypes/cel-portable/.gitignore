@@ -2,3 +2,5 @@ node_modules/
 .cache/
 results/
 *.exe
+dist/
+.playwright-cli/

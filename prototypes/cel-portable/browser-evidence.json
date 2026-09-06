@@ -1,0 +1,15 @@
+{
+  "status": "passed",
+  "cases": 215,
+  "casesSha256": "0a123c2c8280323576f477e93093c43662737de763645a41c901d354034f25ab",
+  "failures": [],
+  "elapsedMs": 48.09999990463257,
+  "startupAndRunMs": 76.79999995231628,
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/152.0.0.0 Safari/537.36",
+  "requests": [
+    "http://127.0.0.1:4178/no-wasm/index.html",
+    "http://127.0.0.1:4178/no-wasm/page.js",
+    "http://127.0.0.1:4178/no-wasm/cases.json",
+    "http://127.0.0.1:4178/no-wasm/worker.js"
+  ]
+}

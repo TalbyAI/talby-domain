@@ -1,10 +1,18 @@
 # Evaluar un perfil portable de CEL para la capa de contrato
 
-**Prototipo desechable, evidencia parcial — decisión abierta.** Contexto: [Evaluar un perfil portable de CEL para la capa de contrato](https://github.com/TalbyAI/talby-domain/issues/3). Perfil normativo: [Formas léxicas y catálogo inicial de funciones](https://github.com/TalbyAI/talby-domain/blob/bde49ea45d7b79147c0ba7ed35c80d469a1f5302/docs/research/formas-lexicas.md).
+**Prototipo desechable; propuesta pendiente de decisión humana.** [Ticket de decisión](https://github.com/TalbyAI/talby-domain/issues/3). [Perfil léxico aprobado](https://github.com/TalbyAI/talby-domain/blob/bde49ea45d7b79147c0ba7ed35c80d469a1f5302/docs/research/formas-lexicas.md).
 
-## Reproducir
+## Propuesta
 
-Entrar primero en esta carpeta. Todo el código, dependencias, configuración, cachés Go y resultados propios del prototipo quedan aquí. Eliminarla no requiere cambios en el resto del repositorio.
+215 casos coinciden con sus resultados esperados en TypeScript/Node, cel-go y Chrome. Se propone adoptar **CEL acotado, tipos/comparadores del host y RE2JS para patrones** en la primera entrega. La equivalencia comprobada pertenece a este perfil, no a CEL completo ni a cualquier implementación del lenguaje.
+
+El usuario permitió evaluar WASM como candidato, sujeto a integración, tamaño y comportamiento en navegador. Las pruebas posteriores favorecen RE2JS: funciona sin WASM ni evaluación dinámica de JavaScript. No se reduce el perfil para usar RegExp nativo ni se necesita mantener un motor de regex propio.
+
+Go es un contraste independiente, no la elección del stack de producción. Esto tampoco adopta CEL definitivamente para futuras entregas o capas.
+
+## Reproducción aislada
+
+Entrar primero en esta carpeta. Sus dependencias, configuración, scripts, cachés Go y resultados quedan aquí; ninguna otra parte del repositorio depende de ella.
 
 ```powershell
 Set-Location prototypes/cel-portable
@@ -12,43 +20,110 @@ npm ci
 ./run.ps1
 ```
 
-Probado en Windows, Node 24.14.1 y Go 1.26.4. Dependencias fijadas: `@marcbachmann/cel-js` 8.0.0, `re2-wasm` 1.0.2 y cel-go 0.26.1; consultar los lockfiles. Node ejecuta TypeScript mediante eliminación de tipos: esta prueba no incluye una compilación con tsc.
+Probado en Windows con Node 24.14.1 y Go 1.26.4. Versiones fijadas: cel-js 8.0.0, cel-go 0.26.1, re2js 2.8.6, re2-wasm 1.0.2 y esbuild 0.28.2. Node ejecuta TypeScript eliminando tipos; no se ejecutó tsc.
 
-Abrir `report.html` con doble clic para recorrer la evidencia registrada. `cases.mjs` materializa `cases.json`; cada host consume los mismos casos y comprueba sus resultados contra un oráculo explícito. `report.mjs` también comprueba igualdad entre hosts. Una diferencia termina el comando con error. Los resultados intermedios se escriben en `results/`.
+`cases.mjs` materializa `cases.json`. Cada host consume esos datos y comprueba resultados contra expectativas explícitas. `report.mjs` comprueba también igualdad entre hosts. Los fallos terminan el comando con error. `report.html` se abre con doble clic y muestra evidencia registrada.
 
-## Evidencia obtenida
+Desde esta carpeta, para navegador:
 
-104 casos pasan en ambos hosts: canonicalización decimal exacta e idempotencia, comparación superior a la precisión de number, precisión/escala de valor, calendario gregoriano, Periodo, instantes UTC y desplazamientos, rechazo de pérdida de precisión, trim fijo, límites de 4096/4097 cifras, matriz required/nullable, rechazos de firmas incompatibles y coincidencia completa de patrones de prueba.
+```powershell
+node build-browser.mjs
+node serve.mjs
+```
 
-El verificador distingue Decimal, CivilDate e Instant de string y entre sí. La declaración `compareDecimal("1", "2")` falla antes de evaluar. `false` de una aserción y error de evaluación se mantienen como resultados diferentes. Los nombres de estado y de funciones de este prototipo no fijan el catálogo público de errores ni las firmas definitivas.
+En otra terminal, también dentro de esta carpeta, usar Playwright CLI instalado:
 
-Las reglas de presencia usan una variable `map<string,dyn>` declarada. La versión probada de cel-js rechaza `has({}.x)`; cel-go además rechaza comparar un valor estáticamente string con null. Por ello no se infiere el esquema de presencia desde literales: el entorno declara el mapa. No se debilitan los tipos de decimal/fecha a dyn.
+```powershell
+playwright-cli -s=cel-portable open --browser=chrome
+playwright-cli -s=cel-portable run-code --filename=browser-check.js
+```
 
-## Nativo frente a host
+Si se cambian los casos, conservar la nueva evidencia antes de regenerar el informe:
 
-| Responsabilidad | Prueba |
+```powershell
+$evidence = playwright-cli -s=cel-portable --raw run-code --filename=browser-check.js
+$evidence | ConvertFrom-Json | ConvertTo-Json -Depth 20 | Set-Content browser-evidence.json -Encoding utf8
+node report.mjs
+```
+
+El informe comprueba el hash SHA-256 de los casos contra la evidencia del navegador para no asociar una ejecución a otros vectores.
+
+También se puede abrir `http://127.0.0.1:4178/no-wasm/index.html` directamente. La página ejecuta los casos en un Worker y muestra fallos, tiempo observado y navegador. El servidor solo escucha en loopback y sirve una lista fija de archivos. Detener con Ctrl+C.
+
+Para reproducir el rechazo de WASM: `node build-browser.mjs wasm`, seguido de `playwright-cli -s=cel-portable run-code --filename=browser-wasm-check.js`. Esta prueba comprueba fallos esperados. `node build-browser.mjs` restaura la variante recomendada.
+
+## Comparación de candidatos en navegador
+
+| Candidato sin parches | Resultado | Tamaño observado |
+| --- | --- | --- |
+| CEL + RE2JS | 215 casos pasan con `script-src 'self'`, sin permisos para WASM/eval; ninguna petición externa o WASM | Worker: 449 483 bytes; gzip 98 131 bytes, aproximadamente 96 KiB |
+| CEL + RE2-WASM | Con `wasm-unsafe-eval`, falla al cargar por `new Function`; con `unsafe-eval` en una prueba negativa, falla `WrappedRE2 is not a constructor` | Worker 69 635 bytes gzip y WASM 312 328 bytes gzip; unos 373 KiB combinados |
+
+No se parcheó WASM ni se propone debilitar la CSP. Los fallos pertenecen a esa versión y empaquetado, no demuestran una limitación intrínseca de WebAssembly. Reparar/recompilar sus bindings sigue siendo posible; RE2JS ya resuelve los casos comprobados con menor integración.
+
+`browser-evidence.json` conserva la ejecución en HeadlessChrome 152, Windows: 215 casos, cero fallos, cuatro peticiones al mismo origen. Se observaron unos 48 ms para los casos y 77 ms incluyendo arranque: una medición local, no un benchmark o garantía. `browser-wasm-evidence.json` conserva los fallos del otro candidato. El tamaño incluye CEL, host, verificadores y fixture; excluye HTML, launcher y datos de prueba. No predice la biblioteca generada final.
+
+No se probaron Firefox, Safari, móviles, todos los bundlers, CSP de extensiones ni funcionamiento offline.
+
+## Responsabilidades
+
+| Responsabilidad | Implementación probada |
 | --- | --- |
-| Parseo de CEL, firmas, booleanos, has sobre mapa declarado | Bibliotecas CEL |
-| Decimal, fecha civil e instante del perfil | Tipos y funciones del host, implementados independientemente |
+| Parseo CEL, firmas, booleanos, presencia | Bibliotecas CEL bajo lista explícita de sintaxis y funciones |
+| Decimal, fecha civil, instante del perfil | Tipos y funciones del host, independientes en TypeScript y Go |
 | Comparación decimal | BigInt en TypeScript, big.Rat en Go; nunca number/double |
-| Canonicalización de instantes | Validación léxica y de calendario del host antes de Date/time; fracción exacta y rango UTC explícitos |
-| Patrones | Función fullMatch del host; RE2-WASM en TypeScript y regexp en Go; anclaje absoluto `\A(?:...)\z` |
+| Fecha e instante | Léxico/calendario antes de Date/time; canon UTC exacto y rango explícito |
+| Normalización, validación estructural y acumulación | Host, antes de suministrar valores válidos a aserciones |
+| Patrones | Parser del perfil en cada host, anclaje absoluto y RE2JS/Go regexp |
 
-No se utiliza el matches predeterminado de CEL. El patrón con salto final se rechaza; el literal astral se compara por carácter; `(a+)+` sobre 30 000 letras seguidas de `!` termina y devuelve false. El caso adversario no es una demostración experimental de complejidad. La garantía algorítmica depende de los motores elegidos; no se midió rendimiento.
+Decimal, CivilDate e Instant son diferentes de string y entre sí. `compareDecimal("1","2")` falla antes de evaluar. CEL no aporta nativamente las canonicalizaciones del contrato.
 
-## Frontera pendiente
+Orden: estructura/tipos y presencia; trim declarado; canonicalización intrínseca; restricciones acumulativas; aserciones cuyos campos sean válidos. Un campo inválido no alimenta reglas dependientes, pero no impide informar errores independientes. El host conserva rutas y distingue incumplimiento (`false`) de error de evaluación. Los códigos, mensajes y rutas definitivos pertenecen a su ticket.
 
-- **Restricción del cliente:** confirmar si admite cargar WASM en navegador. La prueba ejecutada es Node, no un navegador. No se afirma compatibilidad de empaquetado, CSP ni tamaño aceptable.
-- **Patrones:** falta implementar y comprobar el parser que rechaza toda sintaxis fuera del perfil, y acordar/ejecutar límites de longitud, profundidad y expansión comunes. fullMatch acepta ahora la sintaxis del motor: solo sirve para los patrones de la muestra, no valida el perfil aprobado. RE2 y regexp pueden introducir límites adicionales que aún deben contrastarse.
-- **Conformidad restante:** identificadores y sus restricciones, texto Unicode inválido, tipos JSON en la frontera, acumulación de restricciones, enumeraciones, campos desconocidos y diagnósticos por rutas. Dos inclusiones de Periodo se representan aquí como dos aserciones; no se ha implementado un cargador de contratos ni PATCH.
-- **Expresiones:** falta cerrar y verificar una lista de sintaxis/funciones permitidas y cotas comunes de recursos. Estos programas no deben aceptar expresiones o patrones de fuentes no confiables.
+`fields.ts`/`fields.go` son un fixture pequeño de modelo efectivo, no un verificador exhaustivo de declaraciones arbitrarias. No fijan RDF ni API pública. Periodo se contrasta mediante expresiones CEL y mediante agrupaciones anidadas del fixture. No se construyeron cargador RDF, generador TypeScript, HTTP, PATCH o SQLite.
 
-La evidencia demuestra mecanismos concretos de extensión y coincidencia en estos casos. Todavía no basta para adoptar ni descartar CEL para la primera entrega. Go es un motor de contraste, no una elección del stack de producción. El ticket permanece abierto para la revisión humana y las pruebas pendientes.
+## Perfil CEL propuesto
+
+- Literales bool, null, string e int; campos de un entorno declarado; `has`; negación, conjunción/disyunción y comparaciones escalares compatibles. Las aserciones exigen resultado bool; las sondas de canon devuelven escalares para inspeccionarlos.
+- Funciones explícitas del host para tipos, comparadores y patrones. Helpers como `canon` o `decimalScale` son instrumentación: no fijan nombres RDF ni firmas públicas.
+- El modelo debe verificar rutas y declarar tipos efectivos. Los mapas dinámicos del fixture permiten representar presencia, pero por sí solos no detectan errores tipográficos en nombres de campos.
+- Decimal/fecha/instante se comparan mediante sus comparadores, también para igualdad. Se rechaza igualdad directa entre esos tipos opacos: cel-go la admite, mientras que el candidato TypeScript la rechaza.
+- Se excluyen aritmética general, double/uint, conversiones implícitas, matches/timestamp nativos, comprehensions, macros distintos de has, literales de colecciones, índices y condicionales. Colecciones, pertenencia y otras restricciones del catálogo siguen siendo responsabilidades del host.
+- Funciones desconocidas, tipos incompatibles, sintaxis excluida y aserciones no booleanas fallan en verificación. Los patrones declarados deben compilarse al verificar el modelo; el prototipo invoca su parser dentro de fullMatch para probar los rechazos.
+
+## Límites operativos propuestos
+
+Se mantienen los techos aprobados de 4096 dígitos léxicos decimales y 4096 cifras de fracción temporal. Los siguientes son propuestas adicionales de recursos, pendientes de adopción con el perfil; deben aparecer en el modelo efectivo, sin truncamiento ni cambios silenciosos.
+
+| Recurso | Límite |
+| --- | --- |
+| Fuente de patrón | 4096 valores escalares Unicode, incluidas anclas opcionales |
+| Grupos anidados | 32 |
+| Repetición contada individual | 0–1000, como el perfil aprobado |
+| Producto de repeticiones contadas anidadas | 1000; evita un límite oculto de Go |
+| Coste estructural estimado expandido del patrón | 8192 unidades |
+| Entrada de una evaluación de patrón | 65 536 valores escalares Unicode |
+| Fuente CEL | 65 536 valores escalares Unicode |
+| AST CEL | 1024 nodos, profundidad 64 |
+| Paréntesis/prefijos unarios anidados en la fuente CEL | 64; comprobados además del AST porque los parsers simplifican de forma distinta |
+
+Coste de patrón: literal/clase = 1; alternancia = 1; grupo = interior + 1; ?, * y + suman 1; repetición finita multiplica por max(1,m); {n,} multiplica por n+1; concatenación suma. No son bytes ni instrucciones reales del motor, y no se promete latencia constante.
+
+La coincidencia consume toda la cadena, incluido un salto final, por valores escalares. El parser rechaza la sintaxis excluida antes del motor. No basta con que una biblioteca acepte el patrón.
+
+La ausencia de backtracking exponencial depende de los algoritmos RE2JS y Go regexp. Los casos adversarios verifican integración, no prueban por sí solos una cota asintótica. Presupuestos totales por petición, número de reglas, payload y cardinalidad siguen en el contrato técnico correspondiente: estos topes son por operación.
+
+## Cobertura y alcance
+
+Casos: decimal exacto, p/s de valor, calendario, offsets equivalentes, milisegundos exactos, años UTC extremos, límites 4096/4097, trim/idempotencia, required/nullable, Unicode astral/sustituto aislado, entero fuera de rango, booleano como cadena, identificadores 1/128/129 y prefijo/sufijo solapados, restricciones heredadas, enumeraciones incompatibles/duplicadas, campos desconocidos, errores independientes, Periodo anidado, gramática de patrones y topes de recursos.
+
+No es certificación de todo contrato posible. No ejecuta el catálogo completo de referencias, cardinalidad, actualización parcial ni satisfacibilidad exhaustiva. Sus interfaces y aceptación pertenecen a la implementación posterior. Las referencias seguirán validando tipo/formato sin consultar existencia; el prototipo no introduce consultas.
+
+La evidencia permite decidir viabilidad y perfil. La resolución y aceptación de límites se registrarán en el issue tras el intercambio humano; este documento no cierra el ticket por sí solo.
 
 ## Fuentes primarias
 
-- [CEL: definición del lenguaje](https://github.com/cel-expr/cel-spec/blob/master/doc/langdef.md): tipos y extensiones.
-- [cel-js](https://github.com/marcbachmann/cel-js): registro de tipos, funciones y entorno de comprobación.
-- [cel-go](https://github.com/cel-expr/cel-go): compilación y extensiones del host.
-- [RE2-WASM](https://github.com/google/re2-wasm): bindings de RE2 para evitar backtracking exponencial.
-- [Go regexp](https://pkg.go.dev/regexp): garantía de tiempo lineal en el tamaño de entrada para sus expresiones regulares.
+- [CEL](https://github.com/cel-expr/cel-spec/blob/master/doc/langdef.md), [cel-js](https://github.com/marcbachmann/cel-js), [cel-go](https://github.com/cel-expr/cel-go): entorno de tipos y extensiones.
+- [RE2JS](https://github.com/le0pard/re2js), [RE2](https://github.com/google/re2), [Go regexp](https://pkg.go.dev/regexp): implementaciones y garantías algorítmicas. RE2 referencia RE2JS como port JavaScript.
+- [RE2-WASM](https://github.com/google/re2-wasm): paquete evaluado; errores reproducidos localmente.
+- [CSP script-src](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Content-Security-Policy/script-src): diferencia entre permisos de WASM y eval.
