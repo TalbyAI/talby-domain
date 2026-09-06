@@ -16,7 +16,7 @@ CEL aporta parseo, comprobación de firmas y composición/evaluación de expresi
 
 El orden efectivo es: estructura, tipos y presencia; normalizadores declarados en orden; canonicalización intrínseca; restricciones acumulativas; aserciones cuyos campos tengan valores válidos. Ausencia y null son distintos. Un campo inválido no alimenta reglas dependientes, pero no impide informar errores independientes. El host conserva las rutas de las incidencias y distingue incumplimiento de una aserción (`false`) de error de evaluación.
 
-Decimal exacto no pasa por number/double. Fecha civil no se interpreta en una zona horaria. Los instantes cumplen el perfil de precisión exacta y salida UTC. La evaluación no consulta reloj, red ni locale.
+Decimal exacto no pasa por number/double. Fecha civil no se interpreta en una zona horaria. Los instantes se expresan en UTC con precisión de milisegundos; cualquier entrada que perdería precisión al convertirla se rechaza sin redondeo. La evaluación no consulta reloj, red ni locale.
 
 ## Expresiones admitidas
 
@@ -30,7 +30,7 @@ Funciones desconocidas, tipos incompatibles, sintaxis excluida y aserciones no b
 
 ## Patrones y límites operativos
 
-Se conserva el subconjunto de patrones de la decisión léxica, con coincidencia completa, sensibilidad a mayúsculas y semántica por valores escalares Unicode. La coincidencia consume también un salto de línea final. Un parser del perfil rechaza la sintaxis excluida antes de delegar en RE2JS o en el motor equivalente del servidor.
+Se conserva el subconjunto de patrones de la decisión léxica, con coincidencia completa, sensibilidad a mayúsculas y semántica por valores escalares Unicode. Un salto de línea final solo coincide si está incluido explícitamente en el patrón: `a`/`a\n` y `^a$`/`a\n` son falsos; `^a\n$`/`a\n` es verdadero. Un parser del perfil rechaza la sintaxis excluida antes de delegar en RE2JS o en el motor equivalente del servidor.
 
 Los límites siguientes forman parte del perfil efectivo y son iguales en cliente y motor. Son límites de recursos por operación, no restricciones de negocio. Excederlos produce un rechazo explícito, sin truncamiento ni cambios silenciosos.
 
@@ -54,13 +54,13 @@ RE2JS y Go regexp evitan backtracking exponencial por sus algoritmos. Los casos 
 
 ## Resultados y evidencia
 
-La evidencia reproducible está conservada fuera de main en el commit [ec06d68 del prototipo CEL portable](https://github.com/TalbyAI/talby-domain/tree/ec06d684fd71cfd2b3782e8fb129b70a8fa43e5d/prototypes/cel-portable). El [informe del experimento](https://github.com/TalbyAI/talby-domain/blob/ec06d684fd71cfd2b3782e8fb129b70a8fa43e5d/prototypes/cel-portable/README.md) conserva versiones, comandos, alcance y evidencias de ambos candidatos. Esta decisión prevalece sobre el estado de propuesta que figura en aquel activo histórico.
+La evidencia reproducible está conservada fuera de main en el commit [2285a58 del prototipo CEL portable](https://github.com/TalbyAI/talby-domain/tree/2285a58bd9c23c4778c1ed81de9f4821685de3f1/prototypes/cel-portable). El [informe del experimento](https://github.com/TalbyAI/talby-domain/blob/2285a58bd9c23c4778c1ed81de9f4821685de3f1/prototypes/cel-portable/README.md) conserva versiones, comandos, alcance y evidencias de ambos candidatos. Esta decisión prevalece sobre el estado de propuesta que figura en aquel activo histórico.
 
-**215 casos compartidos coinciden con los resultados esperados en TypeScript/Node, cel-go y Chrome.** Incluyen decimal exacto, precisión/escala, calendario y offsets, límites 4096/4097, trim/idempotencia, required/nullable, Unicode, tipos JSON, identificadores, restricciones acumulativas, enumeraciones, campos desconocidos, errores independientes, Periodo anidado, sintaxis y límites de patrones y expresiones.
+**217 casos compartidos coinciden con los resultados esperados en TypeScript/Node, cel-go y Chrome.** Incluyen decimal exacto, precisión/escala, calendario y offsets, límites 4096/4097, trim/idempotencia, required/nullable, Unicode, tipos JSON, identificadores, restricciones acumulativas, enumeraciones, campos desconocidos, errores independientes, Periodo anidado, sintaxis y límites de patrones y expresiones.
 
 | Candidato probado | Resultado de navegador |
 | --- | --- |
-| CEL + RE2JS | 215 casos pasan en Chrome 152 con `script-src 'self'`, sin WASM/eval ni peticiones externas; Worker de prueba de 98 131 bytes gzip |
+| CEL + RE2JS | 217 casos pasan en Chrome 152 con `script-src 'self'`, sin WASM/eval ni peticiones externas; Worker de prueba de 98 131 bytes gzip |
 | CEL + RE2-WASM 1.0.2 | Falla con `wasm-unsafe-eval` por uso de `new Function`; permitir eval en una prueba negativa revela además `WrappedRE2 is not a constructor` |
 
 No se parcheó el paquete WASM ni se propone debilitar la CSP. Las implementaciones probadas son cel-js 8.0.0, cel-go 0.26.1, RE2JS 2.8.6 y RE2-WASM 1.0.2; cualquier cambio de implementación debe conservar la conformidad del perfil.

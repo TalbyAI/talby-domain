@@ -205,6 +205,8 @@ El servicio de ejemplo será gestión de proyectos, partiendo del contexto de `s
 | Demo ejecuta CRUD derivado | El actor de prueba dispone de concesiones visibles por operación. |
 | Importe decimal recorre cliente, HTTP, mock y SQLite | Conserva su valor exacto sin pasar implícitamente por `number`. |
 | CEL evalúa reglas de `Periodo` e importe decimal | Cliente y motor producen resultados equivalentes bajo el perfil adoptado y sus comparadores tipados; se rechaza sintaxis no admitida. |
+| Un patrón CEL recibe una entrada con salto de línea final | La coincidencia completa solo lo acepta si el patrón incluye explícitamente ese salto. |
+| Una fuente CEL, su AST, un patrón, sus repeticiones o su entrada exceden los límites del perfil | Cliente y motor rechazan la operación explícitamente, sin truncamiento ni cambios silenciosos. |
 | Listar proyectos mediante offset y mediante continuation token | Ambas modalidades están disponibles y respetan los límites declarados. |
 | Una petición mezcla offset y continuation token | Se rechaza con error explícito. |
 | Un token no corresponde a la consulta, filtros u orden de la petición | Se rechaza; no se reinicia silenciosamente el listado. |
