@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Inspector del modelo efectivo</title>
+  <style>
+    :root { color-scheme: light; font: 16px/1.5 system-ui, sans-serif; }
+    body { margin: 0; background: #f5f7fb; color: #172033; }
+    main { width: min(1100px, calc(100% - 32px)); margin: 0 auto; padding: 40px 0 64px; }
+    section { margin-top: 24px; padding: 24px; background: #fff; border: 1px solid #dce2ee; border-radius: 12px; }
+    button { cursor: pointer; border: 1px solid #b8c4d8; border-radius: 8px; padding: 9px 13px; background: #fff; color: inherit; }
+    button:hover, button:focus-visible { border-color: #3457d5; outline: 2px solid #c9d3ff; }
+    .accent { color: #3457d5; }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <p class="accent">Prototipo desechable · Definir el modelo efectivo y los contratos CRUD derivados</p>
+      <h1>Inspector del modelo efectivo</h1>
+      <p>Explora qué está declarado, qué aporta el perfil de prototipo y qué se deriva para CRUD.</p>
+    </header>
+    <section aria-labelledby="state-title">
+      <h2 id="state-title">Estado actual</h2>
+      <div id="state"></div>
+    </section>
+    <section aria-labelledby="free-play-title">
+      <h2 id="free-play-title">Exploración libre</h2>
+      <div id="free-play"></div>
+    </section>
+    <section aria-labelledby="walkthrough-title">
+      <h2 id="walkthrough-title">Recorridos guiados</h2>
+      <div id="walkthroughs"></div>
+    </section>
+  </main>
+  <script>
+    "use strict";
+  </script>
+</body>
+</html>
