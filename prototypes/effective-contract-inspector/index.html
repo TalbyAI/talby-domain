@@ -121,7 +121,7 @@
     }
 
     function fieldContract(field, declarations) {
-      const group = field.target && declarations.get(field.target);
+      const group = field.type === "FieldGroup" && declarations.get(field.target);
       return {
         name: field.name,
         type: field.type,
