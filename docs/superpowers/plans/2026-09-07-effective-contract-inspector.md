@@ -207,6 +207,9 @@ function verifySource(source) {
   const ids = new Set(source.declarations.map((declaration) => declaration.id));
   const diagnostics = [];
   for (const declaration of source.declarations) {
+    if (declaration.kind === "entity" && declaration.crud === true && !(declaration.fields || []).some((field) => field.name === declaration.identifier)) {
+      diagnostics.push({ code: "IDENTIFIER_NOT_DECLARED", path: declaration.id + ".identifier", message: "No existe el campo identificador " + declaration.identifier + "." });
+    }
     if (declaration.parent && !ids.has(declaration.parent)) {
       diagnostics.push({ code: "PARENT_NOT_FOUND", path: declaration.id, message: "No existe " + declaration.parent + "." });
     }
