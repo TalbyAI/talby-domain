@@ -244,7 +244,10 @@
         if (operation.pagination) addLine(root, "Paginación", operation.pagination.modes.join(" | ") + "; default " + operation.pagination.defaultLimit + "; max " + operation.pagination.maxLimit, operation.pagination.origin);
         if (operation.patch) addLine(root, "PATCH", "ausente=conservar; grupo presente=sustituir; valida estado completo", operation.patch.origin);
       }
-      const rules = effective.declarations.flatMap((declaration) => (declaration.assertions || []).map((assertion) => declaration.name + "." + assertion));
+      const rules = effective.declarations.flatMap((declaration) => [
+        ...(declaration.assertions || []).map((assertion) => (declaration.fields || []).reduce((text, field) => text.replace(new RegExp("\\b" + field.name + "\\b", "g"), declaration.name + "." + field.name), assertion)),
+        ...(declaration.fields || []).filter((field) => field.type === "Decimal").map((field) => field.name + " decimal exacto"),
+      ]);
       addLine(root, "Reglas", rules.length ? rules.join("; ") : "ninguna", "declarado");
     }
 
