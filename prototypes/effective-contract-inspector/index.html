@@ -161,6 +161,154 @@
         diagnostics: [],
       };
     }
+
+    const initialState = () => ({ variant: null, source: null, verification: null, materialization: null, lastAction: "Ninguna acción todavía." });
+
+    function reduce(state, action) {
+      if (action.type === "reset") return initialState();
+      if (action.type === "load") return { ...initialState(), variant: action.variant, source: loadSource(action.variant), lastAction: "Cargada la variante " + action.variant + "." };
+      if (action.type === "verify" && state.source) {
+        const verification = verifySource(state.source);
+        return { ...state, verification, materialization: null, lastAction: verification.ok ? "La fuente supera la verificación." : "La verificación encontró bloqueos." };
+      }
+      if (action.type === "materialize" && state.source) {
+        const materialization = materialize(state.source, prototypeProfile);
+        return { ...state, verification: verifySource(state.source), materialization, lastAction: materialization.effective ? "Modelo efectivo materializado." : "La materialización está bloqueada." };
+      }
+      return { ...state, lastAction: "Carga una fuente antes de ejecutar esta acción." };
+    }
+
+    function originBadge(origin) {
+      const badge = document.createElement("span");
+      badge.textContent = origin;
+      badge.dataset.origin = origin;
+      return badge;
+    }
+
+    function addLine(parent, label, value, origin) {
+      const line = document.createElement("p");
+      const labelNode = document.createElement("strong");
+      labelNode.textContent = label + ": ";
+      line.append(labelNode, document.createTextNode(String(value)));
+      if (origin) line.append(" ", originBadge(origin));
+      parent.append(line);
+    }
+
+    function render(currentState) {
+      const root = document.getElementById("state");
+      root.replaceChildren();
+      addLine(root, "Fuente", currentState.source ? currentState.source.sourceId : "Ninguna");
+      addLine(root, "Etapa", currentState.materialization && currentState.materialization.effective ? "materializada" : currentState.verification ? "verificada" : "cargada");
+      addLine(root, "Última acción", currentState.lastAction);
+      const diagnostics = currentState.verification ? currentState.verification.diagnostics : [];
+      addLine(root, "Diagnósticos", diagnostics.length ? diagnostics.map((item) => item.code).join(", ") : "ninguno");
+      const effective = currentState.materialization && currentState.materialization.effective;
+      if (!effective) {
+        if (currentState.materialization) addLine(root, "Modelo efectivo", "No hay modelo efectivo: la verificación bloquea la materialización.");
+        return;
+      }
+      addLine(root, "Declaraciones", effective.declarations.map((item) => item.name).join(", "), "declarado");
+      addLine(root, "Defaults aplicados", effective.defaults.length, "default");
+      const labels = { create: "Crear", get: "Obtener", list: "Listar", patch: "Actualizar", delete: "Eliminar" };
+      for (const operation of effective.operations) {
+        addLine(root, labels[operation.verb] || operation.verb, operation.method + " " + operation.route.value, operation.origin);
+        addLine(root, "Ruta", operation.route.value, operation.route.origin);
+        addLine(root, "Permisos", operation.permissions.value.join(", "), operation.permissions.origin);
+        if (operation.pagination) addLine(root, "Paginación", operation.pagination.modes.join(" | ") + "; default " + operation.pagination.defaultLimit + "; max " + operation.pagination.maxLimit, operation.pagination.origin);
+        if (operation.patch) addLine(root, "PATCH", "ausente=conservar; grupo presente=sustituir; valida estado completo", operation.patch.origin);
+      }
+      addLine(root, "Reglas", "Periodo.fin >= Periodo.inicio; importe decimal exacto", "declarado");
+    }
+
+    const freePlayActions = [
+      ["Cargar contrato mínimo", { type: "load", variant: "valid" }],
+      ["Cargar declaración explícita", { type: "load", variant: "explicit" }],
+      ["Cargar contrato inválido", { type: "load", variant: "invalid" }],
+      ["Verificar fuente", { type: "verify" }],
+      ["Materializar modelo efectivo", { type: "materialize" }],
+      ["Reiniciar", { type: "reset" }],
+    ];
+
+    const scenarios = [
+      { id: "defaults", title: "CRUD por defecto", description: "Una entidad sin CRUD escrito recibe el default del perfil y produce cinco operaciones.", steps: [["Cargar fuente", { type: "load", variant: "valid" }], ["Verificar", { type: "verify" }], ["Materializar", { type: "materialize" }]] },
+      { id: "explicit", title: "Declaración explícita", description: "Una ruta y permisos escritos sustituyen los valores derivados.", steps: [["Cargar fuente", { type: "load", variant: "explicit" }], ["Verificar", { type: "verify" }], ["Materializar", { type: "materialize" }]] },
+      { id: "blocked", title: "Verificación bloqueante", description: "Una referencia inexistente y una contradicción impiden producir un modelo parcial.", steps: [["Cargar fuente", { type: "load", variant: "invalid" }], ["Verificar", { type: "verify" }], ["Intentar materializar", { type: "materialize" }]] },
+    ];
+
+    function scenarioCheck(scenarioId, currentState) {
+      if (scenarioId === "defaults") return currentState.materialization && currentState.materialization.effective && currentState.materialization.effective.operations.length === 5;
+      if (scenarioId === "explicit") {
+        const operations = currentState.materialization && currentState.materialization.effective ? currentState.materialization.effective.operations : [];
+        return operations.length === 5 && operations.every((operation) => operation.route.origin === "declarado" && operation.permissions.origin === "declarado");
+      }
+      return scenarioId === "blocked" && currentState.materialization && currentState.materialization.effective === null;
+    }
+
+    let state = initialState();
+    let activeScenario = null;
+    let scenarioStep = 0;
+
+    function dispatch(action) {
+      state = reduce(state, action);
+      render(state);
+    }
+
+    function makeButton(label, onClick) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = label;
+      button.addEventListener("click", onClick);
+      return button;
+    }
+
+    function renderFreePlay() {
+      const root = document.getElementById("free-play");
+      for (const [label, action] of freePlayActions) root.append(makeButton(label, () => dispatch(action)));
+    }
+
+    function renderWalkthroughs() {
+      const root = document.getElementById("walkthroughs");
+      root.replaceChildren();
+      const tabs = document.createElement("p");
+      for (const scenario of scenarios) tabs.append(makeButton(scenario.title, () => startScenario(scenario)));
+      root.append(tabs);
+      if (!activeScenario) return;
+      const panel = document.createElement("div");
+      const title = document.createElement("h3");
+      title.textContent = activeScenario.title;
+      const description = document.createElement("p");
+      description.textContent = activeScenario.description;
+      panel.append(title, description);
+      const complete = scenarioStep === activeScenario.steps.length;
+      panel.append(makeButton(complete ? "Finalizado" : activeScenario.steps[scenarioStep][0], () => advanceScenario()));
+      if (complete) {
+        const check = document.createElement("p");
+        check.textContent = "Comprobación del recorrido: " + (scenarioCheck(activeScenario.id, state) ? "correcta" : "revisar");
+        panel.append(check);
+      }
+      root.append(panel);
+    }
+
+    function startScenario(scenario) {
+      activeScenario = scenario;
+      scenarioStep = 0;
+      dispatch({ type: "reset" });
+      dispatch(scenario.steps[scenarioStep][1]);
+      scenarioStep += 1;
+      renderWalkthroughs();
+    }
+
+    function advanceScenario() {
+      if (scenarioStep < activeScenario.steps.length) {
+        dispatch(activeScenario.steps[scenarioStep][1]);
+        scenarioStep += 1;
+      }
+      renderWalkthroughs();
+    }
+
+    render(state);
+    renderFreePlay();
+    renderWalkthroughs();
   </script>
 </body>
 </html>
