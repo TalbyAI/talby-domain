@@ -1,5 +1,12 @@
 ## Agent skills
 
+### Flujo de integración
+
+- `main` es la rama de integración protegida. Antes de editar archivos o crear commits, ejecuta `git branch --show-current`; si devuelve `main`, crea o cambia primero a una rama de trabajo (`feature/*`, `fix/*`, `docs/*`, `prototype/*` o `chore/*`).
+- Los cambios se integran en `main` mediante un Pull Request o mediante una operación equivalente ejecutada en GitHub. No actualices el remoto con `git push origin main`, ni hagas un merge local que después se publique directamente en `main`.
+- Mantén en la rama de trabajo todos los commits y cambios relacionados. Antes de abrir el Pull Request, verifica `git status --short` y `git diff origin/main...HEAD`.
+- Si `main` local contiene commits que todavía no están en `origin/main`, crea primero una rama que apunte al commit actual para conservarlos. Restablece `main` solo después de comprobar que el árbol de trabajo está limpio y que el destino es el commit esperado de `origin/main`; nunca uses ese mantenimiento para descartar trabajo no conservado.
+
 ### Issue tracker
 
 Issues are tracked in this repository's GitHub Issues. See `docs/agents/issue-tracker.md`.
