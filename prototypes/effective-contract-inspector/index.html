@@ -1,0 +1,353 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Inspector del modelo efectivo</title>
+  <style>
+    :root { color-scheme: light; font: 16px/1.5 system-ui, sans-serif; }
+    body { margin: 0; background: #f5f7fb; color: #172033; }
+    main { width: min(1100px, calc(100% - 32px)); margin: 0 auto; padding: 40px 0 64px; }
+    section { margin-top: 24px; padding: 24px; background: #fff; border: 1px solid #dce2ee; border-radius: 12px; }
+    button { cursor: pointer; border: 1px solid #b8c4d8; border-radius: 8px; padding: 9px 13px; background: #fff; color: inherit; }
+    button:hover, button:focus-visible { border-color: #3457d5; outline: 2px solid #c9d3ff; }
+    .accent { color: #3457d5; }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <p class="accent">Prototipo desechable · Definir el modelo efectivo y los contratos CRUD derivados</p>
+      <h1>Inspector del modelo efectivo</h1>
+      <p>Explora qué está declarado, qué aporta el perfil de prototipo y qué se deriva para CRUD.</p>
+    </header>
+    <section aria-labelledby="state-title">
+      <h2 id="state-title">Estado actual</h2>
+      <div id="state"></div>
+    </section>
+    <section aria-labelledby="free-play-title">
+      <h2 id="free-play-title">Exploración libre</h2>
+      <div id="free-play"></div>
+    </section>
+    <section aria-labelledby="walkthrough-title">
+      <h2 id="walkthrough-title">Recorridos guiados</h2>
+      <div id="walkthroughs"></div>
+    </section>
+  </main>
+  <script>
+    "use strict";
+
+    const prototypeProfile = Object.freeze({
+      id: "prototype-defaults",
+      list: Object.freeze({ modes: ["offset", "continuationToken"], defaultMode: "offset", defaultLimit: 20, maxLimit: 100 }),
+      route: Object.freeze({ strategy: "module/feature/entity", separator: "/" }),
+      permissions: Object.freeze({ pattern: "crud.{entity}.{verb}" }),
+      patch: Object.freeze({ absentField: "preserve", presentGroup: "replace", validatesCompleteResult: true, recursiveNestedPatch: false }),
+    });
+
+    function sourceFixture(variant) {
+      const explicit = variant === "explicit";
+      const invalid = variant === "invalid";
+      return {
+        sourceId: "projects-" + variant + ".ttl",
+        declarations: [
+          { id: "module:gestion", kind: "module", name: "gestion" },
+          { id: "feature:proyectos", kind: "feature", name: "proyectos", parent: "module:gestion" },
+          { id: "entity:cliente", kind: "entity", name: "Cliente", parent: "module:gestion", identifier: "id", fields: [{ name: "id", type: "Identifier" }] },
+          { id: "group:periodo", kind: "fieldGroup", name: "Periodo", parent: "entity:proyecto", fields: [{ name: "inicio", type: "Date" }, { name: "fin", type: "Date" }], assertions: ["fin >= inicio"] },
+          {
+            id: "entity:proyecto",
+            kind: "entity",
+            name: "Proyecto",
+            parent: "feature:proyectos",
+            identifier: "id",
+            crud: true,
+            fields: [
+              { name: "id", type: "Identifier" },
+              { name: "clienteId", type: "EntityReference", target: invalid ? "entity:cliente-inexistente" : "entity:cliente" },
+              { name: "periodo", type: "FieldGroup", target: "group:periodo" },
+              { name: "importe", type: "Decimal" },
+            ],
+            ...(explicit ? { route: "/projects", permissions: { create: ["projects.write"], get: ["projects.read"], list: ["projects.read"], patch: ["projects.write"], delete: ["projects.write"] } } : {}),
+            ...(invalid ? { conflicts: [{ property: "crud", values: [true, false] }] } : {}),
+          },
+        ],
+      };
+    }
+
+    function loadSource(variant) {
+      return structuredClone(sourceFixture(variant));
+    }
+
+    function verifySource(source) {
+      const ids = new Set(source.declarations.map((declaration) => declaration.id));
+      const diagnostics = [];
+      for (const declaration of source.declarations) {
+        if (declaration.kind === "entity" && declaration.crud === true && !(declaration.fields || []).some((field) => field.name === declaration.identifier)) {
+          diagnostics.push({ code: "IDENTIFIER_NOT_DECLARED", path: declaration.id + ".identifier", message: "No existe el campo identificador " + declaration.identifier + "." });
+        }
+        if (declaration.parent && !ids.has(declaration.parent)) {
+          diagnostics.push({ code: "PARENT_NOT_FOUND", path: declaration.id, message: "No existe " + declaration.parent + "." });
+        }
+        for (const field of declaration.fields || []) {
+          if (field.target && !ids.has(field.target)) {
+            diagnostics.push({ code: "REFERENCE_NOT_FOUND", path: declaration.id + "." + field.name, message: "No existe " + field.target + "." });
+          }
+        }
+        for (const conflict of declaration.conflicts || []) {
+          diagnostics.push({ code: "CONTRADICTORY_DECLARATION", path: declaration.id + "." + conflict.property, message: "La propiedad declara valores incompatibles: " + conflict.values.join(" y ") + "." });
+        }
+      }
+      return { ok: diagnostics.length === 0, diagnostics };
+    }
+
+    function declarationMap(source) {
+      return new Map(source.declarations.map((declaration) => [declaration.id, declaration]));
+    }
+
+    function routeFor(entity, declarations, profile) {
+      const segments = [entity.name];
+      let current = entity;
+      while (current.parent) {
+        current = declarations.get(current.parent);
+        segments.unshift(current.name);
+      }
+      const derived = profile.route.separator + segments.join(profile.route.separator);
+      return { value: entity.route || derived, origin: entity.route ? "declarado" : "derivado", rule: profile.route.strategy };
+    }
+
+    function permissionFor(entity, verb) {
+      return ["crud." + entity.name.toLowerCase() + "." + verb];
+    }
+
+    function fieldContract(field, declarations) {
+      const group = field.type === "FieldGroup" && declarations.get(field.target);
+      return {
+        name: field.name,
+        type: field.type,
+        ...(group ? { fields: group.fields.map((nested) => fieldContract(nested, declarations)), assertions: group.assertions, origin: "declarado" } : {}),
+      };
+    }
+
+    function entityContract(entity, declarations, fields) {
+      return { name: entity.name, fields: (fields || entity.fields).map((field) => fieldContract(field, declarations)), origin: "declarado" };
+    }
+
+    function crudOperations(entity, route, profile, declarations) {
+      const collection = route.value;
+      const item = collection + "/{" + entity.identifier + "}";
+      const definitions = [
+        ["create", "POST", collection],
+        ["get", "GET", item],
+        ["list", "GET", collection],
+        ["patch", "PATCH", item],
+        ["delete", "DELETE", item],
+      ];
+      return definitions.map(([verb, method, path]) => ({
+        id: entity.id + ":crud:" + verb,
+        verb,
+        method,
+        route: { value: path, origin: route.origin, rule: route.rule },
+        permissions: { value: entity.permissions && entity.permissions[verb] || permissionFor(entity, verb), origin: entity.permissions && entity.permissions[verb] ? "declarado" : "derivado" },
+        origin: "derivado",
+        contracts: {
+          input: verb === "get" || verb === "delete" ? { name: "Identificador", fields: [fieldContract(entity.fields.find((field) => field.name === entity.identifier), declarations)], origin: "declarado" } : verb === "list" ? { name: "Consulta", fields: [], origin: "derivado" } : entityContract(entity, declarations, verb === "create" ? entity.fields.filter((field) => field.name !== entity.identifier) : entity.fields),
+          output: verb === "delete" ? { name: "Sin contenido", fields: [], origin: "derivado" } : verb === "list" ? { name: "Lista de " + entity.name, fields: entityContract(entity, declarations).fields, origin: "derivado" } : entityContract(entity, declarations),
+        },
+        ...(verb === "list" ? { pagination: { ...profile.list, origin: "default" } } : {}),
+        ...(verb === "patch" ? { patch: { ...profile.patch, origin: "default" } } : {}),
+      }));
+    }
+
+    function materialize(source, profile) {
+      const verification = verifySource(source);
+      if (!verification.ok) return { effective: null, diagnostics: verification.diagnostics };
+      const declarations = declarationMap(source);
+      const entity = source.declarations.find((declaration) => declaration.id === "entity:proyecto");
+      const route = routeFor(entity, declarations, profile);
+      const crudEnabled = entity.crud === true;
+      return {
+        effective: {
+          sourceId: source.sourceId,
+          profileId: profile.id,
+          declarations: source.declarations.map((declaration) => ({ id: declaration.id, kind: declaration.kind, name: declaration.name, fields: declaration.fields, assertions: declaration.assertions, origin: "declarado" })),
+          defaults: [
+            ...(entity.crud === undefined ? [] : [{ target: entity.id, property: "crud", value: entity.crud, origin: "declarado" }]),
+            { target: "crud:list", property: "pagination", value: profile.list, origin: "default" },
+            { target: "crud:patch", property: "semantics", value: profile.patch, origin: "default" },
+          ],
+          operations: crudEnabled ? crudOperations(entity, route, profile, declarations) : [],
+        },
+        diagnostics: [],
+      };
+    }
+
+    const initialState = () => ({ variant: null, source: null, verification: null, materialization: null, lastAction: "Ninguna acción todavía." });
+
+    function reduce(state, action) {
+      if (action.type === "reset") return initialState();
+      if (action.type === "load") return { ...initialState(), variant: action.variant, source: loadSource(action.variant), lastAction: "Cargada la variante " + action.variant + "." };
+      if (action.type === "verify" && state.source) {
+        const verification = verifySource(state.source);
+        return { ...state, verification, materialization: null, lastAction: verification.ok ? "La fuente supera la verificación." : "La verificación encontró bloqueos." };
+      }
+      if (action.type === "materialize" && state.source) {
+        const materialization = materialize(state.source, prototypeProfile);
+        return { ...state, verification: verifySource(state.source), materialization, lastAction: materialization.effective ? "Modelo efectivo materializado." : "La materialización está bloqueada." };
+      }
+      return { ...state, lastAction: "Carga una fuente antes de ejecutar esta acción." };
+    }
+
+    function originBadge(origin) {
+      const badge = document.createElement("span");
+      badge.textContent = origin;
+      badge.dataset.origin = origin;
+      return badge;
+    }
+
+    function addLine(parent, label, value, origin) {
+      const line = document.createElement("p");
+      const labelNode = document.createElement("strong");
+      labelNode.textContent = label + ": ";
+      line.append(labelNode, document.createTextNode(String(value)));
+      if (origin) line.append(" ", originBadge(origin));
+      parent.append(line);
+    }
+
+    function formatContract(contract) {
+      return contract.name + (contract.fields.length ? ": " + contract.fields.map((field) => field.name + " (" + field.type + ")" + (field.fields ? " { " + field.fields.map((nested) => nested.name + " (" + nested.type + ")").join(", ") + " }" : "") + (field.assertions ? " [" + field.assertions.join("; ") + "]" : "")).join(", ") : "");
+    }
+
+    function render(currentState) {
+      const root = document.getElementById("state");
+      root.replaceChildren();
+      addLine(root, "Fuente", currentState.source ? currentState.source.sourceId : "Ninguna");
+      addLine(root, "Etapa", !currentState.source ? "sin fuente cargada" : currentState.materialization && currentState.materialization.effective ? "materializada" : currentState.verification ? "verificada" : "cargada");
+      addLine(root, "Última acción", currentState.lastAction);
+      const diagnostics = currentState.verification ? currentState.verification.diagnostics : [];
+      if (diagnostics.length) {
+        for (const diagnostic of diagnostics) addLine(root, "Diagnóstico", diagnostic.code + " — " + diagnostic.path + ": " + diagnostic.message);
+      } else addLine(root, "Diagnósticos", "ninguno");
+      const effective = currentState.materialization && currentState.materialization.effective;
+      if (!effective) {
+        if (currentState.materialization) addLine(root, "Modelo efectivo", "No hay modelo efectivo: la verificación bloquea la materialización.");
+        return;
+      }
+      addLine(root, "Declaraciones", effective.declarations.map((item) => item.name).join(", "), "declarado");
+      addLine(root, "Defaults aplicados", effective.defaults.length, "default");
+      for (const item of effective.defaults) addLine(root, "Default", item.target + "." + item.property + " = " + JSON.stringify(item.value), item.origin);
+      addLine(root, "Operaciones derivadas", effective.operations.length, "derivado");
+      const labels = { create: "Crear", get: "Obtener", list: "Listar", patch: "Actualizar", delete: "Eliminar" };
+      for (const operation of effective.operations) {
+        addLine(root, labels[operation.verb] || operation.verb, operation.method + " " + operation.route.value, operation.origin);
+        addLine(root, "Ruta", operation.route.value, operation.route.origin);
+        addLine(root, "Permisos", operation.permissions.value.join(", "), operation.permissions.origin);
+        addLine(root, "Entrada", formatContract(operation.contracts.input), operation.contracts.input.origin);
+        addLine(root, "Salida", formatContract(operation.contracts.output), operation.contracts.output.origin);
+        if (operation.pagination) addLine(root, "Paginación", operation.pagination.modes.join(" | ") + "; default " + operation.pagination.defaultLimit + "; max " + operation.pagination.maxLimit, operation.pagination.origin);
+        if (operation.patch) addLine(root, "PATCH", "ausente=conservar; grupo presente=sustituir; valida estado completo", operation.patch.origin);
+      }
+      const rules = effective.declarations.flatMap((declaration) => [
+        ...(declaration.assertions || []).map((assertion) => (declaration.fields || []).reduce((text, field) => text.replace(new RegExp("\\b" + field.name + "\\b", "g"), declaration.name + "." + field.name), assertion)),
+        ...(declaration.fields || []).filter((field) => field.type === "Decimal").map((field) => field.name + " decimal exacto"),
+      ]);
+      addLine(root, "Reglas", rules.length ? rules.join("; ") : "ninguna", "declarado");
+    }
+
+    const freePlayActions = [
+      ["Cargar contrato mínimo", { type: "load", variant: "valid" }],
+      ["Cargar declaración explícita", { type: "load", variant: "explicit" }],
+      ["Cargar contrato inválido", { type: "load", variant: "invalid" }],
+      ["Verificar fuente", { type: "verify" }],
+      ["Materializar modelo efectivo", { type: "materialize" }],
+      ["Reiniciar", { type: "reset" }],
+    ];
+
+    const scenarios = [
+      { id: "crud", title: "CRUD explícitamente habilitado", description: "Una entidad con crud: true declara explícitamente la habilitación y produce cinco operaciones.", steps: [["Cargar fuente", { type: "load", variant: "valid" }], ["Verificar", { type: "verify" }], ["Materializar", { type: "materialize" }]] },
+      { id: "explicit", title: "Declaración explícita", description: "Una ruta y permisos escritos sustituyen los valores derivados.", steps: [["Cargar fuente", { type: "load", variant: "explicit" }], ["Verificar", { type: "verify" }], ["Materializar", { type: "materialize" }]] },
+      { id: "blocked", title: "Verificación bloqueante", description: "Una referencia inexistente y una contradicción impiden producir un modelo parcial.", steps: [["Cargar fuente", { type: "load", variant: "invalid" }], ["Verificar", { type: "verify" }], ["Intentar materializar", { type: "materialize" }]] },
+    ];
+
+    function scenarioCheck(scenarioId, currentState) {
+      if (scenarioId === "crud") {
+        const effective = currentState.materialization && currentState.materialization.effective;
+        const crud = effective && effective.defaults.find((item) => item.target === "entity:proyecto" && item.property === "crud");
+        return Boolean(effective && crud && crud.value === true && crud.origin === "declarado" && effective.operations.length === 5);
+      }
+      if (scenarioId === "explicit") {
+        const operations = currentState.materialization && currentState.materialization.effective ? currentState.materialization.effective.operations : [];
+        return operations.length === 5 && operations.every((operation) => operation.route.origin === "declarado" && operation.permissions.origin === "declarado");
+      }
+      return scenarioId === "blocked" && currentState.materialization && currentState.materialization.effective === null;
+    }
+
+    let state = initialState();
+    let activeScenario = null;
+    let scenarioStep = 0;
+
+    function dispatch(action) {
+      state = reduce(state, action);
+      render(state);
+      renderWalkthroughs();
+    }
+
+    function makeButton(label, onClick) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = label;
+      button.addEventListener("click", onClick);
+      return button;
+    }
+
+    function renderFreePlay() {
+      const root = document.getElementById("free-play");
+      for (const [label, action] of freePlayActions) root.append(makeButton(label, () => dispatch(action)));
+    }
+
+    function renderWalkthroughs() {
+      const root = document.getElementById("walkthroughs");
+      root.replaceChildren();
+      const tabs = document.createElement("p");
+      for (const scenario of scenarios) tabs.append(makeButton(scenario.title, () => startScenario(scenario)));
+      root.append(tabs);
+      if (!activeScenario) return;
+      const panel = document.createElement("div");
+      const title = document.createElement("h3");
+      title.textContent = activeScenario.title;
+      const description = document.createElement("p");
+      description.textContent = activeScenario.description;
+      panel.append(title, description);
+      const complete = scenarioStep === activeScenario.steps.length;
+      panel.append(makeButton(complete ? "Finalizado" : activeScenario.steps[scenarioStep][0], () => advanceScenario()));
+      if (complete) {
+        const check = document.createElement("p");
+        check.textContent = "Comprobación del recorrido: " + (scenarioCheck(activeScenario.id, state) ? "correcta" : "revisar");
+        panel.append(check);
+      }
+      root.append(panel);
+    }
+
+    function startScenario(scenario) {
+      activeScenario = scenario;
+      scenarioStep = 0;
+      dispatch({ type: "reset" });
+      dispatch(scenario.steps[scenarioStep][1]);
+      scenarioStep += 1;
+      renderWalkthroughs();
+    }
+
+    function advanceScenario() {
+      if (scenarioStep < activeScenario.steps.length) {
+        dispatch(activeScenario.steps[scenarioStep][1]);
+        scenarioStep += 1;
+      }
+      renderWalkthroughs();
+    }
+
+    render(state);
+    renderFreePlay();
+    renderWalkthroughs();
+  </script>
+</body>
+</html>

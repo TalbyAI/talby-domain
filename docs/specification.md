@@ -72,7 +72,23 @@ En la primera iteración las agrupaciones solo se incorporan anidadas, mediante 
 
 En un mensaje de cambios parciales, una agrupación presente se sustituye completa y una ausente permanece intacta. La agrupación aportada conserva sus propias validaciones y debe cumplir las validaciones globales del comando que la contiene. No se admiten modificaciones parciales recursivas dentro de la agrupación en esta iteración.
 
-Una entidad puede declarar que dispone de CRUD por defecto; en ese caso, sus operaciones quedan presentes sin describir los comandos uno a uno. Se derivan crear, obtener por identificador, listar con paginación, actualizar parcialmente y eliminar. El identificador debe estar declarado. Al actualizar, los campos ausentes permanecen intactos y se valida el estado resultante. Las operaciones derivadas deben poder inspeccionarse como contratos explícitos. Su interacción con vistas explícitas y el detalle de las respuestas y errores se concretarán en el diseño de los contratos derivados.
+Una entidad puede declarar explícitamente que dispone de CRUD por defecto; en ese caso, sus operaciones quedan presentes sin describir los comandos uno a uno. CRUD no se habilita por omisión. Cuando está habilitado, se derivan crear, obtener por identificador, listar con paginación, actualizar parcialmente y eliminar. El identificador debe estar declarado. Al actualizar, los campos ausentes permanecen intactos y se valida el estado resultante. Las operaciones derivadas deben poder inspeccionarse como contratos explícitos. Su interacción con vistas explícitas y el detalle de las respuestas y errores se concretarán en el diseño de los contratos derivados.
+
+### Resultado del prototipo del modelo efectivo
+
+Estado: conclusiones confirmadas por revisión humana a partir del prototipo del [issue #5](https://github.com/TalbyAI/talby-domain/issues/5). El [inspector desechable](../prototypes/effective-contract-inspector/) aporta la evidencia de esta forma de materialización:
+
+- El flujo visible es `fuente → verificación → materialización → inspección`; una fuente con referencias inexistentes o declaraciones contradictorias no produce un modelo efectivo parcial.
+- Cada elemento distingue su procedencia (`declarado`, `default` o `derivado`) como metadato interno del modelo efectivo, no como parte del payload HTTP público. Un valor explícito sustituye al default y conserva esa procedencia en la ruta, los permisos y los contratos CRUD.
+- CRUD explícitamente habilitado materializa exactamente crear, obtener, listar, actualizar parcialmente y eliminar, cada uno con contrato de entrada y salida inspeccionable. No se habilita automáticamente en ninguna entidad.
+- Un mensaje de cambios parciales conserva campos ausentes, reemplaza completamente una agrupación presente y valida el estado completo; no admite PATCH recursivo dentro de la agrupación en esta iteración.
+- Las inclusiones anidadas conservan sus campos y reglas en contexto, incluido `Periodo.fin >= Periodo.inicio`; el importe decimal se trata como decimal exacto.
+
+La ruta se deriva de la jerarquía módulo/feature/entidad y admite override explícito; los permisos CRUD se derivan por operación y admiten override explícito. La estabilidad de los permisos derivados cuando cambia el nombre o la ubicación de una declaración queda pendiente.
+
+Como dirección futura, fuera de la primera iteración, se registrará un mecanismo general de plantillas o plugins de definición. Podrá recibir modelos semánticos, visuales, de negocio o técnicos y producir definiciones en la misma área o en áreas dependientes, siempre hacia abajo; nunca podrá producir información en un área superior a sus entradas. El ticket deberá cuestionar y especificar todo el mecanismo, sin asumir investigación profunda previa ni una jerarquía completa entre áreas.
+
+Estas conclusiones fijan la forma del modelo efectivo para la primera iteración, pero no resuelven todavía las shapes RDF, las firmas ejecutables, el mapeo HTTP detallado, SQLite o la generación de TypeScript.
 
 Los listados deben admitir tanto `offset + limit` como `continuationToken + limit`. El límite por defecto es 20 y el máximo 100, con orden estable por identificador. Cada listado declara las modalidades admitidas y una por defecto; los listados CRUD derivados admiten ambas. La petición selecciona una modalidad y se rechaza mezclar `offset` y token.
 
