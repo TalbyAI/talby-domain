@@ -231,7 +231,9 @@
         return;
       }
       addLine(root, "Declaraciones", effective.declarations.map((item) => item.name).join(", "), "declarado");
+      addLine(root, "Defaults aplicados", effective.defaults.length, "default");
       for (const item of effective.defaults) addLine(root, "Default", item.target + "." + item.property + " = " + JSON.stringify(item.value), item.origin);
+      addLine(root, "Operaciones derivadas", effective.operations.length, "derivado");
       const labels = { create: "Crear", get: "Obtener", list: "Listar", patch: "Actualizar", delete: "Eliminar" };
       for (const operation of effective.operations) {
         addLine(root, labels[operation.verb] || operation.verb, operation.method + " " + operation.route.value, operation.origin);
@@ -240,8 +242,10 @@
         addLine(root, "Entrada", formatContract(operation.contracts.input), operation.contracts.input.origin);
         addLine(root, "Salida", formatContract(operation.contracts.output), operation.contracts.output.origin);
         if (operation.pagination) addLine(root, "Paginación", operation.pagination.modes.join(" | ") + "; default " + operation.pagination.defaultLimit + "; max " + operation.pagination.maxLimit, operation.pagination.origin);
-        if (operation.patch) addLine(root, "PATCH", "ausente=" + operation.patch.absentField + "; grupo presente=" + operation.patch.presentGroup + "; valida estado completo=" + operation.patch.validatesCompleteResult, operation.patch.origin);
+        if (operation.patch) addLine(root, "PATCH", "ausente=conservar; grupo presente=sustituir; valida estado completo", operation.patch.origin);
       }
+      const rules = effective.declarations.flatMap((declaration) => (declaration.assertions || []).map((assertion) => declaration.name + "." + assertion));
+      addLine(root, "Reglas", rules.length ? rules.join("; ") : "ninguna", "declarado");
     }
 
     const freePlayActions = [
