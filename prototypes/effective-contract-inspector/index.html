@@ -36,6 +36,131 @@
   </main>
   <script>
     "use strict";
+
+    const prototypeProfile = Object.freeze({
+      id: "prototype-defaults",
+      entityCrud: true,
+      list: Object.freeze({ modes: ["offset", "continuationToken"], defaultMode: "offset", defaultLimit: 20, maxLimit: 100 }),
+      route: Object.freeze({ strategy: "module/feature/entity", separator: "/" }),
+      permissions: Object.freeze({ pattern: "crud.{entity}.{verb}" }),
+      patch: Object.freeze({ absentField: "preserve", presentGroup: "replace", validatesCompleteResult: true, recursiveNestedPatch: false }),
+    });
+
+    function sourceFixture(variant) {
+      const explicit = variant === "explicit";
+      const invalid = variant === "invalid";
+      return {
+        sourceId: "projects-" + variant + ".ttl",
+        declarations: [
+          { id: "module:gestion", kind: "module", name: "gestion" },
+          { id: "feature:proyectos", kind: "feature", name: "proyectos", parent: "module:gestion" },
+          { id: "entity:cliente", kind: "entity", name: "Cliente", parent: "module:gestion", identifier: "id", fields: [{ name: "id", type: "Identifier" }] },
+          { id: "group:periodo", kind: "fieldGroup", name: "Periodo", parent: "entity:proyecto", fields: [{ name: "inicio", type: "Date" }, { name: "fin", type: "Date" }], assertions: ["fin >= inicio"] },
+          {
+            id: "entity:proyecto",
+            kind: "entity",
+            name: "Proyecto",
+            parent: "feature:proyectos",
+            identifier: "id",
+            fields: [
+              { name: "id", type: "Identifier" },
+              { name: "clienteId", type: "EntityReference", target: invalid ? "entity:cliente-inexistente" : "entity:cliente" },
+              { name: "periodo", type: "FieldGroup", target: "group:periodo" },
+              { name: "importe", type: "Decimal" },
+            ],
+            ...(explicit ? { route: "/projects", permissions: { create: ["projects.write"], get: ["projects.read"], list: ["projects.read"], patch: ["projects.write"], delete: ["projects.write"] } } : {}),
+            ...(invalid ? { conflicts: [{ property: "crud", values: [true, false] }] } : {}),
+          },
+        ],
+      };
+    }
+
+    function loadSource(variant) {
+      return structuredClone(sourceFixture(variant));
+    }
+
+    function verifySource(source) {
+      const ids = new Set(source.declarations.map((declaration) => declaration.id));
+      const diagnostics = [];
+      for (const declaration of source.declarations) {
+        if (declaration.parent && !ids.has(declaration.parent)) {
+          diagnostics.push({ code: "PARENT_NOT_FOUND", path: declaration.id, message: "No existe " + declaration.parent + "." });
+        }
+        for (const field of declaration.fields || []) {
+          if (field.target && !ids.has(field.target)) {
+            diagnostics.push({ code: "REFERENCE_NOT_FOUND", path: declaration.id + "." + field.name, message: "No existe " + field.target + "." });
+          }
+        }
+        for (const conflict of declaration.conflicts || []) {
+          diagnostics.push({ code: "CONTRADICTORY_DECLARATION", path: declaration.id + "." + conflict.property, message: "La propiedad declara valores incompatibles: " + conflict.values.join(" y ") + "." });
+        }
+      }
+      return { ok: diagnostics.length === 0, diagnostics };
+    }
+
+    function declarationMap(source) {
+      return new Map(source.declarations.map((declaration) => [declaration.id, declaration]));
+    }
+
+    function routeFor(entity, declarations, profile) {
+      const segments = [entity.name];
+      let current = entity;
+      while (current.parent) {
+        current = declarations.get(current.parent);
+        segments.unshift(current.name);
+      }
+      const derived = profile.route.separator + segments.join(profile.route.separator);
+      return { value: entity.route || derived, origin: entity.route ? "declarado" : "derivado", rule: profile.route.strategy };
+    }
+
+    function permissionFor(entity, verb) {
+      return ["crud." + entity.name.toLowerCase() + "." + verb];
+    }
+
+    function crudOperations(entity, route, profile) {
+      const collection = route.value;
+      const item = collection + "/{" + entity.identifier + "}";
+      const definitions = [
+        ["create", "POST", collection],
+        ["get", "GET", item],
+        ["list", "GET", collection],
+        ["patch", "PATCH", item],
+        ["delete", "DELETE", item],
+      ];
+      return definitions.map(([verb, method, path]) => ({
+        id: entity.id + ":crud:" + verb,
+        verb,
+        method,
+        route: { value: path, origin: route.origin, rule: route.rule },
+        permissions: { value: entity.permissions && entity.permissions[verb] || permissionFor(entity, verb), origin: entity.permissions && entity.permissions[verb] ? "declarado" : "derivado" },
+        origin: "derivado",
+        ...(verb === "list" ? { pagination: { ...profile.list, origin: "default" } } : {}),
+        ...(verb === "patch" ? { patch: { ...profile.patch, origin: "default" } } : {}),
+      }));
+    }
+
+    function materialize(source, profile) {
+      const verification = verifySource(source);
+      if (!verification.ok) return { effective: null, diagnostics: verification.diagnostics };
+      const declarations = declarationMap(source);
+      const entity = source.declarations.find((declaration) => declaration.id === "entity:proyecto");
+      const route = routeFor(entity, declarations, profile);
+      const crudEnabled = entity.crud === undefined ? profile.entityCrud : entity.crud;
+      return {
+        effective: {
+          sourceId: source.sourceId,
+          profileId: profile.id,
+          declarations: source.declarations.map((declaration) => ({ id: declaration.id, kind: declaration.kind, name: declaration.name, origin: "declarado" })),
+          defaults: [
+            { target: entity.id, property: "crud", value: crudEnabled, origin: entity.crud === undefined ? "default" : "declarado" },
+            { target: "crud:list", property: "pagination", value: profile.list, origin: "default" },
+            { target: "crud:patch", property: "semantics", value: profile.patch, origin: "default" },
+          ],
+          operations: crudEnabled ? crudOperations(entity, route, profile) : [],
+        },
+        diagnostics: [],
+      };
+    }
   </script>
 </body>
 </html>
