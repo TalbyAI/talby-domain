@@ -15,7 +15,7 @@
 - El módulo de lógica no conocerá document, el DOM ni los manejadores de botones.
 - Cada elemento visible distinguirá los orígenes declarado, default y derivado.
 - El modelo de ejemplo usará gestion, proyectos, Proyecto, Periodo e importe decimal.
-- CRUD por defecto derivará crear, obtener, listar, actualizar parcialmente y eliminar.
+- Una entidad solo derivará CRUD si declara explícitamente `crud: true`; en ese caso derivará crear, obtener, listar, actualizar parcialmente y eliminar.
 - PATCH conservará campos ausentes, sustituirá agrupaciones presentes completas y validará el estado resultante.
 - Una ruta explícita sustituirá la ruta derivada; permisos explícitos sustituirán los permisos derivados.
 - Referencias inexistentes y contradicciones bloquearán la materialización.
@@ -159,7 +159,6 @@ Insert this data before DOM code:
 ~~~js
 const prototypeProfile = Object.freeze({
   id: "prototype-defaults",
-  entityCrud: true,
   list: Object.freeze({ modes: ["offset", "continuationToken"], defaultMode: "offset", defaultLimit: 20, maxLimit: 100 }),
   route: Object.freeze({ strategy: "module/feature/entity", separator: "/" }),
   permissions: Object.freeze({ pattern: "crud.{entity}.{verb}" }),
@@ -182,6 +181,7 @@ function sourceFixture(variant) {
         name: "Proyecto",
         parent: "feature:proyectos",
         identifier: "id",
+        crud: true,
         fields: [
           { name: "id", type: "Identifier" },
           { name: "clienteId", type: "EntityReference", target: invalid ? "entity:cliente-inexistente" : "entity:cliente" },
@@ -277,14 +277,14 @@ function materialize(source, profile) {
   const declarations = declarationMap(source);
   const entity = source.declarations.find((declaration) => declaration.id === "entity:proyecto");
   const route = routeFor(entity, declarations, profile);
-  const crudEnabled = entity.crud === undefined ? profile.entityCrud : entity.crud;
+  const crudEnabled = entity.crud === true;
   return {
     effective: {
       sourceId: source.sourceId,
       profileId: profile.id,
       declarations: source.declarations.map((declaration) => ({ id: declaration.id, kind: declaration.kind, name: declaration.name, origin: "declarado" })),
       defaults: [
-        { target: entity.id, property: "crud", value: crudEnabled, origin: entity.crud === undefined ? "default" : "declarado" },
+        ...(entity.crud === undefined ? [] : [{ target: entity.id, property: "crud", value: entity.crud, origin: "declarado" }]),
         { target: "crud:list", property: "pagination", value: profile.list, origin: "default" },
         { target: "crud:patch", property: "semantics", value: profile.patch, origin: "default" },
       ],
@@ -429,7 +429,7 @@ The verify and materialize buttons remain visible before loading a source; the s
 
 ~~~js
 const scenarios = [
-  { id: "defaults", title: "CRUD por defecto", description: "Una entidad sin CRUD escrito recibe el default del perfil y produce cinco operaciones.", steps: [["Cargar fuente", { type: "load", variant: "valid" }], ["Verificar", { type: "verify" }], ["Materializar", { type: "materialize" }]] },
+  { id: "crud", title: "CRUD explícitamente habilitado", description: "Una entidad con crud: true declara explícitamente la habilitación y produce cinco operaciones.", steps: [["Cargar fuente", { type: "load", variant: "valid" }], ["Verificar", { type: "verify" }], ["Materializar", { type: "materialize" }]] },
   { id: "explicit", title: "Declaración explícita", description: "Una ruta y permisos escritos sustituyen los valores derivados.", steps: [["Cargar fuente", { type: "load", variant: "explicit" }], ["Verificar", { type: "verify" }], ["Materializar", { type: "materialize" }]] },
   { id: "blocked", title: "Verificación bloqueante", description: "Una referencia inexistente y una contradicción impiden producir un modelo parcial.", steps: [["Cargar fuente", { type: "load", variant: "invalid" }], ["Verificar", { type: "verify" }], ["Intentar materializar", { type: "materialize" }]] },
 ];
@@ -441,7 +441,11 @@ Starting a scenario first dispatches reset, then its first load action. The next
 
 ~~~js
 function scenarioCheck(scenarioId, currentState) {
-  if (scenarioId === "defaults") return currentState.materialization && currentState.materialization.effective && currentState.materialization.effective.operations.length === 5;
+  if (scenarioId === "crud") {
+    const effective = currentState.materialization && currentState.materialization.effective;
+    const crud = effective && effective.defaults.find((item) => item.target === "entity:proyecto" && item.property === "crud");
+    return Boolean(effective && crud && crud.value === true && crud.origin === "declarado" && effective.operations.length === 5);
+  }
   if (scenarioId === "explicit") {
     const operations = currentState.materialization && currentState.materialization.effective ? currentState.materialization.effective.operations : [];
     return operations.length === 5 && operations.every((operation) => operation.route.origin === "declarado" && operation.permissions.origin === "declarado");
@@ -461,7 +465,7 @@ Start-Process .\index.html
 
 Expected:
 
-- CRUD por defecto ends with five operations and a correct check.
+- CRUD explícitamente habilitado ends with five operations and a correct check.
 - Declaración explícita ends with /projects, declared permissions and a correct check.
 - Verificación bloqueante shows REFERENCE_NOT_FOUND, CONTRADICTORY_DECLARATION, no operations and a correct check.
 

@@ -50,7 +50,7 @@ Cada acción actualizará el estado completo y señalará qué cambió.
 
 Habrá tres pestañas guiadas. Cada una reinicia a un estado conocido y avanza con botones reales:
 
-1. **CRUD por defecto**: carga una entidad con CRUD por defecto, verifica y materializa las cinco operaciones: crear, obtener, listar, actualizar parcialmente y eliminar.
+1. **CRUD explícitamente habilitado**: carga una entidad que declara `crud: true`, verifica y materializa las cinco operaciones: crear, obtener, listar, actualizar parcialmente y eliminar.
 2. **Declaración explícita**: muestra un override de ruta y permisos declarados; esos valores sustituyen los defaults correspondientes y el inspector conserva la procedencia.
 3. **Verificación bloqueante**: carga una referencia inexistente o una contradicción, muestra el diagnóstico y deja claro que no se produce un modelo efectivo parcial.
 
@@ -58,7 +58,7 @@ Habrá tres pestañas guiadas. Cada una reinicia a un estado conocido y avanza c
 
 El prototipo será satisfactorio si permite observar sin leer código que:
 
-- CRUD por defecto deriva exactamente las cinco operaciones acordadas;
+- CRUD explícitamente habilitado deriva exactamente las cinco operaciones acordadas;
 - un PATCH conserva los campos ausentes, sustituye completa una agrupación presente y valida el estado resultante;
 - las reglas de una inclusión anidada permanecen visibles en su contexto;
 - un override explícito gana al default;
