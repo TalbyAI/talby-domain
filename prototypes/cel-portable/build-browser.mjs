@@ -1,0 +1,16 @@
+import { build } from 'esbuild';
+import { mkdirSync, copyFileSync, writeFileSync, readFileSync } from 'node:fs';
+import { gzipSync } from 'node:zlib';
+import { resolve } from 'node:path';
+const mode=process.argv[2]??'js';
+if(!['js','wasm'].includes(mode))throw Error('Use js or wasm');
+mkdirSync('dist', {recursive:true});
+mkdirSync('results', {recursive:true});
+await build({entryPoints:['worker.ts'],bundle:true,format:'iife',platform:'browser',external:['fs','path'],outfile:'dist/worker.js',plugins:mode==='wasm'?[{name:'wasm-candidate',setup(b){b.onResolve({filter:/^\.\/regex\.ts$/},()=>({path:resolve('regex-wasm.ts')}));}}]:[]});
+if(mode==='wasm')copyFileSync('node_modules/re2-wasm/build/wasm/re2.wasm','dist/re2.wasm');
+copyFileSync('cases.json','dist/cases.json');
+writeFileSync('dist/index.html', `<!doctype html><html lang="es"><meta charset="utf-8"><title>CEL — prueba de navegador</title><h1>CEL — prueba de navegador</h1><p>Casos compartidos, ejecutados en un Worker con ${mode==='wasm'?'RE2-WASM':'RE2JS'}.</p><pre id="result">Cargando…</pre><script src="page.js"></script></html>`);
+writeFileSync('dist/page.js', `const stable=x=>JSON.stringify(x,(_,v)=>v&&typeof v==='object'&&!Array.isArray(v)?Object.fromEntries(Object.entries(v).sort(([a],[b])=>a.localeCompare(b))):v);let casesSha256;const started=performance.now();const result=document.getElementById('result');const worker=new Worker('worker.js');worker.onerror=e=>{result.textContent=JSON.stringify({status:'load-error',message:e.message});worker.terminate();};worker.onmessage=({data})=>{const failures=data.rows.filter(r=>stable(r.expected)!==stable(r.actual));result.textContent=JSON.stringify({status:failures.length?'failed':'passed',cases:data.rows.length,casesSha256,failures,elapsedMs:data.elapsedMs,startupAndRunMs:performance.now()-started,userAgent:navigator.userAgent},null,2);worker.terminate();};fetch('cases.json').then(r=>r.text()).then(async text=>{casesSha256=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(text)))).map(b=>b.toString(16).padStart(2,'0')).join('');worker.postMessage(JSON.parse(text));}).catch(e=>result.textContent=String(e));`);
+const sizes=Object.fromEntries((mode==='wasm'?['worker.js','re2.wasm']:['worker.js']).map(f=>{const b=readFileSync('dist/'+f);return[f,{bytes:b.length,gzipBytes:gzipSync(b).length}]}));
+writeFileSync('results/browser-size-'+mode+'.json',JSON.stringify(sizes,null,2));
+console.log(sizes);

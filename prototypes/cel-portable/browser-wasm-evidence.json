@@ -1,0 +1,12 @@
+{
+  "strict": {
+    "status": "load-error",
+    "message": "Uncaught EvalError: Evaluating a string as JavaScript violates the following Content Security Policy directive because 'unsafe-eval' is not an allowed source of script: script-src 'self' 'wasm-unsafe-eval'\".\n"
+  },
+  "relaxed": {
+    "status": "failed",
+    "cases": 215,
+    "failures": 30
+  },
+  "firstError": "WASM candidate: TypeError: re2_1.WrappedRE2 is not a constructor\n    at new _RE2 (http://127.0.0.1:4178/relaxed/worker.js:3849:26)\n    at matches (http://127.0.0.1:4178/relaxed/worker.js:8343:14)\n    at Evaluator.<anonymous> (http://127.0.0.1:4178/relaxed/worker.js:8536:12)\n    at callFunctionHandler (http://127.0.0.1:4178/relaxed/worker.js:6398:30)\n    at argTypes.some.decl.handler.__handle [as handle] (http://127.0.0.1:4178/relaxed/worker.js:6640:112)\n    at _ASTNode.evaluate (http://127.0.0.1:4178/relaxed/worker.js:6645:20)\n    at _ASTNode.evaluate (http://127.0.0.1:4178/relaxed/worker.js:7477:19)\n    at #evaluateAST (http://127.0.0.1:4178/relaxed/worker.js:8286:20)\n    at _Environment.evaluate (http://127.0.0.1:4178/relaxed/worker.js:8279:31)\n    at run (http://127.0.0.1:4178/relaxed/worker.js:8584:25)"
+}
