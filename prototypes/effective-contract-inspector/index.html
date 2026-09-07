@@ -117,7 +117,20 @@
       return ["crud." + entity.name.toLowerCase() + "." + verb];
     }
 
-    function crudOperations(entity, route, profile) {
+    function fieldContract(field, declarations) {
+      const group = field.target && declarations.get(field.target);
+      return {
+        name: field.name,
+        type: field.type,
+        ...(group ? { fields: group.fields.map((nested) => fieldContract(nested, declarations)), assertions: group.assertions, origin: "declarado" } : {}),
+      };
+    }
+
+    function entityContract(entity, declarations, fields) {
+      return { name: entity.name, fields: (fields || entity.fields).map((field) => fieldContract(field, declarations)), origin: "declarado" };
+    }
+
+    function crudOperations(entity, route, profile, declarations) {
       const collection = route.value;
       const item = collection + "/{" + entity.identifier + "}";
       const definitions = [
@@ -134,6 +147,10 @@
         route: { value: path, origin: route.origin, rule: route.rule },
         permissions: { value: entity.permissions && entity.permissions[verb] || permissionFor(entity, verb), origin: entity.permissions && entity.permissions[verb] ? "declarado" : "derivado" },
         origin: "derivado",
+        contracts: {
+          input: verb === "get" || verb === "delete" ? { name: "Identificador", fields: [fieldContract(entity.fields.find((field) => field.name === entity.identifier), declarations)], origin: "declarado" } : verb === "list" ? { name: "Consulta", fields: [], origin: "derivado" } : entityContract(entity, declarations, verb === "create" ? entity.fields.filter((field) => field.name !== entity.identifier) : entity.fields),
+          output: verb === "delete" ? { name: "Sin contenido", fields: [], origin: "derivado" } : verb === "list" ? { name: "Lista de " + entity.name, fields: entityContract(entity, declarations).fields, origin: "derivado" } : entityContract(entity, declarations),
+        },
         ...(verb === "list" ? { pagination: { ...profile.list, origin: "default" } } : {}),
         ...(verb === "patch" ? { patch: { ...profile.patch, origin: "default" } } : {}),
       }));
@@ -150,13 +167,13 @@
         effective: {
           sourceId: source.sourceId,
           profileId: profile.id,
-          declarations: source.declarations.map((declaration) => ({ id: declaration.id, kind: declaration.kind, name: declaration.name, origin: "declarado" })),
+          declarations: source.declarations.map((declaration) => ({ id: declaration.id, kind: declaration.kind, name: declaration.name, fields: declaration.fields, assertions: declaration.assertions, origin: "declarado" })),
           defaults: [
             { target: entity.id, property: "crud", value: crudEnabled, origin: entity.crud === undefined ? "default" : "declarado" },
             { target: "crud:list", property: "pagination", value: profile.list, origin: "default" },
             { target: "crud:patch", property: "semantics", value: profile.patch, origin: "default" },
           ],
-          operations: crudEnabled ? crudOperations(entity, route, profile) : [],
+          operations: crudEnabled ? crudOperations(entity, route, profile, declarations) : [],
         },
         diagnostics: [],
       };
@@ -194,30 +211,37 @@
       parent.append(line);
     }
 
+    function formatContract(contract) {
+      return contract.name + (contract.fields.length ? ": " + contract.fields.map((field) => field.name + " (" + field.type + ")" + (field.fields ? " { " + field.fields.map((nested) => nested.name + " (" + nested.type + ")").join(", ") + " }" : "") + (field.assertions ? " [" + field.assertions.join("; ") + "]" : "")).join(", ") : "");
+    }
+
     function render(currentState) {
       const root = document.getElementById("state");
       root.replaceChildren();
       addLine(root, "Fuente", currentState.source ? currentState.source.sourceId : "Ninguna");
-      addLine(root, "Etapa", currentState.materialization && currentState.materialization.effective ? "materializada" : currentState.verification ? "verificada" : "cargada");
+      addLine(root, "Etapa", !currentState.source ? "sin fuente cargada" : currentState.materialization && currentState.materialization.effective ? "materializada" : currentState.verification ? "verificada" : "cargada");
       addLine(root, "Última acción", currentState.lastAction);
       const diagnostics = currentState.verification ? currentState.verification.diagnostics : [];
-      addLine(root, "Diagnósticos", diagnostics.length ? diagnostics.map((item) => item.code).join(", ") : "ninguno");
+      if (diagnostics.length) {
+        for (const diagnostic of diagnostics) addLine(root, "Diagnóstico", diagnostic.code + " — " + diagnostic.path + ": " + diagnostic.message);
+      } else addLine(root, "Diagnósticos", "ninguno");
       const effective = currentState.materialization && currentState.materialization.effective;
       if (!effective) {
         if (currentState.materialization) addLine(root, "Modelo efectivo", "No hay modelo efectivo: la verificación bloquea la materialización.");
         return;
       }
       addLine(root, "Declaraciones", effective.declarations.map((item) => item.name).join(", "), "declarado");
-      addLine(root, "Defaults aplicados", effective.defaults.length, "default");
+      for (const item of effective.defaults) addLine(root, "Default", item.target + "." + item.property + " = " + JSON.stringify(item.value), item.origin);
       const labels = { create: "Crear", get: "Obtener", list: "Listar", patch: "Actualizar", delete: "Eliminar" };
       for (const operation of effective.operations) {
         addLine(root, labels[operation.verb] || operation.verb, operation.method + " " + operation.route.value, operation.origin);
         addLine(root, "Ruta", operation.route.value, operation.route.origin);
         addLine(root, "Permisos", operation.permissions.value.join(", "), operation.permissions.origin);
+        addLine(root, "Entrada", formatContract(operation.contracts.input), operation.contracts.input.origin);
+        addLine(root, "Salida", formatContract(operation.contracts.output), operation.contracts.output.origin);
         if (operation.pagination) addLine(root, "Paginación", operation.pagination.modes.join(" | ") + "; default " + operation.pagination.defaultLimit + "; max " + operation.pagination.maxLimit, operation.pagination.origin);
-        if (operation.patch) addLine(root, "PATCH", "ausente=conservar; grupo presente=sustituir; valida estado completo", operation.patch.origin);
+        if (operation.patch) addLine(root, "PATCH", "ausente=" + operation.patch.absentField + "; grupo presente=" + operation.patch.presentGroup + "; valida estado completo=" + operation.patch.validatesCompleteResult, operation.patch.origin);
       }
-      addLine(root, "Reglas", "Periodo.fin >= Periodo.inicio; importe decimal exacto", "declarado");
     }
 
     const freePlayActions = [
@@ -251,6 +275,7 @@
     function dispatch(action) {
       state = reduce(state, action);
       render(state);
+      renderWalkthroughs();
     }
 
     function makeButton(label, onClick) {
