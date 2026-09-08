@@ -1,0 +1,2 @@
+# The probe is self-contained; keep accidental local artifacts out.
+*.log
