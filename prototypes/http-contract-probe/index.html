@@ -56,7 +56,7 @@
       <p class="eyebrow">Prototipo desechable · ticket 7</p>
       <h1>Probe del contrato HTTP/JSON</h1>
       <p><strong>Pregunta:</strong> ¿qué forma mínima y coherente deben tener las rutas, peticiones, respuestas, errores y la selección del actor de prueba para recorrer el ejemplo de proyectos?</p>
-      <p class="scope">Este archivo valida el contrato y el modelo visible en memoria. No implementa HTTP real, SQLite, autenticación real ni JWE: el continuation token es una cadena opaca representativa.</p>
+      <p class="scope">Este archivo valida el contrato y el modelo visible en memoria. Los errores usan Problem Details (`application/problem+json`); no implementa HTTP real, SQLite, autenticación real ni JWE: el continuation token es una cadena opaca representativa.</p>
     </header>
 
     <section aria-labelledby="state-title">
@@ -111,12 +111,37 @@
         periodo: { inicio: "2026-09-01", fin: "2026-12-31" },
         importe: "1250.50",
       });
+      const problemTitles = Object.freeze({
+        INVALID_JSON: "Petición inválida",
+        INVALID_QUERY: "Parámetros de petición inválidos",
+        CONTINUATION_TOKEN_INVALID: "Continuation token inválido",
+        VALIDATION_FAILED: "La petición no cumple el contrato",
+        ACTOR_NOT_AUTHORIZED: "Actor no autorizado",
+        PROJECT_NOT_FOUND: "Proyecto no encontrado",
+        ROUTE_NOT_FOUND: "Ruta no encontrada",
+        PROJECT_ALREADY_APPROVED: "Operación de negocio rechazada",
+        INTERNAL_ERROR: "Error técnico interno",
+      });
 
       const clone = (value) => value === undefined ? undefined : JSON.parse(JSON.stringify(value));
       const isObject = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
       const issue = (code, rule, paths, details = {}) => ({ code, rule, paths, details });
-      const errorBody = (code, category, message, issues) => ({ code, category, message, issues });
+      const errorBody = (code, category, detail, issues) => ({ code, category, detail, issues });
       const response = (status, body) => body === undefined ? { status } : { status, body };
+
+      function problemDetails(state, request, status, body) {
+        const code = body.code || "INTERNAL_ERROR";
+        return {
+          type: "https://talby.ai/problems/" + code.toLowerCase().replace(/_/g, "-"),
+          title: problemTitles[code] || "Problema HTTP",
+          status,
+          detail: body.detail || "La petición no pudo procesarse.",
+          instance: "urn:talby:prototype:request:" + (state.requestCount + 1),
+          code,
+          category: body.category || "technical",
+          issues: body.issues || [],
+        };
+      }
 
       function actorProfile(id) {
         return actorById.get(id) || { id: id || null, label: id ? "Actor desconocido" : "Actor ausente", permissions: [] };
@@ -162,10 +187,15 @@
       }
 
       function finish(state, request, result, nextTransition, projects = state.projects, nextProjectNumber = state.nextProjectNumber) {
-        const body = result.body;
-        const incident = result.status >= 400 && body && body.issues ? {
+        const finalResult = result.status >= 400 && result.body ? {
+          ...result,
+          headers: { "Content-Type": "application/problem+json" },
+          body: problemDetails(state, request, result.status, result.body),
+        } : result;
+        const body = finalResult.body;
+        const incident = finalResult.status >= 400 && body && body.issues ? {
           sequence: state.requestCount + 1,
-          status: result.status,
+          status: finalResult.status,
           code: body.code,
           category: body.category,
           issues: body.issues.map((item) => ({ code: item.code, paths: item.paths })),
@@ -175,8 +205,8 @@
           projects: clone(projects),
           nextProjectNumber,
           lastRequest: publicRequest(request),
-          lastResponse: clone(result),
-          lastTransition: { ...nextTransition, status: result.status },
+          lastResponse: clone(finalResult),
+          lastTransition: { ...nextTransition, status: finalResult.status },
           incidents: incident ? [...state.incidents, incident] : state.incidents,
           requestCount: state.requestCount + 1,
         };
@@ -488,6 +518,12 @@
       status.className = "status " + (state.lastResponse.status >= 400 ? "error" : state.lastResponse.status < 300 ? "ok" : "neutral");
       status.textContent = state.lastResponse.status + (state.lastResponse.status === 204 ? " No Content" : state.lastResponse.status < 300 ? " OK" : " Error");
       root.append(status);
+      if (state.lastResponse.headers) {
+        const headers = document.createElement("p");
+        headers.className = "muted";
+        headers.textContent = Object.entries(state.lastResponse.headers).map(([name, value]) => name + ": " + value).join(" · ");
+        root.append(headers);
+      }
       const pre = document.createElement("pre");
       pre.textContent = state.lastResponse.body === undefined ? "(sin cuerpo)" : pretty(state.lastResponse.body);
       root.append(pre);
