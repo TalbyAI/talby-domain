@@ -1,0 +1,691 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Probe del contrato HTTP/JSON</title>
+  <style>
+    :root { color-scheme: light; font: 16px/1.5 system-ui, sans-serif; }
+    body { margin: 0; background: #f5f7fb; color: #172033; }
+    main { width: min(1180px, calc(100% - 32px)); margin: 0 auto; padding: 36px 0 64px; }
+    section { margin-top: 22px; padding: 22px; background: #fff; border: 1px solid #dce2ee; border-radius: 12px; }
+    h1, h2, h3 { line-height: 1.2; }
+    h1 { margin-bottom: 8px; }
+    h2 { margin-top: 0; }
+    h3 { margin-bottom: 8px; }
+    p { margin: 8px 0; }
+    .eyebrow, .accent { color: #3457d5; font-weight: 650; }
+    .scope { color: #526079; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 14px; }
+    .panel { padding: 15px; background: #f8faff; border: 1px solid #e2e8f4; border-radius: 9px; }
+    .panel h3 { margin-top: 0; }
+    .line { margin: 6px 0; }
+    .line strong { color: #344158; }
+    button, select { font: inherit; }
+    button { cursor: pointer; border: 1px solid #b8c4d8; border-radius: 8px; padding: 8px 11px; background: #fff; color: inherit; }
+    button:hover, button:focus-visible, select:focus-visible { border-color: #3457d5; outline: 2px solid #c9d3ff; }
+    button.primary { border-color: #3457d5; background: #3457d5; color: #fff; }
+    button.danger { color: #9b2c2c; }
+    .buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+    .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+    .chip { display: inline-block; padding: 2px 8px; border-radius: 999px; background: #e6ecff; color: #2946ab; font-size: .9rem; }
+    .muted { color: #69758d; }
+    .status { font-weight: 700; }
+    .status.ok { color: #16734a; }
+    .status.error { color: #b03030; }
+    .status.neutral { color: #526079; }
+    pre { overflow: auto; margin: 8px 0 0; padding: 12px; background: #172033; color: #eef3ff; border-radius: 8px; font: 13px/1.45 ui-monospace, SFMono-Regular, Consolas, monospace; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 8px 6px; border-bottom: 1px solid #e2e8f4; text-align: left; vertical-align: top; }
+    th { color: #526079; font-size: .9rem; }
+    .empty { color: #69758d; font-style: italic; }
+    .tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+    .tab[aria-selected="true"] { border-color: #3457d5; background: #e6ecff; color: #2946ab; }
+    .step { display: flex; align-items: center; gap: 9px; margin: 7px 0; }
+    .step.done { color: #16734a; }
+    .step-number { width: 24px; height: 24px; display: inline-grid; place-items: center; border-radius: 50%; background: #e2e8f4; color: #526079; font-size: .85rem; }
+    .step.done .step-number { background: #d7f1e4; color: #16734a; }
+    .step.current .step-number { background: #3457d5; color: #fff; }
+    .walkthrough-note { color: #526079; }
+    @media (max-width: 650px) { main { width: min(100% - 20px, 1180px); padding-top: 22px; } section { padding: 16px; } th:nth-child(2), td:nth-child(2) { display: none; } }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <p class="eyebrow">Prototipo desechable · ticket 7</p>
+      <h1>Probe del contrato HTTP/JSON</h1>
+      <p><strong>Pregunta:</strong> ¿qué forma mínima y coherente deben tener las rutas, peticiones, respuestas, errores y la selección del actor de prueba para recorrer el ejemplo de proyectos?</p>
+      <p class="scope">Este archivo valida el contrato y el modelo visible en memoria. Los errores usan Problem Details (`application/problem+json`); no implementa HTTP real, SQLite, autenticación real ni JWE: el continuation token es una cadena opaca representativa.</p>
+    </header>
+
+    <section aria-labelledby="state-title">
+      <h2 id="state-title">Estado actual</h2>
+      <div id="state" class="grid"></div>
+      <div class="grid" style="margin-top:14px">
+        <div class="panel"><h3>Última petición HTTP/JSON</h3><pre id="last-request">Todavía no hay una petición.</pre></div>
+        <div class="panel"><h3>Última respuesta HTTP/JSON</h3><div id="last-response">Todavía no hay una respuesta.</div></div>
+      </div>
+      <div class="panel" style="margin-top:14px"><h3>Historial de incidencias</h3><div id="incidents"></div></div>
+    </section>
+
+    <section aria-labelledby="free-play-title">
+      <h2 id="free-play-title">Exploración libre</h2>
+      <p class="muted">Selecciona un actor fijo arriba y pulsa cualquier acción. Los botones de actor ausente o desconocido prueban la denegación por defecto sin cambiar el selector.</p>
+      <div id="free-play" class="grid"></div>
+    </section>
+
+    <section aria-labelledby="walkthrough-title">
+      <h2 id="walkthrough-title">Recorridos guiados</h2>
+      <div id="walkthroughs"></div>
+    </section>
+  </main>
+
+  <script>
+    "use strict";
+
+    // Módulo lógico portable: no conoce el DOM ni los controles de esta página.
+    const ContractProbe = (() => {
+      const actors = [
+        { id: "editor", label: "Editor", permissions: ["projects.read", "projects.write", "projects.approve"] },
+        { id: "reader", label: "Reader", permissions: ["projects.read"] },
+        { id: "anonymous", label: "Anonymous", permissions: [] },
+      ];
+      const actorById = new Map(actors.map((actor) => [actor.id, actor]));
+      const operationPermissions = Object.freeze({
+        create: ["projects.write"],
+        get: ["projects.read"],
+        list: ["projects.read"],
+        patch: ["projects.write"],
+        delete: ["projects.write"],
+        approve: ["projects.read", "projects.approve"],
+      });
+      const validTokens = new Map([["ct-projects-demo", 1]]);
+      const projectFields = ["clienteId", "nombre", "periodo", "importe"];
+      const defaultCreate = Object.freeze({
+        clienteId: "cli-001",
+        nombre: "Portal Iberia",
+        periodo: { inicio: "2026-09-01", fin: "2026-12-31" },
+        importe: "1250.50",
+      });
+      const problemTitles = Object.freeze({
+        INVALID_JSON: "Petición inválida",
+        INVALID_QUERY: "Parámetros de petición inválidos",
+        CONTINUATION_TOKEN_INVALID: "Continuation token inválido",
+        VALIDATION_FAILED: "La petición no cumple el contrato",
+        ACTOR_NOT_AUTHORIZED: "Actor no autorizado",
+        PROJECT_NOT_FOUND: "Proyecto no encontrado",
+        ROUTE_NOT_FOUND: "Ruta no encontrada",
+        PROJECT_ALREADY_APPROVED: "Operación de negocio rechazada",
+        INTERNAL_ERROR: "Error técnico interno",
+      });
+
+      const clone = (value) => value === undefined ? undefined : JSON.parse(JSON.stringify(value));
+      const isObject = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
+      const issue = (code, rule, paths, details = {}) => ({ code, rule, paths, details });
+      const errorBody = (code, category, detail, errors) => ({ code, category, detail, errors });
+      const response = (status, body) => body === undefined ? { status } : { status, body };
+
+      function problemDetails(state, request, status, body) {
+        const code = body.code || "INTERNAL_ERROR";
+        return {
+          type: "https://talby.ai/problems/" + code.toLowerCase().replace(/_/g, "-"),
+          title: problemTitles[code] || "Problema HTTP",
+          status,
+          detail: body.detail || "La petición no pudo procesarse.",
+          instance: "urn:talby:prototype:request:" + (state.requestCount + 1),
+          errors: body.errors || [],
+        };
+      }
+
+      function actorProfile(id) {
+        return actorById.get(id) || { id: id || null, label: id ? "Actor desconocido" : "Actor ausente", permissions: [] };
+      }
+
+      function initialState() {
+        return {
+          actor: "editor",
+          actors: clone(actors),
+          clients: [{ id: "cli-001", nombre: "Cliente de ejemplo" }],
+          projects: [],
+          nextProjectNumber: 1,
+          lastRequest: null,
+          lastResponse: null,
+          lastTransition: { operation: null, status: null, label: "Estado inicial.", authorization: null },
+          incidents: [],
+          requestCount: 0,
+        };
+      }
+
+      function publicRequest(request) {
+        const visible = { method: request.method, path: request.path, headers: request.headers || {} };
+        if (request.query && Object.keys(request.query).length) visible.query = clone(request.query);
+        if (Object.prototype.hasOwnProperty.call(request, "body")) visible.body = clone(request.body);
+        return visible;
+      }
+
+      function authorizationFor(request, operation) {
+        const actorId = request.headers && request.headers["X-Test-Actor"];
+        const actor = actorProfile(actorId);
+        const required = operationPermissions[operation] || [];
+        const granted = actor.permissions.filter((permission) => required.includes(permission));
+        const missing = required.filter((permission) => !actor.permissions.includes(permission));
+        return { actor, required, granted, missing, allowed: missing.length === 0 && actorById.has(actor.id) && actor.id !== "anonymous" };
+      }
+
+      function transition(operation, label, auth) {
+        return {
+          operation,
+          label,
+          authorization: auth ? { actor: auth.actor.label, required: auth.required, granted: auth.granted, missing: auth.missing, allowed: auth.allowed } : null,
+        };
+      }
+
+      function finish(state, request, result, nextTransition, projects = state.projects, nextProjectNumber = state.nextProjectNumber) {
+        const sourceBody = result.body;
+        const finalResult = result.status >= 400 && result.body ? {
+          ...result,
+          headers: { "Content-Type": "application/problem+json" },
+          body: problemDetails(state, request, result.status, result.body),
+        } : result;
+        const body = finalResult.body;
+        const incident = finalResult.status >= 400 && sourceBody && sourceBody.errors ? {
+          sequence: state.requestCount + 1,
+          status: finalResult.status,
+          code: sourceBody.code,
+          category: sourceBody.category,
+          issues: sourceBody.errors.map((item) => ({ code: item.code, paths: item.paths })),
+        } : null;
+        return {
+          ...state,
+          projects: clone(projects),
+          nextProjectNumber,
+          lastRequest: publicRequest(request),
+          lastResponse: clone(finalResult),
+          lastTransition: { ...nextTransition, status: finalResult.status },
+          incidents: incident ? [...state.incidents, incident] : state.incidents,
+          requestCount: state.requestCount + 1,
+        };
+      }
+
+      function failed(state, request, status, body, nextTransition) {
+        return finish(state, request, response(status, body), nextTransition);
+      }
+
+      function matchRoute(request) {
+        if (request.method === "POST" && request.path === "/projects") return { operation: "create", kind: "create" };
+        if (request.method === "GET" && request.path === "/projects") return { operation: "list", kind: "list" };
+        if (request.method === "POST" && request.path === "/projects/commands/AprobarProyecto") return { operation: "approve", kind: "approve" };
+        const item = /^\/projects\/([^/]+)$/.exec(request.path || "");
+        if (!item) return null;
+        const kindByMethod = { GET: "get", PATCH: "patch", DELETE: "delete" };
+        const kind = kindByMethod[request.method];
+        return kind ? { operation: kind, kind, id: decodeURIComponent(item[1]) } : null;
+      }
+
+      function invalidRequest(state, request, auth, body) {
+        return failed(state, request, 400, body, transition("petición", "La petición no puede interpretarse.", auth));
+      }
+
+      function readBody(request) {
+        if (!Object.prototype.hasOwnProperty.call(request, "body")) return { missing: true };
+        if (request.rawBody) {
+          try { return { value: JSON.parse(request.body) }; }
+          catch (_) { return { error: errorBody("INVALID_JSON", "request", "El cuerpo no contiene JSON válido.", [issue("INVALID_JSON", "body debe ser JSON válido", ["/body"])]) }; }
+        }
+        return { value: clone(request.body) };
+      }
+
+      function unknownFieldIssues(value, allowed, basePath = "") {
+        return Object.keys(value).filter((key) => !allowed.includes(key)).map((key) => issue("UNKNOWN_FIELD", "el payload no contiene campos desconocidos", [basePath + "/" + key]));
+      }
+
+      function validatePeriod(value, path = "/periodo") {
+        const issues = [];
+        if (!isObject(value)) return { value, issues: [issue("PERIOD_INVALID", "periodo debe ser un objeto", [path])] };
+        issues.push(...unknownFieldIssues(value, ["inicio", "fin"], path));
+        const inicio = typeof value.inicio === "string" ? value.inicio.trim() : value.inicio;
+        const fin = typeof value.fin === "string" ? value.fin.trim() : value.fin;
+        if (typeof inicio !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(inicio)) issues.push(issue("DATE_INVALID", "inicio debe tener formato YYYY-MM-DD", [path + "/inicio"]));
+        if (typeof fin !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(fin)) issues.push(issue("DATE_INVALID", "fin debe tener formato YYYY-MM-DD", [path + "/fin"]));
+        if (typeof inicio === "string" && typeof fin === "string" && /^\d{4}-\d{2}-\d{2}$/.test(inicio) && /^\d{4}-\d{2}-\d{2}$/.test(fin) && fin < inicio) {
+          issues.push(issue("PERIOD_END_BEFORE_START", "fin >= inicio", [path + "/inicio", path + "/fin"]));
+        }
+        return { value: { inicio, fin }, issues };
+      }
+
+      function validateProjectPayload(payload, mode, existing, clients) {
+        if (!isObject(payload)) return { value: null, issues: [issue("PAYLOAD_OBJECT_REQUIRED", "el payload debe ser un objeto JSON", ["/body"]) ] };
+        const issues = unknownFieldIssues(payload, projectFields);
+        const value = {};
+        for (const field of projectFields) {
+          if (!Object.prototype.hasOwnProperty.call(payload, field)) continue;
+          const raw = payload[field];
+          if (field === "periodo") {
+            const period = validatePeriod(raw);
+            value[field] = period.value;
+            issues.push(...period.issues);
+          } else if (field === "nombre" || field === "clienteId" || field === "importe") {
+            value[field] = typeof raw === "string" ? raw.trim() : raw;
+          }
+        }
+        const candidate = mode === "patch" ? { ...existing, ...value } : value;
+        if (mode === "patch" && Object.keys(value).length === 0 && issues.length === 0) issues.push(issue("EMPTY_PATCH", "el mensaje de cambios parciales debe aportar al menos un campo", ["/body"]));
+        for (const field of ["clienteId", "nombre", "periodo", "importe"]) {
+          if (!Object.prototype.hasOwnProperty.call(candidate, field)) {
+            issues.push(issue("REQUIRED_FIELD", "el campo es obligatorio en el estado completo", ["/" + field]));
+          }
+        }
+        if (Object.prototype.hasOwnProperty.call(value, "clienteId") && (typeof value.clienteId !== "string" || !value.clienteId || !clients.some((client) => client.id === value.clienteId))) issues.push(issue("CLIENT_REFERENCE_INVALID", "clienteId debe ser una referencia no vacía y existente", ["/clienteId"]));
+        if (Object.prototype.hasOwnProperty.call(value, "nombre") && (typeof value.nombre !== "string" || !value.nombre)) issues.push(issue("NAME_INVALID", "nombre debe ser texto no vacío", ["/nombre"]));
+        if (Object.prototype.hasOwnProperty.call(value, "importe") && (typeof value.importe !== "string" || !/^-?(0|[1-9]\d*)(\.\d+)?$/.test(value.importe))) issues.push(issue("DECIMAL_INVALID", "importe debe ser decimal exacto representado como cadena", ["/importe"]));
+        return { value: candidate, issues };
+      }
+
+      function validateCommandPayload(payload) {
+        if (!isObject(payload)) return [issue("PAYLOAD_OBJECT_REQUIRED", "el payload debe ser un objeto JSON", ["/body"])];
+        const issues = unknownFieldIssues(payload, ["projectId"]);
+        if (typeof payload.projectId !== "string" || !payload.projectId.trim()) issues.push(issue("PROJECT_ID_REQUIRED", "projectId debe ser un identificador no vacío", ["/projectId"]));
+        return issues;
+      }
+
+      function parseListQuery(state, request, auth) {
+        const query = request.query || {};
+        const issues = unknownFieldIssues(query, ["offset", "limit", "continuationToken"], "/query");
+        const hasOffset = Object.prototype.hasOwnProperty.call(query, "offset");
+        const hasToken = Object.prototype.hasOwnProperty.call(query, "continuationToken");
+        if (hasOffset && hasToken) issues.push(issue("PAGINATION_MODE_AMBIGUOUS", "usar offset o continuationToken, no ambos", ["/query/offset", "/query/continuationToken"]));
+        const limitValue = query.limit === undefined ? 20 : Number(query.limit);
+        if (!Number.isInteger(limitValue) || limitValue < 1 || limitValue > 100) issues.push(issue("LIMIT_INVALID", "limit debe estar entre 1 y 100", ["/query/limit"], { default: 20, maximum: 100 }));
+        if (issues.length) return { error: errorBody("INVALID_QUERY", "request", "Los parámetros de paginación no cumplen el contrato.", issues) };
+        if (hasToken) {
+          const position = validTokens.get(query.continuationToken);
+          if (typeof query.continuationToken !== "string" || position === undefined) {
+            return { error: errorBody("CONTINUATION_TOKEN_INVALID", "request", "El continuation token es inválido o no pertenece a esta consulta.", [issue("CONTINUATION_TOKEN_INVALID", "el token debe ser opaco, válido y vinculado a la consulta", ["/query/continuationToken"]) ]), auth };
+          }
+          return { mode: "continuationToken", limit: limitValue, position };
+        }
+        const offsetValue = query.offset === undefined ? 0 : Number(query.offset);
+        if (!Number.isInteger(offsetValue) || offsetValue < 0) return { error: errorBody("INVALID_QUERY", "request", "Los parámetros de paginación no cumplen el contrato.", [issue("OFFSET_INVALID", "offset debe ser un entero mayor o igual que cero", ["/query/offset"])]) };
+        return { mode: "offset", offset: offsetValue, limit: limitValue };
+      }
+
+      function handleCreate(state, request, route, auth) {
+        const parsed = readBody(request);
+        if (parsed.error) return invalidRequest(state, request, auth, parsed.error);
+        if (parsed.missing) return failed(state, request, 422, errorBody("VALIDATION_FAILED", "validation", "La creación necesita un payload de proyecto.", [issue("BODY_REQUIRED", "el cuerpo es obligatorio", ["/body"])]), transition(route.operation, "Falta el payload del proyecto.", auth));
+        const checked = validateProjectPayload(parsed.value, "create", undefined, state.clients);
+        if (checked.issues.length) return failed(state, request, 422, errorBody("VALIDATION_FAILED", "validation", "El proyecto no cumple el contrato.", checked.issues), transition(route.operation, "La creación fue rechazada por validación.", auth));
+        const id = "proy-" + String(state.nextProjectNumber).padStart(3, "0");
+        const project = { id, ...checked.value, estado: "borrador" };
+        return finish(state, request, response(201, project), transition(route.operation, "Proyecto creado.", auth), [...state.projects, project], state.nextProjectNumber + 1);
+      }
+
+      function handleGet(state, request, route, auth) {
+        const project = state.projects.find((item) => item.id === route.id);
+        if (!project) return failed(state, request, 404, errorBody("PROJECT_NOT_FOUND", "not_found", "No existe el proyecto solicitado.", [issue("PROJECT_NOT_FOUND", "el identificador debe corresponder a un proyecto existente", ["/path/id"], { id: route.id })]), transition(route.operation, "Proyecto no encontrado.", auth));
+        return finish(state, request, response(200, project), transition(route.operation, "Proyecto obtenido.", auth));
+      }
+
+      function handleList(state, request, route, auth) {
+        const paging = parseListQuery(state, request, auth);
+        if (paging.error) return failed(state, request, 400, paging.error, transition(route.operation, "El listado fue rechazado por sus parámetros.", auth));
+        const projects = [...state.projects].sort((a, b) => a.id.localeCompare(b.id));
+        const start = paging.mode === "offset" ? paging.offset : paging.position;
+        const items = projects.slice(start, start + paging.limit);
+        const hasNext = start + paging.limit < projects.length;
+        const nextPosition = start + paging.limit;
+        const nextToken = "ct-projects-" + nextPosition;
+        if (hasNext && paging.mode === "continuationToken") validTokens.set(nextToken, nextPosition);
+        const pagination = paging.mode === "offset"
+          ? { mode: "offset", offset: paging.offset, limit: paging.limit, total: projects.length, hasNext, ...(hasNext ? { nextOffset: start + paging.limit } : {}) }
+          : { mode: "continuationToken", limit: paging.limit, hasNext, ...(hasNext ? { nextContinuationToken: nextToken } : {}) };
+        return finish(state, request, response(200, { items, pagination }), transition(route.operation, "Listado obtenido.", auth));
+      }
+
+      function handlePatch(state, request, route, auth) {
+        const existing = state.projects.find((item) => item.id === route.id);
+        if (!existing) return failed(state, request, 404, errorBody("PROJECT_NOT_FOUND", "not_found", "No existe el proyecto que se quiere actualizar.", [issue("PROJECT_NOT_FOUND", "el identificador debe corresponder a un proyecto existente", ["/path/id"], { id: route.id })]), transition(route.operation, "Proyecto no encontrado.", auth));
+        const parsed = readBody(request);
+        if (parsed.error) return invalidRequest(state, request, auth, parsed.error);
+        if (parsed.missing) return failed(state, request, 422, errorBody("VALIDATION_FAILED", "validation", "La actualización necesita un mensaje de cambios parciales.", [issue("BODY_REQUIRED", "el cuerpo es obligatorio", ["/body"])]), transition(route.operation, "Falta el mensaje de cambios parciales.", auth));
+        const checked = validateProjectPayload(parsed.value, "patch", existing, state.clients);
+        if (checked.issues.length) return failed(state, request, 422, errorBody("VALIDATION_FAILED", "validation", "El estado completo resultante no cumple el contrato.", checked.issues), transition(route.operation, "La actualización fue rechazada por validación.", auth));
+        const updated = { ...checked.value, id: existing.id, estado: existing.estado };
+        return finish(state, request, response(200, updated), transition(route.operation, "Proyecto actualizado; se devuelve el estado completo.", auth), state.projects.map((item) => item.id === route.id ? updated : item));
+      }
+
+      function handleDelete(state, request, route, auth) {
+        if (!state.projects.some((item) => item.id === route.id)) return failed(state, request, 404, errorBody("PROJECT_NOT_FOUND", "not_found", "No existe el proyecto que se quiere eliminar.", [issue("PROJECT_NOT_FOUND", "el identificador debe corresponder a un proyecto existente", ["/path/id"], { id: route.id })]), transition(route.operation, "Proyecto no encontrado.", auth));
+        return finish(state, request, response(204), transition(route.operation, "Proyecto eliminado; la respuesta no tiene cuerpo.", auth), state.projects.filter((item) => item.id !== route.id));
+      }
+
+      function handleApprove(state, request, route, auth) {
+        const parsed = readBody(request);
+        if (parsed.error) return invalidRequest(state, request, auth, parsed.error);
+        if (parsed.missing) return failed(state, request, 422, errorBody("VALIDATION_FAILED", "validation", "El comando necesita un payload.", [issue("BODY_REQUIRED", "el cuerpo es obligatorio", ["/body"])]), transition(route.operation, "Falta el payload del comando.", auth));
+        const issues = validateCommandPayload(parsed.value);
+        if (issues.length) return failed(state, request, 422, errorBody("VALIDATION_FAILED", "validation", "El comando no cumple el contrato.", issues), transition(route.operation, "El comando fue rechazado por validación.", auth));
+        const projectId = parsed.value.projectId.trim();
+        const project = state.projects.find((item) => item.id === projectId);
+        if (!project) return failed(state, request, 404, errorBody("PROJECT_NOT_FOUND", "not_found", "No existe el proyecto que se quiere aprobar.", [issue("PROJECT_NOT_FOUND", "projectId debe corresponder a un proyecto existente", ["/projectId"], { id: projectId })]), transition(route.operation, "Proyecto no encontrado.", auth));
+        if (project.estado === "aprobado") return failed(state, request, 422, errorBody("PROJECT_ALREADY_APPROVED", "business", "El proyecto ya está aprobado.", [issue("PROJECT_ALREADY_APPROVED", "solo se puede aprobar un proyecto en borrador", ["/projectId"]) ]), transition(route.operation, "El comando fue rechazado por una regla de negocio.", auth));
+        const approved = { ...project, estado: "aprobado" };
+        return finish(state, request, response(200, { projectId, estado: "aprobado", resultado: "Proyecto aprobado" }), transition(route.operation, "Proyecto aprobado.", auth), state.projects.map((item) => item.id === projectId ? approved : item));
+      }
+
+      function execute(state, request) {
+        const route = matchRoute(request);
+        if (!route) return failed(state, request, 404, errorBody("ROUTE_NOT_FOUND", "not_found", "La ruta no pertenece al contrato del prototipo.", [issue("ROUTE_NOT_FOUND", "la ruta y el método deben estar declarados", ["/path"]) ]), transition("ruta", "Ruta no declarada."));
+        const auth = authorizationFor(request, route.operation);
+        if (!auth.allowed) {
+          const body = errorBody("ACTOR_NOT_AUTHORIZED", "authorization", "El actor no tiene todas las concesiones requeridas para esta operación.", [issue("ACTOR_NOT_AUTHORIZED", "se requieren todas las concesiones declaradas", ["/headers/X-Test-Actor"], { actor: auth.actor.id, required: auth.required, missing: auth.missing })]);
+          return failed(state, request, 403, body, transition(route.operation, "Acceso denegado por defecto.", auth));
+        }
+        if (request.simulateTechnical) {
+          const body = errorBody("INTERNAL_ERROR", "technical", "El prototipo simuló un fallo técnico inesperado.", [issue("UNEXPECTED_FAILURE", "los fallos técnicos no forman parte del payload de negocio", [])]);
+          return failed(state, request, 500, body, transition(route.operation, "Fallo técnico simulado.", auth));
+        }
+        if (route.kind === "create") return handleCreate(state, request, route, auth);
+        if (route.kind === "get") return handleGet(state, request, route, auth);
+        if (route.kind === "list") return handleList(state, request, route, auth);
+        if (route.kind === "patch") return handlePatch(state, request, route, auth);
+        if (route.kind === "delete") return handleDelete(state, request, route, auth);
+        return handleApprove(state, request, route, auth);
+      }
+
+      function reduce(state, action) {
+        if (action.type === "reset") return initialState();
+        if (action.type === "setActor" && actorById.has(action.actor)) {
+          const actor = actorProfile(action.actor);
+          return { ...state, actor: action.actor, lastTransition: { operation: "selector", status: null, label: "Actor seleccionado: " + actor.label + ".", authorization: { actor: actor.label, required: [], granted: actor.permissions, missing: [], allowed: true } } };
+        }
+        if (action.type === "request") return execute(state, action.request);
+        return state;
+      }
+
+      return Object.freeze({ actors: clone(actors), defaultCreate: clone(defaultCreate), initialState, reduce });
+    })();
+
+    let state = ContractProbe.initialState();
+    let selectedWalkthrough = "crud";
+    let activeWalkthrough = null;
+
+    const $ = (id) => document.getElementById(id);
+    const pretty = (value, empty = "—") => value === undefined ? empty : JSON.stringify(value, null, 2);
+    const knownProjectId = () => state.projects[0] ? state.projects[0].id : "proy-001";
+
+    function request(method, path, options = {}) {
+      const actor = Object.prototype.hasOwnProperty.call(options, "actor") ? options.actor : state.actor;
+      const result = { method, path, headers: actor === null ? {} : { "X-Test-Actor": actor } };
+      if (options.query) result.query = options.query;
+      if (Object.prototype.hasOwnProperty.call(options, "body")) result.body = options.body;
+      if (options.rawBody) result.rawBody = true;
+      if (options.simulateTechnical) result.simulateTechnical = true;
+      return result;
+    }
+
+    function dispatch(action) {
+      state = ContractProbe.reduce(state, action);
+      render();
+    }
+
+    function line(label, value) {
+      const p = document.createElement("p");
+      p.className = "line";
+      const strong = document.createElement("strong");
+      strong.textContent = label + ": ";
+      p.append(strong, document.createTextNode(String(value)));
+      return p;
+    }
+
+    function chips(values, empty = "ninguna") {
+      const root = document.createElement("div");
+      root.className = "chips";
+      if (!values.length) { root.textContent = empty; root.className = "muted"; return root; }
+      for (const value of values) { const span = document.createElement("span"); span.className = "chip"; span.textContent = value; root.append(span); }
+      return root;
+    }
+
+    function panel(title) {
+      const root = document.createElement("div");
+      root.className = "panel";
+      const heading = document.createElement("h3");
+      heading.textContent = title;
+      root.append(heading);
+      return root;
+    }
+
+    function renderState() {
+      const root = $("state");
+      root.replaceChildren();
+      const actorPanel = panel("Actor de prueba");
+      const select = document.createElement("select");
+      select.setAttribute("aria-label", "Actor de prueba");
+      for (const actor of ContractProbe.actors) { const option = document.createElement("option"); option.value = actor.id; option.textContent = actor.label + " (" + actor.id + ")"; option.selected = actor.id === state.actor; select.append(option); }
+      select.addEventListener("change", () => dispatch({ type: "setActor", actor: select.value }));
+      actorPanel.append(select);
+      const actor = ContractProbe.actors.find((item) => item.id === state.actor);
+      actorPanel.append(line("Cabecera simulada", "X-Test-Actor: " + actor.id));
+      actorPanel.append(document.createTextNode("Concesiones efectivas:"), chips(actor.permissions));
+      root.append(actorPanel);
+
+      const permissionsPanel = panel("Permisos efectivos de la última transición");
+      const auth = state.lastTransition.authorization;
+      if (!auth) permissionsPanel.append(line("Estado", "todavía no hay operación"));
+      else {
+        permissionsPanel.append(line("Actor", auth.actor));
+        permissionsPanel.append(line("Acceso", auth.allowed ? "permitido" : "denegado"));
+        permissionsPanel.append(document.createTextNode("Requeridos:"), chips(auth.required));
+        permissionsPanel.append(document.createTextNode("Faltantes:"), chips(auth.missing, "ninguna"));
+      }
+      root.append(permissionsPanel);
+
+      const clientsPanel = panel("Clientes en memoria");
+      if (!state.clients.length) clientsPanel.append(Object.assign(document.createElement("p"), { className: "empty", textContent: "No hay clientes." }));
+      for (const client of state.clients) clientsPanel.append(line(client.id, client.nombre));
+      root.append(clientsPanel);
+
+      const projectsPanel = panel("Proyectos en memoria");
+      if (!state.projects.length) projectsPanel.append(Object.assign(document.createElement("p"), { className: "empty", textContent: "No hay proyectos." }));
+      else {
+        const table = document.createElement("table");
+        table.innerHTML = "<thead><tr><th>Identificador</th><th>Nombre</th><th>Periodo</th><th>Importe</th><th>Estado</th></tr></thead>";
+        const body = document.createElement("tbody");
+        for (const project of state.projects) {
+          const row = document.createElement("tr");
+          for (const value of [project.id, project.nombre, project.periodo.inicio + " → " + project.periodo.fin, project.importe, project.estado]) { const cell = document.createElement("td"); cell.textContent = value; row.append(cell); }
+          body.append(row);
+        }
+        table.append(body);
+        projectsPanel.append(table);
+      }
+      root.append(projectsPanel);
+
+      const transitionPanel = panel("Última transición");
+      transitionPanel.append(line("Operación", state.lastTransition.operation || "—"));
+      transitionPanel.append(line("Resultado", state.lastTransition.status ? String(state.lastTransition.status) : "—"));
+      transitionPanel.append(line("Qué ocurrió", state.lastTransition.label));
+      root.append(transitionPanel);
+    }
+
+    function renderRequestResponse() {
+      $("last-request").textContent = state.lastRequest ? pretty(state.lastRequest) : "Todavía no hay una petición.";
+      const root = $("last-response");
+      root.replaceChildren();
+      if (!state.lastResponse) { root.textContent = "Todavía no hay una respuesta."; return; }
+      const status = document.createElement("p");
+      status.className = "status " + (state.lastResponse.status >= 400 ? "error" : state.lastResponse.status < 300 ? "ok" : "neutral");
+      status.textContent = state.lastResponse.status + (state.lastResponse.status === 204 ? " No Content" : state.lastResponse.status < 300 ? " OK" : " Error");
+      root.append(status);
+      if (state.lastResponse.headers) {
+        const headers = document.createElement("p");
+        headers.className = "muted";
+        headers.textContent = Object.entries(state.lastResponse.headers).map(([name, value]) => name + ": " + value).join(" · ");
+        root.append(headers);
+      }
+      const pre = document.createElement("pre");
+      pre.textContent = state.lastResponse.body === undefined ? "(sin cuerpo)" : pretty(state.lastResponse.body);
+      root.append(pre);
+    }
+
+    function renderIncidents() {
+      const root = $("incidents");
+      root.replaceChildren();
+      if (!state.incidents.length) { root.textContent = "No hay incidencias registradas."; root.className = "muted"; return; }
+      root.className = "";
+      const list = document.createElement("ol");
+      for (const incident of [...state.incidents].reverse()) {
+        const item = document.createElement("li");
+        item.textContent = "#" + incident.sequence + " · " + incident.status + " · " + incident.code + " (" + incident.category + ") · " + incident.issues.map((entry) => entry.code + " [" + entry.paths.join(", ") + "]").join("; ");
+        list.append(item);
+      }
+      root.append(list);
+    }
+
+    function addActionButton(root, label, action, className = "") {
+      const button = document.createElement("button");
+      button.textContent = label;
+      if (className) button.className = className;
+      button.addEventListener("click", () => dispatch(action()));
+      root.append(button);
+    }
+
+    function renderFreePlay() {
+      const root = $("free-play");
+      if (root.childElementCount) return;
+      const crud = panel("CRUD");
+      const crudButtons = document.createElement("div"); crudButtons.className = "buttons";
+      addActionButton(crudButtons, "Crear proyecto", () => ({ type: "request", request: request("POST", "/projects", { body: ContractProbe.defaultCreate }) }), "primary");
+      addActionButton(crudButtons, "Listar por offset", () => ({ type: "request", request: request("GET", "/projects", { query: { offset: "0", limit: "20" } }) }));
+      addActionButton(crudButtons, "Obtener proyecto", () => ({ type: "request", request: request("GET", "/projects/" + knownProjectId()) }));
+      addActionButton(crudButtons, "Obtener inexistente", () => ({ type: "request", request: request("GET", "/projects/proy-404") }));
+      addActionButton(crudButtons, "Actualizar nombre", () => ({ type: "request", request: request("PATCH", "/projects/" + knownProjectId(), { body: { nombre: "Portal actualizado" } }) }));
+      addActionButton(crudButtons, "Periodo inválido", () => ({ type: "request", request: request("PATCH", "/projects/" + knownProjectId(), { body: { periodo: { inicio: "2026-12-31", fin: "2026-01-01" } } }) }));
+      addActionButton(crudButtons, "Campo desconocido", () => ({ type: "request", request: request("PATCH", "/projects/" + knownProjectId(), { body: { campoInventado: true } }) }));
+      addActionButton(crudButtons, "Eliminar proyecto", () => ({ type: "request", request: request("DELETE", "/projects/" + knownProjectId()) }), "danger");
+      crud.append(crudButtons); root.append(crud);
+
+      const paging = panel("Paginación y peticiones inválidas");
+      const pagingButtons = document.createElement("div"); pagingButtons.className = "buttons";
+      addActionButton(pagingButtons, "Listar con token válido", () => ({ type: "request", request: request("GET", "/projects", { query: { continuationToken: "ct-projects-demo", limit: "20" } }) }));
+      addActionButton(pagingButtons, "Token inválido", () => ({ type: "request", request: request("GET", "/projects", { query: { continuationToken: "token-inventado", limit: "20" } }) }));
+      addActionButton(pagingButtons, "Offset + token", () => ({ type: "request", request: request("GET", "/projects", { query: { offset: "0", continuationToken: "ct-projects-demo", limit: "20" } }) }));
+      addActionButton(pagingButtons, "JSON inválido", () => ({ type: "request", request: request("POST", "/projects", { body: "{", rawBody: true }) }));
+      paging.append(pagingButtons); root.append(paging);
+
+      const commands = panel("Comando y autorización");
+      const commandButtons = document.createElement("div"); commandButtons.className = "buttons";
+      addActionButton(commandButtons, "Aprobar proyecto", () => ({ type: "request", request: request("POST", "/projects/commands/AprobarProyecto", { body: { projectId: knownProjectId() } }) }), "primary");
+      addActionButton(commandButtons, "Aprobar como reader", () => ({ type: "request", request: request("POST", "/projects/commands/AprobarProyecto", { actor: "reader", body: { projectId: knownProjectId() } }) }));
+      addActionButton(commandButtons, "GET sin actor", () => ({ type: "request", request: request("GET", "/projects", { actor: null, query: { offset: "0", limit: "20" } }) }));
+      addActionButton(commandButtons, "GET actor desconocido", () => ({ type: "request", request: request("GET", "/projects", { actor: "actor-inventado", query: { offset: "0", limit: "20" } }) }));
+      addActionButton(commandButtons, "Simular fallo técnico 500", () => ({ type: "request", request: request("GET", "/projects", { query: { offset: "0", limit: "20" }, simulateTechnical: true }) }));
+      commands.append(commandButtons); root.append(commands);
+    }
+
+    const walkthroughs = [
+      {
+        id: "crud",
+        title: "CRUD autorizado",
+        description: "Recorre crear, listar, obtener, actualizar parcialmente y eliminar como editor. Observa que PATCH devuelve el estado completo.",
+        steps: [
+          ["Crear un proyecto (201)", () => ({ type: "request", request: request("POST", "/projects", { body: ContractProbe.defaultCreate }) })],
+          ["Listar por offset (200)", () => ({ type: "request", request: request("GET", "/projects", { query: { offset: "0", limit: "20" } }) })],
+          ["Obtener el proyecto (200)", () => ({ type: "request", request: request("GET", "/projects/" + knownProjectId()) })],
+          ["Actualizar parcialmente (200)", () => ({ type: "request", request: request("PATCH", "/projects/" + knownProjectId(), { body: { nombre: "Portal actualizado" } }) })],
+          ["Eliminar el proyecto (204 sin cuerpo)", () => ({ type: "request", request: request("DELETE", "/projects/" + knownProjectId()) })],
+        ],
+      },
+      {
+        id: "invalid",
+        title: "Contrato inválido",
+        description: "Provoca una regla entre campos y un campo desconocido. En ambos casos el estado del proyecto debe permanecer sin cambios.",
+        steps: [
+          ["Crear un proyecto", () => ({ type: "request", request: request("POST", "/projects", { body: ContractProbe.defaultCreate }) })],
+          ["Intentar Periodo con fin anterior a inicio (422)", () => ({ type: "request", request: request("PATCH", "/projects/" + knownProjectId(), { body: { periodo: { inicio: "2026-12-31", fin: "2026-01-01" } } }) })],
+          ["Intentar un campo desconocido (422)", () => ({ type: "request", request: request("PATCH", "/projects/" + knownProjectId(), { body: { campoInventado: true } }) })],
+        ],
+      },
+      {
+        id: "paging",
+        title: "Paginación",
+        description: "Compara metadatos de offset y continuation token. El token válido es opaco para la página; el inválido y la mezcla de modalidades producen 400.",
+        steps: [
+          ["Crear el primer proyecto", () => ({ type: "request", request: request("POST", "/projects", { body: ContractProbe.defaultCreate }) })],
+          ["Crear el segundo proyecto", () => ({ type: "request", request: request("POST", "/projects", { body: { ...ContractProbe.defaultCreate, nombre: "Portal Norte" } }) })],
+          ["Crear el tercer proyecto", () => ({ type: "request", request: request("POST", "/projects", { body: { ...ContractProbe.defaultCreate, nombre: "Portal Sur" } }) })],
+          ["Crear el cuarto proyecto", () => ({ type: "request", request: request("POST", "/projects", { body: { ...ContractProbe.defaultCreate, nombre: "Portal Este" } }) })],
+          ["Listar la primera página por offset", () => ({ type: "request", request: request("GET", "/projects", { query: { offset: "0", limit: "1" } }) })],
+          ["Continuar con token válido", () => ({ type: "request", request: request("GET", "/projects", { query: { continuationToken: "ct-projects-demo", limit: "1" } }) })],
+          ["Continuar con el siguiente token", () => ({ type: "request", request: request("GET", "/projects", { query: { continuationToken: state.lastResponse.body.pagination.nextContinuationToken, limit: "1" } }) })],
+          ["Alcanzar el cuarto proyecto con otro token", () => ({ type: "request", request: request("GET", "/projects", { query: { continuationToken: state.lastResponse.body.pagination.nextContinuationToken, limit: "1" } }) })],
+          ["Rechazar token inválido (400)", () => ({ type: "request", request: request("GET", "/projects", { query: { continuationToken: "token-inventado", limit: "1" } }) })],
+          ["Rechazar offset + token (400)", () => ({ type: "request", request: request("GET", "/projects", { query: { offset: "0", continuationToken: "ct-projects-demo", limit: "1" } }) })],
+        ],
+      },
+      {
+        id: "authorization",
+        title: "Autorización del comando",
+        description: "El editor puede aprobar; reader conserva lectura pero no la concesión de aprobación. El resultado muestra permisos requeridos, concedidos y faltantes.",
+        steps: [
+          ["Crear un proyecto como editor", () => ({ type: "request", request: request("POST", "/projects", { body: ContractProbe.defaultCreate }) })],
+          ["Seleccionar el actor reader", () => ({ type: "setActor", actor: "reader" })],
+          ["Intentar aprobar como reader (403)", () => ({ type: "request", request: request("POST", "/projects/commands/AprobarProyecto", { body: { projectId: knownProjectId() } }) })],
+          ["Seleccionar el actor editor", () => ({ type: "setActor", actor: "editor" })],
+          ["Aprobar como editor (200)", () => ({ type: "request", request: request("POST", "/projects/commands/AprobarProyecto", { body: { projectId: knownProjectId() } }) })],
+        ],
+      },
+    ];
+
+    function renderWalkthroughs() {
+      const root = $("walkthroughs");
+      root.replaceChildren();
+      const tabs = document.createElement("div"); tabs.className = "tabs";
+      for (const scenario of walkthroughs) {
+        const tab = document.createElement("button");
+        tab.className = "tab";
+        tab.textContent = scenario.title;
+        tab.setAttribute("aria-selected", String(scenario.id === selectedWalkthrough));
+        tab.addEventListener("click", () => { selectedWalkthrough = scenario.id; renderWalkthroughs(); });
+        tabs.append(tab);
+      }
+      root.append(tabs);
+      const scenario = walkthroughs.find((item) => item.id === selectedWalkthrough);
+      const content = document.createElement("div");
+      const title = document.createElement("h3"); title.textContent = scenario.title; content.append(title);
+      const description = document.createElement("p"); description.className = "walkthrough-note"; description.textContent = scenario.description; content.append(description);
+      const start = document.createElement("button"); start.className = "primary"; start.textContent = activeWalkthrough && activeWalkthrough.id === scenario.id ? "Reiniciar recorrido" : "Iniciar recorrido";
+      start.addEventListener("click", () => { state = ContractProbe.reduce(state, { type: "reset" }); activeWalkthrough = { id: scenario.id, index: 0 }; render(); });
+      content.append(start);
+      const progress = activeWalkthrough && activeWalkthrough.id === scenario.id ? activeWalkthrough.index : 0;
+      const list = document.createElement("div"); list.style.marginTop = "14px";
+      scenario.steps.forEach(([label], index) => {
+        const row = document.createElement("div"); row.className = "step" + (index < progress ? " done" : index === progress && activeWalkthrough && activeWalkthrough.id === scenario.id ? " current" : "");
+        const number = document.createElement("span"); number.className = "step-number"; number.textContent = String(index + 1); row.append(number);
+        const text = document.createElement("span"); text.textContent = label; row.append(text); list.append(row);
+      });
+      content.append(list);
+      if (activeWalkthrough && activeWalkthrough.id === scenario.id && progress < scenario.steps.length) {
+        const next = document.createElement("button"); next.className = "primary"; next.textContent = "Ejecutar paso " + (progress + 1) + ": " + scenario.steps[progress][0];
+        next.style.marginTop = "12px";
+        next.addEventListener("click", () => { state = ContractProbe.reduce(state, scenario.steps[progress][1]()); activeWalkthrough.index += 1; render(); });
+        content.append(next);
+      } else if (activeWalkthrough && activeWalkthrough.id === scenario.id) {
+        const done = document.createElement("p"); done.className = "status ok"; done.textContent = "Recorrido terminado. Revisa el estado, las respuestas y las incidencias."; content.append(done);
+      }
+      root.append(content);
+    }
+
+    function render() {
+      renderState();
+      renderRequestResponse();
+      renderIncidents();
+      renderFreePlay();
+      renderWalkthroughs();
+    }
+
+    render();
+  </script>
+</body>
+</html>
