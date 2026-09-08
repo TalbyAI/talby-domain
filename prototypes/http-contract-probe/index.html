@@ -126,7 +126,7 @@
       const clone = (value) => value === undefined ? undefined : JSON.parse(JSON.stringify(value));
       const isObject = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
       const issue = (code, rule, paths, details = {}) => ({ code, rule, paths, details });
-      const errorBody = (code, category, detail, issues) => ({ code, category, detail, issues });
+      const errorBody = (code, category, detail, errors) => ({ code, category, detail, errors });
       const response = (status, body) => body === undefined ? { status } : { status, body };
 
       function problemDetails(state, request, status, body) {
@@ -137,9 +137,7 @@
           status,
           detail: body.detail || "La petición no pudo procesarse.",
           instance: "urn:talby:prototype:request:" + (state.requestCount + 1),
-          code,
-          category: body.category || "technical",
-          issues: body.issues || [],
+          errors: body.errors || [],
         };
       }
 
@@ -187,18 +185,19 @@
       }
 
       function finish(state, request, result, nextTransition, projects = state.projects, nextProjectNumber = state.nextProjectNumber) {
+        const sourceBody = result.body;
         const finalResult = result.status >= 400 && result.body ? {
           ...result,
           headers: { "Content-Type": "application/problem+json" },
           body: problemDetails(state, request, result.status, result.body),
         } : result;
         const body = finalResult.body;
-        const incident = finalResult.status >= 400 && body && body.issues ? {
+        const incident = finalResult.status >= 400 && sourceBody && sourceBody.errors ? {
           sequence: state.requestCount + 1,
           status: finalResult.status,
-          code: body.code,
-          category: body.category,
-          issues: body.issues.map((item) => ({ code: item.code, paths: item.paths })),
+          code: sourceBody.code,
+          category: sourceBody.category,
+          issues: sourceBody.errors.map((item) => ({ code: item.code, paths: item.paths })),
         } : null;
         return {
           ...state,

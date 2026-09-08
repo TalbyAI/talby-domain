@@ -46,7 +46,7 @@ Los modelos individuales no tendrán envoltorio. Las listas tendrán `items` y `
 
 ## Errores
 
-Todas las respuestas de error usarán [Problem Details para HTTP (RFC 9457)](https://www.rfc-editor.org/rfc/rfc9457.html) y el tipo `application/problem+json`. El objeto conservará los miembros estándar `type`, `title`, `status`, `detail` e `instance`; `code`, `category` e `issues` serán extensiones del contrato de Talby:
+Todas las respuestas de error usarán [Problem Details para HTTP (RFC 9457)](https://www.rfc-editor.org/rfc/rfc9457.html) y el tipo `application/problem+json`. El objeto conservará los miembros estándar `type`, `title`, `status`, `detail` e `instance`; `errors` será la única extensión del contrato de Talby:
 
 ```json
 {
@@ -55,9 +55,7 @@ Todas las respuestas de error usarán [Problem Details para HTTP (RFC 9457)](htt
   "status": 422,
   "detail": "La petición no cumple el contrato.",
   "instance": "urn:talby:prototype:request:42",
-  "code": "VALIDATION_FAILED",
-  "category": "validation",
-  "issues": [
+  "errors": [
     {
       "code": "PERIOD_END_BEFORE_START",
       "rule": "fin >= inicio",
