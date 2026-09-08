@@ -100,10 +100,7 @@
         delete: ["projects.write"],
         approve: ["projects.read", "projects.approve"],
       });
-      const validTokens = Object.freeze({
-        "ct-projects-demo": 1,
-        "ct-projects-next": 2,
-      });
+      const validTokens = new Map([["ct-projects-demo", 1]]);
       const projectFields = ["clienteId", "nombre", "periodo", "importe"];
       const defaultCreate = Object.freeze({
         clienteId: "cli-001",
@@ -257,7 +254,7 @@
         return { value: { inicio, fin }, issues };
       }
 
-      function validateProjectPayload(payload, mode, existing) {
+      function validateProjectPayload(payload, mode, existing, clients) {
         if (!isObject(payload)) return { value: null, issues: [issue("PAYLOAD_OBJECT_REQUIRED", "el payload debe ser un objeto JSON", ["/body"]) ] };
         const issues = unknownFieldIssues(payload, projectFields);
         const value = {};
@@ -279,7 +276,7 @@
             issues.push(issue("REQUIRED_FIELD", "el campo es obligatorio en el estado completo", ["/" + field]));
           }
         }
-        if (Object.prototype.hasOwnProperty.call(value, "clienteId") && (typeof value.clienteId !== "string" || !value.clienteId)) issues.push(issue("CLIENT_REFERENCE_INVALID", "clienteId debe ser una referencia no vacía", ["/clienteId"]));
+        if (Object.prototype.hasOwnProperty.call(value, "clienteId") && (typeof value.clienteId !== "string" || !value.clienteId || !clients.some((client) => client.id === value.clienteId))) issues.push(issue("CLIENT_REFERENCE_INVALID", "clienteId debe ser una referencia no vacía y existente", ["/clienteId"]));
         if (Object.prototype.hasOwnProperty.call(value, "nombre") && (typeof value.nombre !== "string" || !value.nombre)) issues.push(issue("NAME_INVALID", "nombre debe ser texto no vacío", ["/nombre"]));
         if (Object.prototype.hasOwnProperty.call(value, "importe") && (typeof value.importe !== "string" || !/^-?(0|[1-9]\d*)(\.\d+)?$/.test(value.importe))) issues.push(issue("DECIMAL_INVALID", "importe debe ser decimal exacto representado como cadena", ["/importe"]));
         return { value: candidate, issues };
@@ -302,10 +299,11 @@
         if (!Number.isInteger(limitValue) || limitValue < 1 || limitValue > 100) issues.push(issue("LIMIT_INVALID", "limit debe estar entre 1 y 100", ["/query/limit"], { default: 20, maximum: 100 }));
         if (issues.length) return { error: errorBody("INVALID_QUERY", "request", "Los parámetros de paginación no cumplen el contrato.", issues) };
         if (hasToken) {
-          if (typeof query.continuationToken !== "string" || !Object.prototype.hasOwnProperty.call(validTokens, query.continuationToken)) {
+          const position = validTokens.get(query.continuationToken);
+          if (typeof query.continuationToken !== "string" || position === undefined) {
             return { error: errorBody("CONTINUATION_TOKEN_INVALID", "request", "El continuation token es inválido o no pertenece a esta consulta.", [issue("CONTINUATION_TOKEN_INVALID", "el token debe ser opaco, válido y vinculado a la consulta", ["/query/continuationToken"]) ]), auth };
           }
-          return { mode: "continuationToken", limit: limitValue, position: validTokens[query.continuationToken] };
+          return { mode: "continuationToken", limit: limitValue, position };
         }
         const offsetValue = query.offset === undefined ? 0 : Number(query.offset);
         if (!Number.isInteger(offsetValue) || offsetValue < 0) return { error: errorBody("INVALID_QUERY", "request", "Los parámetros de paginación no cumplen el contrato.", [issue("OFFSET_INVALID", "offset debe ser un entero mayor o igual que cero", ["/query/offset"])]) };
@@ -316,7 +314,7 @@
         const parsed = readBody(request);
         if (parsed.error) return invalidRequest(state, request, auth, parsed.error);
         if (parsed.missing) return failed(state, request, 422, errorBody("VALIDATION_FAILED", "validation", "La creación necesita un payload de proyecto.", [issue("BODY_REQUIRED", "el cuerpo es obligatorio", ["/body"])]), transition(route.operation, "Falta el payload del proyecto.", auth));
-        const checked = validateProjectPayload(parsed.value, "create");
+        const checked = validateProjectPayload(parsed.value, "create", undefined, state.clients);
         if (checked.issues.length) return failed(state, request, 422, errorBody("VALIDATION_FAILED", "validation", "El proyecto no cumple el contrato.", checked.issues), transition(route.operation, "La creación fue rechazada por validación.", auth));
         const id = "proy-" + String(state.nextProjectNumber).padStart(3, "0");
         const project = { id, ...checked.value, estado: "borrador" };
@@ -336,9 +334,12 @@
         const start = paging.mode === "offset" ? paging.offset : paging.position;
         const items = projects.slice(start, start + paging.limit);
         const hasNext = start + paging.limit < projects.length;
+        const nextPosition = start + paging.limit;
+        const nextToken = "ct-projects-" + nextPosition;
+        if (hasNext && paging.mode === "continuationToken") validTokens.set(nextToken, nextPosition);
         const pagination = paging.mode === "offset"
           ? { mode: "offset", offset: paging.offset, limit: paging.limit, total: projects.length, hasNext, ...(hasNext ? { nextOffset: start + paging.limit } : {}) }
-          : { mode: "continuationToken", limit: paging.limit, hasNext, ...(hasNext ? { nextContinuationToken: "ct-projects-next" } : {}) };
+          : { mode: "continuationToken", limit: paging.limit, hasNext, ...(hasNext ? { nextContinuationToken: nextToken } : {}) };
         return finish(state, request, response(200, { items, pagination }), transition(route.operation, "Listado obtenido.", auth));
       }
 
@@ -348,7 +349,7 @@
         const parsed = readBody(request);
         if (parsed.error) return invalidRequest(state, request, auth, parsed.error);
         if (parsed.missing) return failed(state, request, 422, errorBody("VALIDATION_FAILED", "validation", "La actualización necesita un mensaje de cambios parciales.", [issue("BODY_REQUIRED", "el cuerpo es obligatorio", ["/body"])]), transition(route.operation, "Falta el mensaje de cambios parciales.", auth));
-        const checked = validateProjectPayload(parsed.value, "patch", existing);
+        const checked = validateProjectPayload(parsed.value, "patch", existing, state.clients);
         if (checked.issues.length) return failed(state, request, 422, errorBody("VALIDATION_FAILED", "validation", "El estado completo resultante no cumple el contrato.", checked.issues), transition(route.operation, "La actualización fue rechazada por validación.", auth));
         const updated = { ...checked.value, id: existing.id, estado: existing.estado };
         return finish(state, request, response(200, updated), transition(route.operation, "Proyecto actualizado; se devuelve el estado completo.", auth), state.projects.map((item) => item.id === route.id ? updated : item));
@@ -613,8 +614,12 @@
         steps: [
           ["Crear el primer proyecto", () => ({ type: "request", request: request("POST", "/projects", { body: ContractProbe.defaultCreate }) })],
           ["Crear el segundo proyecto", () => ({ type: "request", request: request("POST", "/projects", { body: { ...ContractProbe.defaultCreate, nombre: "Portal Norte" } }) })],
+          ["Crear el tercer proyecto", () => ({ type: "request", request: request("POST", "/projects", { body: { ...ContractProbe.defaultCreate, nombre: "Portal Sur" } }) })],
+          ["Crear el cuarto proyecto", () => ({ type: "request", request: request("POST", "/projects", { body: { ...ContractProbe.defaultCreate, nombre: "Portal Este" } }) })],
           ["Listar la primera página por offset", () => ({ type: "request", request: request("GET", "/projects", { query: { offset: "0", limit: "1" } }) })],
           ["Continuar con token válido", () => ({ type: "request", request: request("GET", "/projects", { query: { continuationToken: "ct-projects-demo", limit: "1" } }) })],
+          ["Continuar con el siguiente token", () => ({ type: "request", request: request("GET", "/projects", { query: { continuationToken: state.lastResponse.body.pagination.nextContinuationToken, limit: "1" } }) })],
+          ["Alcanzar el cuarto proyecto con otro token", () => ({ type: "request", request: request("GET", "/projects", { query: { continuationToken: state.lastResponse.body.pagination.nextContinuationToken, limit: "1" } }) })],
           ["Rechazar token inválido (400)", () => ({ type: "request", request: request("GET", "/projects", { query: { continuationToken: "token-inventado", limit: "1" } }) })],
           ["Rechazar offset + token (400)", () => ({ type: "request", request: request("GET", "/projects", { query: { offset: "0", continuationToken: "ct-projects-demo", limit: "1" } }) })],
         ],
