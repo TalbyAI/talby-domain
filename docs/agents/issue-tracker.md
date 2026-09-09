@@ -11,6 +11,17 @@ Issues and specs for this repo live as GitHub issues. Use the `gh` CLI for all o
 - **Apply / remove labels**: `gh issue edit <number> --add-label "..."` / `--remove-label "..."`
 - **Close**: `gh issue close <number> --comment "..."`
 
+## Issue closure with repository changes
+
+Before closing an issue, inspect both the working tree (`git status --short`) and the branch delta (`git diff origin/main...HEAD`). If the issue has associated committed or uncommitted repository changes:
+
+- Keep the issue open and propose a pull request from the working branch.
+- Include all changes associated with the issue in that pull request, committing uncommitted changes on the working branch first.
+- Link the issue with `Closes #<work issue>` (and use `Part of #<parent issue>` when applicable).
+- Do not run `gh issue close`; the original issue closes only after the pull request is reviewed, approved, and merged through GitHub.
+
+Directly close an issue only when it has no associated repository changes, or when the user explicitly requests an exception.
+
 Infer the repo from `git remote -v` — `gh` does this automatically when run inside a clone.
 
 ## Pull requests as a triage surface

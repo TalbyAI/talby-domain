@@ -4,8 +4,8 @@ Vocabulario del proyecto para describir y ejecutar servicios y trasladarlos a un
 
 ## Lenguaje
 
-**Asentamiento**:
-Transición de un servicio definido en el DSL a una implementación en un stack tecnológico concreto, independiente del DSL original. Se plantea cuando las necesidades de rendimiento y escalabilidad lo justifiquen.
+**Materialization**:
+Transition from a service defined in the DSL to an implementation on a concrete technology stack, independent of the original DSL. It is considered when performance and scalability needs justify it.
 
 **Capa de contrato**:
 Nivel que describe el modelo de datos público y sus reglas de validación estructural y normalización tal como los percibe un consumidor del servicio.
@@ -34,17 +34,17 @@ Unidad sin padre que describe un servicio y constituye su frontera de aislamient
 **Feature**:
 Agrupación organizativa cuyo padre es un módulo u otra feature y que puede contener entidades y features anidadas. Su jerarquía forma el namespace interno y, por defecto, la ruta pública de la API.
 
-**Inclusión aplanada**:
-Composición que incorpora los campos de una agrupación al mismo nivel que los del modelo receptor, conservando sus reglas y resolviendo conflictos de nombres mediante renombrados explícitos.
+**Flattened Inclusion**:
+Composition that places a group's fields at the same level as the receiving model's fields, preserving their rules and resolving name conflicts through explicit renaming.
 
 **Inclusión anidada**:
 Composición que incorpora una agrupación como un campo compuesto con nombre explícito dentro del modelo receptor.
 
-**CRUD por defecto**:
-Declaración sobre una entidad que incorpora sus operaciones CRUD sin exigir describir cada comando individualmente.
+**Default CRUD Operations**:
+Declaration on an entity that includes its CRUD operations without requiring each command to be described individually.
 
-**Mensaje de cambios parciales**:
-Entrada que describe modificaciones de un modelo: un campo ausente conserva su valor anterior. Los valores aportados y el estado resultante mantienen las restricciones del modelo completo.
+**Partial Update Message**:
+Message describing changes to a model: an absent field retains its previous value. Supplied values and the resulting state preserve the constraints of the complete model.
 
 **Fuente semántica**:
 Datos RDF que declaran el significado y los contratos del servicio conforme a sus ontologías semánticas.
@@ -52,11 +52,11 @@ Datos RDF que declaran el significado y los contratos del servicio conforme a su
 **Fuente visual**:
 Datos RDF que describen ubicación, colores y otros detalles de representación de elementos semánticos conforme a una ontología visual, sin cambiar su significado.
 
-**Fuente de mocking**:
-Datos RDF opcionales que enriquecen la simulación de operaciones conforme a una ontología de mocking. Se seleccionan al ejecutar el prototipo.
+**Mocking Source**:
+Optional RDF data that enriches operation simulation according to a mocking ontology. It is selected when the prototype runs.
 
-**Identificador de declaración**:
-Identidad estable de un elemento de la especificación, independiente de su nombre y namespace. Permite reconocer el mismo elemento al reorganizarlo y rastrear sus representaciones derivadas.
+**Declaration Identifier**:
+Stable identity of a specification element, independent of its name and namespace. It allows the same element to be recognized when reorganized and its derived representations to be traced.
 
 **Identificador de entidad**:
 Valor obligatorio y no nulo que identifica una instancia de entidad, sujeto a reglas del modelo sobre caracteres, longitud, prefijo y sufijo, sin quedar ligado a un generador concreto. Cada entidad señala un único uso de campo propio como identificador. Es distinto del identificador de la declaración que describe su tipo.
@@ -64,8 +64,8 @@ Valor obligatorio y no nulo que identifica una instancia de entidad, sujeto a re
 **Campo**:
 Definición reutilizable de un dato, con nombre por defecto, tipo, normalizadores y restricciones originales. Su nombre se aplica a los usos que no declaran uno propio.
 
-**Uso de campo**:
-Declaración reutilizable que incorpora un campo a una o varias vistas de datos, con nombre opcional que sustituye al nombre por defecto en esos usos. Conserva la secuencia de normalizadores del campo sin añadir normalizadores locales y permite añadir restricciones sin sustituir ni debilitar las originales; un mismo campo puede tener varios usos en una misma vista o en vistas diferentes.
+**Field Use**:
+Reusable declaration that incorporates a field into one or more data views, with an optional name that replaces the default name for those uses. It preserves the field's normalizer sequence without adding local normalizers and may add constraints without replacing or weakening the original ones; the same field may have multiple uses in one view or in different views.
 
 **Referencia a entidad**:
 Tipo de dato cuyo valor identifica una instancia de la entidad destino, sin incorporar sus datos. Valida el tipo y formato de su identificador; la existencia del destino requiere una regla de negocio adicional.
@@ -104,8 +104,8 @@ _Evitar_: Actividad extensible como término que mezcle operaciones internas y e
 **Opciones por defecto**:
 Decisiones que el sistema aporta para ejecutar un prototipo cuando su especificación omite detalles de las capas inferiores.
 
-**Perfil de prototipo**:
-Conjunto explícito de opciones por defecto que permite ejecutar una especificación parcial, distinguiendo el comportamiento de demostración del negocio definido.
+**Prototype Profile**:
+Explicit set of default options that allows a partial specification to run while distinguishing demonstration behavior from defined business behavior.
 
 **Actor de prueba**:
 Identidad de simulación con permisos asignados para comprobar el acceso a comandos y queries en el mock.
@@ -115,8 +115,8 @@ Especificación única sobre la que operan la edición visual y la textual, inde
 
 ### Evolución y gobernanza
 
-**Publicación**:
-Instantánea inmutable del conjunto de fuentes semántica, visual, de mocking y, cuando exista, de gobernanza, junto con su modelo efectivo, que se ofrece como contrato para consumidores. Versiona ese conjunto y conserva un identificador y una huella de cada fuente y del modelo efectivo. Esos metadatos permiten identificar y comparar snapshots, pero no reconstruir por sí solos el contenido de las fuentes o del modelo efectivo ni el informe de comparación. No equivale a un cambio atómico individual de la fuente.
+**Publication**:
+Immutable snapshot of the semantic, visual, mocking and, when present, governance sources, together with their effective model, offered as a contract to consumers. It versions that set and retains an identifier and fingerprint for each source and for the effective model. Those metadata identify and compare snapshots, but cannot by themselves reconstruct the source contents, the effective model or the comparison report. A publication is not an individual atomic source change.
 
 **Línea base publicada**:
 Publicación seleccionada como referencia para comparar una fuente candidata. El informe incluye todos los cambios incompatibles desde esta línea base hasta la publicación vigente, incluidas las publicaciones intermedias. La Aprobación de ruptura permanece vinculada a esta línea base. Puede ser anterior a la publicación inmediatamente precedente.
@@ -127,14 +127,14 @@ Fuente opcional que declara las políticas, autoridades y decisiones necesarias 
 **Gobernanza heredada**:
 Gobernanza que toma otra como base y añade extensiones sin debilitar sus reglas. Los conflictos entre la base y la extensión impiden obtener una gobernanza efectiva.
 
-**Aprobación de ruptura**:
-Autorización autenticada y registrada de un usuario con la autoridad correspondiente para publicar cambios incompatibles, vinculada a la línea base, la fuente candidata, el informe y las declaraciones afectadas. La aprobación permite publicar la ruptura, pero no la clasifica como compatible.
+**Breaking Change Approval**:
+Authenticated and recorded authorization from a user with the relevant authority to publish incompatible changes, linked to the baseline, candidate source, report and affected declarations. The approval permits publishing the breaking change but does not classify it as compatible.
 
-**Ruta efectiva**:
-Ruta pública vigente que representa una operación del contrato.
+**Effective Route**:
+Current public route that represents a contract operation.
 
-**Ruta sustituida**:
-Ruta anterior que continúa respondiendo directamente y comunica su sucesora mediante `Link: <URL-de-la-ruta-efectiva>; rel="successor-version"`.
+**Superseded Route**:
+Previous route that continues responding directly and communicates its successor through `Link: <effective-route-URL>; rel="successor-version"`.
 
 **Ruta redirigida**:
 Ruta anterior que permanece soportada mediante `308 Permanent Redirect` a la ruta efectiva e incluye `Location: URL-de-la-ruta-efectiva`, conservando el método y el cuerpo de la petición.
