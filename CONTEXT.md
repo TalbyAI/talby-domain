@@ -116,7 +116,7 @@ Especificación única sobre la que operan la edición visual y la textual, inde
 ### Evolución y gobernanza
 
 **Publication**:
-Immutable snapshot of the semantic, visual, mocking and, when present, governance sources, together with their effective model, offered as a contract to consumers. It versions that set and retains an identifier and fingerprint for each source and for the effective model. Those metadata identify and compare snapshots, but cannot by themselves reconstruct the source contents, the effective model or the comparison report. A publication is not an individual atomic source change.
+Immutable snapshot of the semantic, visual, mocking and, when present, governance sources, together with their effective model, offered as a contract to consumers. It assigns a version to that set and retains an identifier and fingerprint for each source and for the effective model derived from those sources. Those metadata identify and compare snapshots, but cannot by themselves reconstruct the source contents, the effective model or the comparison report. A publication is not an individual atomic source change.
 
 **Línea base publicada**:
 Publicación seleccionada como referencia para comparar una fuente candidata. El informe incluye todos los cambios incompatibles desde esta línea base hasta la publicación vigente, incluidas las publicaciones intermedias. La Aprobación de ruptura permanece vinculada a esta línea base. Puede ser anterior a la publicación inmediatamente precedente.
