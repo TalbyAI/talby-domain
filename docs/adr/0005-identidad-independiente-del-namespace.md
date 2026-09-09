@@ -1,3 +1,3 @@
-# Identidad estable independiente del namespace
+# Stable identity independent of the namespace
 
-Los elementos declarados tienen identificadores estables separados de sus nombres y ubicación en la jerarquía. Se elige esta identidad para reconocer movimientos, comparar versiones y rastrear artefactos generados sin tratar cada reorganización como eliminación y creación. El namespace sigue determinando representaciones y rutas API por defecto: conservar la identidad no evita que una reorganización pueda romper un contrato público.
+Declared elements have stable identifiers separate from their names and position in the hierarchy. This identity is chosen to recognize moves, compare versions, and trace generated artifacts without treating every reorganization as a deletion and creation. The namespace still determines representations and default API routes: preserving identity does not prevent a reorganization from breaking a public contract.

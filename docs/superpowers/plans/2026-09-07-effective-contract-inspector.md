@@ -1,56 +1,56 @@
 # Effective Contract Inspector Prototype Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (- [ ] ) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Crear un prototipo HTML desechable que haga inspeccionable la transición desde una fuente cargada hasta el modelo efectivo con CRUD, PATCH, permisos y rutas derivadas.
+**Goal:** Build a disposable HTML prototype that makes the transition from a loaded source to the effective model inspectable, including CRUD, PATCH, permissions, and derived routes.
 
-**Architecture:** index.html contendrá el único artefacto ejecutable, con un módulo puro de datos y transformaciones separado de una envoltura DOM fina. El flujo será source → verify(source) → materialize(source, profile) → inspect(effectiveModel); una verificación con errores nunca producirá un modelo efectivo parcial.
+**Architecture:** `index.html` will contain the only executable artifact, with a pure data-and-transformation module separated from a thin DOM wrapper. The flow will be source → verify(source) → materialize(source, profile) → inspect(effectiveModel); verification with errors will never produce a partial effective model.
 
-**Tech Stack:** HTML, CSS y JavaScript nativos dentro de un único archivo; sin framework, bundler, servidor ni dependencias.
+**Tech Stack:** Native HTML, CSS, and JavaScript in one file; no framework, bundler, server, or dependencies.
 
 ## Global Constraints
 
-- El prototipo vivirá únicamente en prototypes/effective-contract-inspector/ y será eliminable sin modificar otra parte del repositorio.
-- La página se abrirá directamente con doble clic y no hará peticiones de red.
-- El módulo de lógica no conocerá document, el DOM ni los manejadores de botones.
-- Cada elemento visible distinguirá los orígenes declarado, default y derivado.
-- El modelo de ejemplo usará gestion, proyectos, Proyecto, Periodo e importe decimal.
-- Una entidad solo derivará CRUD si declara explícitamente `crud: true`; en ese caso derivará crear, obtener, listar, actualizar parcialmente y eliminar.
-- PATCH conservará campos ausentes, sustituirá agrupaciones presentes completas y validará el estado resultante.
-- Una ruta explícita sustituirá la ruta derivada; permisos explícitos sustituirán los permisos derivados.
-- Referencias inexistentes y contradicciones bloquearán la materialización.
-- No se añadirá una suite de pruebas separada; la comprobación será manual mediante los recorridos guiados y una aserción visible por recorrido.
+- The prototype will live only in `prototypes/effective-contract-inspector/` and must be removable without modifying another part of the repository.
+- The page will open directly by double-clicking and will make no network requests.
+- The logic module will not know about `document`, the DOM, or button handlers.
+- Every visible element will distinguish declared, default, and derived origins.
+- The example model will use `gestion`, `proyectos`, `Proyecto`, `Periodo`, and a decimal amount.
+- An entity will derive CRUD only when it explicitly declares `crud: true`; in that case it will derive create, get, list, partial update, and delete.
+- PATCH will preserve absent fields, completely replace present groupings, and validate the resulting state.
+- An explicit route will replace the derived route; explicit permissions will replace derived permissions.
+- Missing references and contradictions will block materialization.
+- No separate test suite will be added; checking will be manual through guided walkthroughs and one visible assertion per walkthrough.
 
 ---
 
 ## File map
 
-- Create: prototypes/effective-contract-inspector/index.html — HTML, estilos, fixture, módulo puro, estado de interacción y renderizado.
-- Create: prototypes/effective-contract-inspector/README.md — pregunta, alcance y comando de apertura.
-- Create: prototypes/effective-contract-inspector/.gitignore — residuos comunes del directorio aislado.
-- Modify: none — el código de producción no participa.
-- Test: none — el activo es un prototipo manual autocontenido; sus comprobaciones viven en la interfaz.
+- Create: `prototypes/effective-contract-inspector/index.html` — HTML, styles, fixture, pure module, interaction state, and rendering.
+- Create: `prototypes/effective-contract-inspector/README.md` — question, scope, and opening command.
+- Create: `prototypes/effective-contract-inspector/.gitignore` — common residue for the isolated directory.
+- Modify: none — production code is not involved.
+- Test: none — the asset is a self-contained manual prototype; its checks live in the interface.
 
-## Task 1: Crear el contenedor aislado y la página vacía
+## Task 1: Create the isolated container and empty page
 
 **Files:**
-- Create: prototypes/effective-contract-inspector/.gitignore
-- Create: prototypes/effective-contract-inspector/README.md
-- Create: prototypes/effective-contract-inspector/index.html
+- Create: `prototypes/effective-contract-inspector/.gitignore`
+- Create: `prototypes/effective-contract-inspector/README.md`
+- Create: `prototypes/effective-contract-inspector/index.html`
 
 **Interfaces:**
 - Consumes: none.
-- Produces: una página abrible por doble clic con los contenedores #state, #free-play y #walkthroughs.
+- Produces: a page that opens by double-clicking with `#state`, `#free-play`, and `#walkthroughs` containers.
 
-- [ ] **Step 1: Crear la rama desechable**
+- [ ] **Step 1: Create the disposable branch**
 
 ~~~powershell
 git switch -c prototype/effective-contract-inspector
 ~~~
 
-Expected: Switched to a new branch 'prototype/effective-contract-inspector'.
+Expected: Switched to a new branch `prototype/effective-contract-inspector`.
 
-- [ ] **Step 2: Escribir el .gitignore local**
+- [ ] **Step 2: Write the local `.gitignore`**
 
 Use this exact content:
 
@@ -59,9 +59,9 @@ Use this exact content:
 Thumbs.db
 ~~~
 
-- [ ] **Step 3: Escribir las instrucciones locales**
+- [ ] **Step 3: Write the local instructions**
 
-Use this exact content in README.md:
+Use this exact content in `README.md`:
 
 ~~~markdown
 # Prototipo desechable: inspector del modelo efectivo
@@ -79,9 +79,9 @@ Entrar primero en esta carpeta y abrir index.html con doble clic. No hay depende
 La página compara declaraciones, defaults y derivaciones para un servicio pequeño de gestión de proyectos. No ejecuta HTTP, SQLite ni generación real de TypeScript.
 ~~~
 
-- [ ] **Step 4: Crear la estructura HTML mínima**
+- [ ] **Step 4: Create the minimum HTML structure**
 
-Write index.html with this shell:
+Write `index.html` with this shell:
 
 ~~~html
 <!doctype html>
@@ -127,7 +127,7 @@ Write index.html with this shell:
 </html>
 ~~~
 
-- [ ] **Step 5: Comprobar el shell**
+- [ ] **Step 5: Check the shell**
 
 ~~~powershell
 Set-Location prototypes/effective-contract-inspector
@@ -143,16 +143,16 @@ git add prototypes/effective-contract-inspector
 git commit -m "prototype: scaffold effective contract inspector"
 ~~~
 
-## Task 2: Implementar el modelo puro de fuente, verificación y materialización
+## Task 2: Implement the pure source, verification, and materialization model
 
 **Files:**
-- Modify: prototypes/effective-contract-inspector/index.html:script block
+- Modify: `prototypes/effective-contract-inspector/index.html:script block`
 
 **Interfaces:**
 - Consumes: the shell from Task 1.
-- Produces: prototypeProfile, sourceFixture(variant), loadSource(variant), verifySource(source) and materialize(source, profile).
+- Produces: `prototypeProfile`, `sourceFixture(variant)`, `loadSource(variant)`, `verifySource(source)`, and `materialize(source, profile)`.
 
-- [ ] **Step 1: Añadir el perfil explícito y las tres fuentes de ejemplo**
+- [ ] **Step 1: Add the explicit profile and three example sources**
 
 Insert this data before DOM code:
 
@@ -200,7 +200,7 @@ function loadSource(variant) {
 }
 ~~~
 
-- [ ] **Step 2: Añadir la verificación con diagnósticos públicos**
+- [ ] **Step 2: Add verification with public diagnostics**
 
 ~~~js
 function verifySource(source) {
@@ -226,7 +226,7 @@ function verifySource(source) {
 }
 ~~~
 
-- [ ] **Step 3: Añadir la derivación de rutas, permisos y cinco operaciones CRUD**
+- [ ] **Step 3: Add route, permission, and five-operation CRUD derivation**
 
 ~~~js
 function declarationMap(source) {
@@ -271,7 +271,7 @@ function crudOperations(entity, route, profile) {
 }
 ~~~
 
-- [ ] **Step 4: Materializar solo después de una verificación válida**
+- [ ] **Step 4: Materialize only after valid verification**
 
 ~~~js
 function materialize(source, profile) {
@@ -298,9 +298,9 @@ function materialize(source, profile) {
 }
 ~~~
 
-- [ ] **Step 5: Comprobar el módulo puro**
+- [ ] **Step 5: Check the pure module**
 
-Open index.html, then run in DevTools:
+Open `index.html`, then run in DevTools:
 
 ~~~js
 verifySource(loadSource("valid")).ok === true
@@ -317,16 +317,16 @@ git add prototypes/effective-contract-inspector/index.html
 git commit -m "prototype: derive effective contract model"
 ~~~
 
-## Task 3: Añadir el inspector, la exploración libre y los recorridos guiados
+## Task 3: Add the inspector, free exploration, and guided walkthroughs
 
 **Files:**
-- Modify: prototypes/effective-contract-inspector/index.html:script block
+- Modify: `prototypes/effective-contract-inspector/index.html:script block`
 
 **Interfaces:**
-- Consumes: loadSource, verifySource, materialize and prototypeProfile from Task 2.
-- Produces: reduce(state, action), renderizado legible, botones libres y tres escenarios.
+- Consumes: `loadSource`, `verifySource`, `materialize`, and `prototypeProfile` from Task 2.
+- Produces: `reduce(state, action)`, readable rendering, free-play buttons, and three scenarios.
 
-- [ ] **Step 1: Añadir el estado puro y su reducer**
+- [ ] **Step 1: Add pure state and reducer**
 
 ~~~js
 const initialState = () => ({ variant: null, source: null, verification: null, materialization: null, lastAction: "Ninguna acción todavía." });
@@ -346,9 +346,9 @@ function reduce(state, action) {
 }
 ~~~
 
-- [ ] **Step 2: Renderizar el estado completo en lenguaje de dominio**
+- [ ] **Step 2: Render complete state in domain language**
 
-Render after every dispatch, using textContent for fixture values. Always show Fuente, Etapa, Diagnósticos, Declaraciones, Defaults aplicados, Operaciones derivadas, Ruta, Permisos, PATCH and Reglas. Add origin badges with exactly declarado, default or derivado.
+Render after every dispatch, using `textContent` for fixture values. Always show Fuente, Etapa, Diagnósticos, Declaraciones, Defaults aplicados, Operaciones derivadas, Ruta, Permisos, PATCH, and Reglas. Add origin badges with exactly declarado, default, or derivado.
 
 Use these DOM-only helpers for the readable state panel:
 
@@ -405,9 +405,9 @@ Actualizar  PATCH  /gestion/proyectos/Proyecto/{id} ausente=conservar; grupo pre
 Eliminar    DELETE /gestion/proyectos/Proyecto/{id} crud.proyecto.delete
 ~~~
 
-For the explicit fixture, show /projects and the declared projects.read / projects.write values. For the invalid fixture, show both diagnostic codes and No hay modelo efectivo: la verificación bloquea la materialización.
+For the explicit fixture, show `/projects` and the declared `projects.read` / `projects.write` values. For the invalid fixture, show both diagnostic codes and `No hay modelo efectivo: la verificación bloquea la materialización.`
 
-- [ ] **Step 3: Añadir botones libres siempre visibles**
+- [ ] **Step 3: Add always-visible free-play buttons**
 
 ~~~js
 const freePlayActions = [
@@ -426,9 +426,9 @@ function dispatch(action) {
 }
 ~~~
 
-The verify and materialize buttons remain visible before loading a source; the state panel explains the required precondition.
+The verify and materialize buttons remain visible before a source is loaded; the state panel explains the required precondition.
 
-- [ ] **Step 4: Añadir las tres pestañas guiadas**
+- [ ] **Step 4: Add the three guided tabs**
 
 ~~~js
 const scenarios = [
@@ -440,7 +440,7 @@ const scenarios = [
 
 Starting a scenario first dispatches reset, then its first load action. The next-step button becomes Finalizado after the last action.
 
-- [ ] **Step 5: Añadir una aserción visible por recorrido**
+- [ ] **Step 5: Add one visible assertion per walkthrough**
 
 ~~~js
 function scenarioCheck(scenarioId, currentState) {
@@ -457,9 +457,9 @@ function scenarioCheck(scenarioId, currentState) {
 }
 ~~~
 
-Show Comprobación del recorrido: correcta or Comprobación del recorrido: revisar after the final step. This is the only runnable check; do not create a test runner.
+Show `Comprobación del recorrido: correcta` or `Comprobación del recorrido: revisar` after the final step. This is the only runnable check; do not create a test runner.
 
-- [ ] **Step 6: Comprobar manualmente la interacción**
+- [ ] **Step 6: Check the interaction manually**
 
 ~~~powershell
 Set-Location prototypes/effective-contract-inspector
@@ -468,9 +468,9 @@ Start-Process .\index.html
 
 Expected:
 
-- CRUD explícitamente habilitado ends with five operations and a correct check.
-- Declaración explícita ends with /projects, declared permissions and a correct check.
-- Verificación bloqueante shows REFERENCE_NOT_FOUND, CONTRADICTORY_DECLARATION, no operations and a correct check.
+- The `CRUD explícitamente habilitado` walkthrough ends with five operations and a correct check.
+- The `Declaración explícita` walkthrough ends with `/projects`, declared permissions, and a correct check.
+- The `Verificación bloqueante` walkthrough shows `REFERENCE_NOT_FOUND`, `CONTRADICTORY_DECLARATION`, no operations, and a correct check.
 
 - [ ] **Step 7: Commit the interactive inspector**
 
@@ -479,26 +479,26 @@ git add prototypes/effective-contract-inspector/index.html
 git commit -m "prototype: add effective model walkthroughs"
 ~~~
 
-## Task 4: Capturar la evidencia desechable y entregar la decisión
+## Task 4: Capture disposable evidence and hand off the decision
 
 **Files:**
-- Modify: prototypes/effective-contract-inspector/README.md only if the launch command from Task 1 changes.
+- Modify: `prototypes/effective-contract-inspector/README.md` only if the launch command from Task 1 changes.
 - Create: none.
 
 **Interfaces:**
 - Consumes: the working HTML and the three manual walkthrough results from Task 3.
-- Produces: a throwaway branch commit linked as primary evidence from [Definir el modelo efectivo y los contratos CRUD derivados](https://github.com/TalbyAI/talby-domain/issues/5); that ticket remains open until the human confirms the decision.
+- Produces: a throwaway branch commit linked as primary evidence from [Define the effective model and derived CRUD contracts](https://github.com/TalbyAI/talby-domain/issues/5); that ticket remains open until the human confirms the decision.
 
-- [ ] **Step 1: Ejecutar el smoke check final**
+- [ ] **Step 1: Run the final smoke check**
 
 ~~~powershell
 Set-Location prototypes/effective-contract-inspector
 Start-Process .\index.html
 ~~~
 
-Click every free-play button once, complete all three tabs, confirm that every action re-renders the full state and confirm that the browser console has no error.
+Click every free-play button once, complete all three tabs, confirm that every action re-renders the full state, and confirm that the browser console has no error.
 
-- [ ] **Step 2: Comprobar aislamiento y formato**
+- [ ] **Step 2: Check isolation and format**
 
 ~~~powershell
 git diff --check main...HEAD
@@ -507,7 +507,7 @@ git status --short
 
 Expected: no whitespace errors; only the prototype directory is changed on the branch.
 
-- [ ] **Step 3: Capturar el commit y el context pointer**
+- [ ] **Step 3: Capture the commit and context pointer**
 
 ~~~powershell
 $sha = git rev-parse HEAD
@@ -516,12 +516,12 @@ gh issue comment 5 --body "Prototipo de inspección del modelo efectivo: https:/
 
 The comment links the prototype as primary evidence and does not claim that the human decision is closed.
 
-- [ ] **Step 4: Registrar el veredicto humano**
+- [ ] **Step 4: Record the human verdict**
 
 After the human has used the prototype, comment the chosen model and its reason on issue 5. Close the issue only when the exchange settles the decision; then append its one-line gist and issue-comment link to Decisions so far on map issue 1.
 
 ## Self-review
 
-- Spec coverage: Tasks 2 and 3 cover the source-to-model flow, origin badges, CRUD, PATCH semantics, permissions, routes, defaults, diagnostics and the three scenarios; Task 4 covers isolation and evidence capture.
+- Spec coverage: Tasks 2 and 3 cover the source-to-model flow, origin badges, CRUD, PATCH semantics, permissions, routes, defaults, diagnostics, and the three scenarios; Task 4 covers isolation and evidence capture.
 - Completeness scan: every implementation step has concrete files, interfaces, code or commands, and expected observations.
-- Type consistency: loadSource returns a source fixture; verifySource returns { ok, diagnostics }; materialize returns { effective, diagnostics }; reduce stores those exact values; scenarioCheck reads the exact effective.operations, route.origin, permissions.origin and effective === null fields produced by materialization.
+- Type consistency: `loadSource` returns a source fixture; `verifySource` returns `{ ok, diagnostics }`; `materialize` returns `{ effective, diagnostics }`; `reduce` stores those exact values; `scenarioCheck` reads the exact `effective.operations`, `route.origin`, `permissions.origin`, and `effective === null` fields produced by materialization.

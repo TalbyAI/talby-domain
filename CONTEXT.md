@@ -1,143 +1,143 @@
-# Lenguaje de servicios empresariales
+# Enterprise service language
 
-Vocabulario del proyecto para describir y ejecutar servicios y trasladarlos a un stack tecnológico concreto.
+Project vocabulary for describing and executing services and lowering them to a concrete technology stack.
 
-## Lenguaje
+## Language
 
-**Asentamiento**:
-Transición de un servicio definido en el DSL a una implementación en un stack tecnológico concreto, independiente del DSL original. Se plantea cuando las necesidades de rendimiento y escalabilidad lo justifiquen.
+**Materialization**:
+Transition from a service defined in the DSL to an implementation on a concrete technology stack, independent of the original DSL. It is considered when performance and scalability needs justify it.
 
-**Capa de contrato**:
-Nivel que describe el modelo de datos público y sus reglas de validación estructural y normalización tal como los percibe un consumidor del servicio.
+**Contract Layer**:
+The level that describes the public data model and its structural validation and normalization rules as perceived by a service consumer.
 
-**Vista de datos**:
-Agrupación de usos de campo para describir un contrato, como un comando, un evento o un modelo de lectura, incluida la composición anidada de otras agrupaciones. Puede declarar reglas que combinen varios usos de campo.
+**Data View**:
+Grouping of field uses that describes a contract, such as a command, event, or read model, including nested composition of other groupings. It may declare rules that combine multiple field uses.
 
-**Comando**:
-Especialización de una agrupación de campos con reglas, permisos, configuración API y referencias a resultados y errores. Puede declarar un resultado u omitirlo para indicar que no devuelve datos. Sus metadatos describen el contrato y no forman parte de los datos enviados.
+**Command**:
+Specialization of a field grouping with rules, permissions, API configuration, and references to results and errors. It may declare a result or omit one to indicate that it returns no data. Its metadata describes the contract and is not part of the data sent.
 
 **Query**:
-Agrupación especializada de parámetros para una consulta, con permisos, configuración API y exactamente un resultado declarado.
+Specialized grouping of parameters for a query, with permissions, API configuration, and exactly one declared result.
 
 **Continuation token**:
-Valor opaco devuelto por un listado para continuar desde la última posición, vinculado a su consulta, filtros y orden. Se utiliza junto con un límite de resultados y no se combina con `offset`.
+Opaque value returned by a listing to continue from the last position, bound to its query, filters, and ordering. It is used with a result limit and is not combined with `offset`.
 
-**Modelo de lectura**:
-Agrupación especializada que describe los datos expuestos como resultado de lectura, con sus metadatos y reglas estructurales.
+**Read Model**:
+Specialized grouping that describes data exposed as a read result, with its metadata and structural rules.
 
-**Evento**:
-Agrupación especializada que describe una ocurrencia y sus datos, con metadatos propios. Su contrato no exige un resultado de operación.
+**Event**:
+Specialized grouping that describes an occurrence and its data, with its own metadata. Its contract does not require an operation result.
 
-**Módulo**:
-Unidad sin padre que describe un servicio y constituye su frontera de aislamiento respecto a otros servicios. Puede contener entidades y features; no es una feature raíz.
+**Module**:
+Parentless unit that describes a service and forms its isolation boundary from other services. It may contain entities and features; it is not a root feature.
 
 **Feature**:
-Agrupación organizativa cuyo padre es un módulo u otra feature y que puede contener entidades y features anidadas. Su jerarquía forma el namespace interno y, por defecto, la ruta pública de la API.
+Organizational grouping whose parent is a module or another feature and which may contain nested entities and features. Its hierarchy forms the internal namespace and, by default, the public API route.
 
-**Inclusión aplanada**:
-Composición que incorpora los campos de una agrupación al mismo nivel que los del modelo receptor, conservando sus reglas y resolviendo conflictos de nombres mediante renombrados explícitos.
+**Flattened Inclusion**:
+Composition that brings the fields of a grouping to the same level as those of the receiving model, preserving its rules and resolving name conflicts through explicit renames.
 
-**Inclusión anidada**:
-Composición que incorpora una agrupación como un campo compuesto con nombre explícito dentro del modelo receptor.
+**Nested Inclusion**:
+Composition that brings a grouping in as a named composite field inside the receiving model.
 
-**CRUD por defecto**:
-Declaración sobre una entidad que incorpora sus operaciones CRUD sin exigir describir cada comando individualmente.
+**Default CRUD Operations**:
+Declaration on an entity that includes its CRUD operations without requiring every individual command to be described.
 
-**Mensaje de cambios parciales**:
-Entrada que describe modificaciones de un modelo: un campo ausente conserva su valor anterior. Los valores aportados y el estado resultante mantienen las restricciones del modelo completo.
+**Partial Update Message**:
+Input that describes changes to a model: an absent field keeps its previous value. Supplied values and the resulting state preserve the constraints of the complete model.
 
-**Fuente semántica**:
-Datos RDF que declaran el significado y los contratos del servicio conforme a sus ontologías semánticas.
+**Semantic Source**:
+RDF data that declares the meaning and contracts of the service according to its semantic ontologies.
 
-**Fuente visual**:
-Datos RDF que describen ubicación, colores y otros detalles de representación de elementos semánticos conforme a una ontología visual, sin cambiar su significado.
+**Visual Source**:
+RDF data that describes location, colors, and other representation details of semantic elements according to a visual ontology, without changing their meaning.
 
-**Fuente de mocking**:
-Datos RDF opcionales que enriquecen la simulación de operaciones conforme a una ontología de mocking. Se seleccionan al ejecutar el prototipo.
+**Mocking Source**:
+Optional RDF data that enriches operation simulation according to a mocking ontology. It is selected when the prototype runs.
 
-**Identificador de declaración**:
-Identidad estable de un elemento de la especificación, independiente de su nombre y namespace. Permite reconocer el mismo elemento al reorganizarlo y rastrear sus representaciones derivadas.
+**Declaration Identifier**:
+Stable identity of a specification element, independent of its name and namespace. It allows the same element to be recognized after reorganization and its derived representations to be traced.
 
-**Identificador de entidad**:
-Valor obligatorio y no nulo que identifica una instancia de entidad, sujeto a reglas del modelo sobre caracteres, longitud, prefijo y sufijo, sin quedar ligado a un generador concreto. Cada entidad señala un único uso de campo propio como identificador. Es distinto del identificador de la declaración que describe su tipo.
+**Entity Identifier**:
+Required, non-null value that identifies an entity instance, subject to model rules for characters, length, prefix, and suffix, without being tied to a particular generator. Each entity points to one own field use as its identifier. It differs from the declaration identifier that describes its type.
 
-**Campo**:
-Definición reutilizable de un dato, con nombre por defecto, tipo, normalizadores y restricciones originales. Su nombre se aplica a los usos que no declaran uno propio.
+**Field**:
+Reusable definition of data, with a default name, type, normalizers, and original constraints. Its name applies to uses that do not declare one of their own.
 
-**Uso de campo**:
-Declaración reutilizable que incorpora un campo a una o varias vistas de datos, con nombre opcional que sustituye al nombre por defecto en esos usos. Conserva la secuencia de normalizadores del campo sin añadir normalizadores locales y permite añadir restricciones sin sustituir ni debilitar las originales; un mismo campo puede tener varios usos en una misma vista o en vistas diferentes.
+**Field Use**:
+Reusable declaration that adds a field to one or more data views, with an optional name that replaces the default name in those uses. It preserves the field's normalizer sequence without adding local normalizers and may add constraints without replacing or weakening the originals; one field may have multiple uses in the same or different data views.
 
-**Referencia a entidad**:
-Tipo de dato cuyo valor identifica una instancia de la entidad destino, sin incorporar sus datos. Valida el tipo y formato de su identificador; la existencia del destino requiere una regla de negocio adicional.
+**Entity Reference**:
+Data type whose value identifies an instance of the target entity without embedding its data. It validates the type and format of its identifier; target existence requires an additional business rule.
 
-**Colección**:
-Tipo de dato que describe una lista ordenada de elementos de un tipo declarado. En los cambios parciales, una colección aportada sustituye la lista completa.
+**Collection**:
+Data type that describes an ordered list of elements of a declared type. In partial updates, a supplied collection replaces the complete list.
 
-**Tipo de valor**:
-Tipo escalar definido a partir de un primitivo u otro tipo de valor, conservando sus restricciones y añadiendo otras. Las cadenas de tipos base no forman ciclos; una enumeración es un tipo de valor con una restricción de pertenencia.
+**Value Type**:
+Scalar type defined from a primitive or another value type, preserving its constraints and adding others. Base-type chains are acyclic; an enumeration is a value type with a membership constraint.
 
-**Escenario de mocking**:
-Caso que selecciona una operación y condiciones de entrada para producir una respuesta, un error declarado o éxito sin datos para un comando sin resultado. Forma parte de una fuente de mocking.
+**Mocking Scenario**:
+Case that selects an operation and input conditions to produce a response, a declared error, or success with no data for a command without a result. It belongs to a mocking source.
 
-**Permiso**:
-Concesión nombrada que una operación puede exigir para permitir su ejecución. Se requieren todas las concesiones declaradas; el acceso anónimo es una alternativa explícita y excluyente, y omitir ambas alternativas deniega el acceso.
+**Permission**:
+Named grant that an operation may require to allow execution. All declared grants are required; anonymous access is an explicit and exclusive alternative, and omitting both alternatives denies access.
 
-**Error de negocio declarado**:
-Resultado de error que una operación declara que puede producir, con código único dentro de su módulo y una vista de datos opcional para sus detalles. Es distinto de los fallos del motor.
+**Declared Business Error**:
+Error result that an operation declares it may produce, with a code unique within its module and an optional data view for its details. It differs from engine failures.
 
-**Modelo privado**:
-Extensión del modelo público, definida en la capa de negocio, con campos y reglas no expuestos públicamente y mappings explícitos donde ambos modelos difieren.
+**Private Model**:
+Extension of the public model, defined in the business layer, with fields and rules not exposed publicly and explicit mappings where the two models differ.
 
-**Capa de negocio**:
-Nivel que describe los procesos de tratamiento de datos y las respuestas a eventos desde la perspectiva de un experto del dominio.
+**Business Layer**:
+Level that describes data-processing workflows and responses to events from the domain expert's perspective.
 
-**Capa técnica**:
-Nivel que declara las capacidades y opciones de implementación del servicio desde la perspectiva de un arquitecto o technical leader.
+**Technical Layer**:
+Level that declares service implementation capabilities and options from the architect's or technical leader's perspective.
 
-**Actividad declarativa**:
-Paso de un workflow definido en el DSL para interactuar con el modelo declarado del servicio. La interacción declarativa con otros servicios descritos mediante DSL es una ampliación prevista.
+**Declarative Activity**:
+Workflow step defined in the DSL to interact with the service's declared model. Declarative interaction with other services described through the DSL is planned as an extension.
 
-**Actividad externa**:
-Paso de un workflow implementado en código que interactúa con un sistema externo a partir de entradas explícitas, sin acceder directamente al estado del servicio principal.
-_Evitar_: Actividad extensible como término que mezcle operaciones internas y externas.
+**External Activity**:
+Workflow step implemented in code that interacts with an external system from explicit inputs, without directly accessing the main service's state.
+_Avoid_: Extensible activity as a term that mixes internal and external operations.
 
-**Opciones por defecto**:
-Decisiones que el sistema aporta para ejecutar un prototipo cuando su especificación omite detalles de las capas inferiores.
+**Defaults**:
+Decisions supplied by the system to run a prototype when its specification omits lower-layer details.
 
-**Perfil de prototipo**:
-Conjunto explícito de opciones por defecto que permite ejecutar una especificación parcial, distinguiendo el comportamiento de demostración del negocio definido.
+**Prototype Profile**:
+Explicit set of defaults that allows a partial specification to run while distinguishing demonstration behavior from defined business behavior.
 
-**Actor de prueba**:
-Identidad de simulación con permisos asignados para comprobar el acceso a comandos y queries en el mock.
+**Test Actor**:
+Simulation identity with assigned permissions for checking access to commands and queries in the mock.
 
-**Modelo semántico compartido**:
-Especificación única sobre la que operan la edición visual y la textual, independientemente de la disposición gráfica utilizada para representarla.
+**Shared Semantic Model**:
+Single specification operated on by visual and textual editing, independent of the graphical layout used to represent it.
 
-### Evolución y gobernanza
+### Evolution and governance
 
-**Publicación**:
-Instantánea inmutable del conjunto de fuentes semántica, visual, de mocking y, cuando exista, de gobernanza, junto con su modelo efectivo, que se ofrece como contrato para consumidores. Versiona ese conjunto y conserva un identificador y una huella de cada fuente y del modelo efectivo. Esos metadatos permiten identificar y comparar snapshots, pero no reconstruir por sí solos el contenido de las fuentes o del modelo efectivo ni el informe de comparación. No equivale a un cambio atómico individual de la fuente.
+**Publication**:
+Immutable snapshot of the semantic, visual, mocking, and, when present, governance sources, together with their effective model, offered as a contract to consumers. It versions that set and retains an identifier and fingerprint for each source and the effective model. Those metadata identify and compare snapshots but cannot by themselves reconstruct the source or effective-model contents or the comparison report. It is not equivalent to an individual atomic source change.
 
-**Línea base publicada**:
-Publicación seleccionada como referencia para comparar una fuente candidata. El informe incluye todos los cambios incompatibles desde esta línea base hasta la publicación vigente, incluidas las publicaciones intermedias. La Aprobación de ruptura permanece vinculada a esta línea base. Puede ser anterior a la publicación inmediatamente precedente.
+**Published Baseline**:
+Publication selected as the reference for comparing a candidate source. The report includes every incompatible change from this baseline to the current publication, including intermediate publications. Breaking Change Approval remains linked to this baseline. It may be older than the immediately preceding publication.
 
-**Fuente de gobernanza**:
-Fuente opcional que declara las políticas, autoridades y decisiones necesarias para gobernar un módulo, separada de sus fuentes semántica, visual y de mocking.
+**Governance Source**:
+Optional source that declares the policies, authorities, and decisions needed to govern a module, separate from its semantic, visual, and mocking sources.
 
-**Gobernanza heredada**:
-Gobernanza que toma otra como base y añade extensiones sin debilitar sus reglas. Los conflictos entre la base y la extensión impiden obtener una gobernanza efectiva.
+**Inherited Governance**:
+Governance that takes another governance source as its base and adds extensions without weakening its rules. Conflicts between the base and extension prevent an effective governance source from being obtained.
 
-**Aprobación de ruptura**:
-Autorización autenticada y registrada de un usuario con la autoridad correspondiente para publicar cambios incompatibles, vinculada a la línea base, la fuente candidata, el informe y las declaraciones afectadas. La aprobación permite publicar la ruptura, pero no la clasifica como compatible.
+**Breaking Change Approval**:
+Authenticated and recorded authorization from a user with the corresponding authority to publish incompatible changes, linked to the baseline, candidate source, report, and affected declarations. Approval permits publishing the breaking change but does not classify it as compatible.
 
-**Ruta efectiva**:
-Ruta pública vigente que representa una operación del contrato.
+**Effective Route**:
+Current public route representing a contract operation.
 
-**Ruta sustituida**:
-Ruta anterior que continúa respondiendo directamente y comunica su sucesora mediante `Link: <URL-de-la-ruta-efectiva>; rel="successor-version"`.
+**Superseded Route**:
+Former route that continues to respond directly and communicates its successor through `Link: <URL-of-the-effective-route>; rel="successor-version"`.
 
-**Ruta redirigida**:
-Ruta anterior que permanece soportada mediante `308 Permanent Redirect` a la ruta efectiva e incluye `Location: URL-de-la-ruta-efectiva`, conservando el método y el cuerpo de la petición.
+**Redirected Route**:
+Former route that remains supported through `308 Permanent Redirect` to the effective route and includes `Location: URL-of-the-effective-route`, preserving the request method and body.
 
-**Ruta retirada**:
-Ruta que ha dejado de estar soportada y responde con `410 Gone`.
+**Retired Route**:
+Route that is no longer supported and responds with `410 Gone`.

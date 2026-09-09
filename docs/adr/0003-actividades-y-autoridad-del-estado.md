@@ -1,3 +1,3 @@
-# Actividades declarativas sobre el modelo y código para efectos externos
+# Declarative activities over the model and code for external effects
 
-Los workflows y las actividades que operan sobre el modelo del servicio se declaran en el DSL. Las actividades en código se reservan para interacciones con sistemas externos mediante entradas, resultados, errores y efectos explícitos, sin acceso directo al estado del servicio principal. Esta separación conserva la autoridad del modelo en el servicio y evita que las extensiones eludan sus reglas, a cambio de exigir que sus operaciones internas puedan expresarse declarativamente.
+Workflows and activities that operate on the service model are declared in the DSL. Activities in code are reserved for interactions with external systems through explicit inputs, results, errors, and effects, without direct access to the main service state. This separation preserves the model's authority in the service and prevents extensions from bypassing its rules, at the cost of requiring internal operations to be expressible declaratively.

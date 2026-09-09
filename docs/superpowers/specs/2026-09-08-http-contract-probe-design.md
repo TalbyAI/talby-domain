@@ -1,52 +1,52 @@
-# Prototipo del contrato HTTP/JSON y de actores de prueba
+# HTTP/JSON contract and test-actor prototype
 
-## Pregunta
+## Question
 
-¿Qué forma mínima y coherente deben tener las rutas, peticiones, respuestas, errores y selección del actor de prueba para ejecutar el ejemplo de proyectos?
+What minimum and coherent shape should routes, requests, responses, errors, and test-actor selection have to run the project example?
 
-## Objetivo
+## Goal
 
-Construir un prototipo lógico desechable que permita recorrer un CRUD mínimo y el comando `AprobarProyecto`, viendo la petición HTTP/JSON, la respuesta, los permisos efectivos y el estado en memoria. El prototipo sirve para validar el contrato, no para implementar HTTP, SQLite ni autenticación real.
+Build a disposable logical prototype that can walk through a minimal CRUD and the `AprobarProyecto` command while showing the HTTP/JSON request, response, effective permissions, and in-memory state. The prototype validates the contract; it does not implement HTTP, SQLite, or real authentication.
 
-## Artefacto y límites
+## Artifact and limits
 
-- `prototypes/http-contract-probe/index.html` será un HTML autocontenido, abrible con doble clic.
-- La carpeta tendrá su propio `.gitignore` y no tendrá dependencias ni referencias desde el código de producción.
-- La lógica ejecutable estará en un módulo puro dentro del `script`; la interfaz solo despachará acciones y renderizará el estado.
-- Los datos vivirán en memoria.
-- El continuation token será una cadena opaca representativa. La autenticación JWE decidida en el ticket de paginación queda fuera de este prototipo.
+- `prototypes/http-contract-probe/index.html` will be a self-contained HTML file that opens by double-clicking.
+- The folder will have its own `.gitignore` and no dependencies or references from production code.
+- Executable logic will live in a pure module inside the `script`; the interface will only dispatch actions and render state.
+- Data will live in memory.
+- The continuation token will be a representative opaque string. The JWE authentication decided in the pagination ticket is outside this prototype.
 
-## Modelo y flujo
+## Model and flow
 
-El fixture usará `Cliente`, `Proyecto` y el grupo anidado `Periodo`, con `importe` como decimal representado por cadena. El estado visible incluirá actores, permisos, entidades, última petición, última respuesta y el historial de incidencias.
+The fixture will use `Cliente`, `Proyecto`, and the nested `Periodo` group, with `importe` represented as a decimal string. Visible state will include actors, permissions, entities, the last request, the last response, and the incident history.
 
-El recorrido delgado será:
+The thin walkthrough will be:
 
-1. Crear un proyecto.
-2. Listarlo con `offset`.
-3. Obtenerlo y actualizarlo parcialmente.
-4. Intentar un `Periodo` inválido y un campo desconocido.
-5. Listarlo con continuation token e intentar un token inválido.
-6. Ejecutar `AprobarProyecto` con un actor autorizado y uno no autorizado.
-7. Eliminar el proyecto.
+1. Create a project.
+2. List it with `offset`.
+3. Get it and partially update it.
+4. Try an invalid `Periodo` and an unknown field.
+5. List it with a continuation token and try an invalid token.
+6. Run `AprobarProyecto` with an authorized and an unauthorized actor.
+7. Delete the project.
 
-## Contrato HTTP provisional
+## Provisional HTTP contract
 
-| Operación | Ruta | Respuesta de éxito |
+| Operation | Route | Success response |
 | --- | --- | --- |
-| Crear | `POST /projects` | `201` y el proyecto |
-| Obtener | `GET /projects/{id}` | `200` y el proyecto |
-| Listar por offset | `GET /projects?offset=0&limit=20` | `200` y envoltorio de lista |
-| Listar por token | `GET /projects?continuationToken=...&limit=20` | `200` y envoltorio de lista |
-| Actualizar | `PATCH /projects/{id}` | `200` y el estado completo resultante |
-| Eliminar | `DELETE /projects/{id}` | `204` sin cuerpo |
-| Aprobar | `POST /projects/commands/AprobarProyecto` | `200` y el resultado declarado |
+| Create | `POST /projects` | `201` and the project |
+| Get | `GET /projects/{id}` | `200` and the project |
+| List by offset | `GET /projects?offset=0&limit=20` | `200` and a list wrapper |
+| List by token | `GET /projects?continuationToken=...&limit=20` | `200` and a list wrapper |
+| Update | `PATCH /projects/{id}` | `200` and the complete resulting state |
+| Delete | `DELETE /projects/{id}` | `204` with no body |
+| Approve | `POST /projects/commands/AprobarProyecto` | `200` and the declared result |
 
-Los modelos individuales no tendrán envoltorio. Las listas tendrán `items` y `pagination`; solo aparecerán los metadatos propios de la modalidad usada. Se rechazará mezclar `offset` y `continuationToken`.
+Individual models will not be wrapped. Lists will have `items` and `pagination`; only metadata for the selected mode will appear. Mixing `offset` and `continuationToken` will be rejected.
 
-## Errores
+## Errors
 
-Todas las respuestas de error usarán [Problem Details para HTTP (RFC 9457)](https://www.rfc-editor.org/rfc/rfc9457.html) y el tipo `application/problem+json`. El objeto conservará los miembros estándar `type`, `title`, `status`, `detail` e `instance`; `errors` será la única extensión del contrato de Talby:
+All error responses will use [Problem Details for HTTP (RFC 9457)](https://www.rfc-editor.org/rfc/rfc9457.html) and the `application/problem+json` type. The object will retain standard members `type`, `title`, `status`, `detail`, and `instance`; `errors` will be Talby's only contract extension:
 
 ```json
 {
@@ -66,45 +66,45 @@ Todas las respuestas de error usarán [Problem Details para HTTP (RFC 9457)](htt
 }
 ```
 
-El mapeo del prototipo será:
+The prototype mapping will be:
 
-- `400`: JSON, parámetros o token inválidos.
-- `403`: actor ausente, desconocido o sin todos los permisos.
-- `404`: entidad inexistente.
-- `422`: payload válido como JSON pero inválido según el contrato, o error de negocio declarado.
-- `500`: fallo técnico inesperado de referencia.
+- `400`: invalid JSON, parameters, or token.
+- `403`: absent, unknown, or insufficiently permitted actor.
+- `404`: missing entity.
+- `422`: JSON-valid but contract-invalid payload, or a declared business error.
+- `500`: unexpected technical reference failure.
 
-Las rutas de incidencias usarán JSON Pointer. Una regla entre campos podrá señalar varias rutas.
+Incident paths will use JSON Pointer. A cross-field rule may identify several paths.
 
-## Actores de prueba
+## Test actors
 
-El selector ofrecerá perfiles fijos:
+The selector will offer fixed profiles:
 
-- `editor`: lectura, escritura y aprobación.
-- `reader`: solo lectura.
-- `anonymous`: sin permisos.
+- `editor`: read, write, and approval.
+- `reader`: read only.
+- `anonymous`: no permissions.
 
-La petición mostrará `X-Test-Actor` como cabecera simulada. El selector no permitirá editar concesiones. La omisión o el nombre desconocido se comportarán como denegación por defecto; ningún endpoint del fixture declara acceso anónimo.
+The request will show `X-Test-Actor` as a simulated header. The selector will not allow grants to be edited. Omission or an unknown name will behave as denial by default; no fixture endpoint declares anonymous access.
 
-## Interfaz del prototipo
+## Prototype interface
 
-La página tendrá cuatro zonas:
+The page will have four areas:
 
-1. Pregunta y alcance.
-2. Estado actual: actor, permisos, entidades y última transición.
-3. Exploración libre: botones para todas las acciones.
-4. Recorridos guiados: CRUD autorizado, contrato inválido, paginación y autorización del comando.
+1. Question and scope.
+2. Current state: actor, permissions, entities, and last transition.
+3. Free exploration: buttons for every action.
+4. Guided walkthroughs: authorized CRUD, invalid contract, pagination, and command authorization.
 
-Cada acción volverá a renderizar el estado completo y mostrará la petición y la respuesta en lenguaje de contrato, no detalles internos del reducer.
+Each action will render the complete state again and show the request and response in contract language, not reducer internals.
 
-## Comprobación
+## Check
 
-Los recorridos guiados serán la comprobación ejecutable del prototipo: deben demostrar el camino feliz, una actualización que deja un estado inválido, campos desconocidos, paginación ambigua/token inválido y autorización permitida/denegada. No se añadirá una suite de pruebas ni persistencia de prueba; el HTML debe abrirse y funcionar por sí solo.
+Guided walkthroughs are the executable check for the prototype: they must demonstrate the happy path, an update that leaves an invalid state, unknown fields, ambiguous pagination/invalid token, and allowed/denied authorization. Do not add a test suite or test persistence; the HTML must open and work by itself.
 
-## Decisiones fuera de alcance
+## Out-of-scope decisions
 
-- Autenticación o autorización de producción.
-- Servidor HTTP real, SQLite, generación TypeScript y cliente externo.
-- Firma JWE real del token.
-- Cobertura exhaustiva de todos los comandos, queries o códigos técnicos.
-- Cambiar las decisiones ya cerradas sobre modelo efectivo, restricciones acumulativas o paginación.
+- Production authentication or authorization.
+- A real HTTP server, SQLite, TypeScript generation, or external client.
+- Real JWE token signing.
+- Exhaustive coverage of every command, query, or technical code.
+- Changing decisions already closed for the effective model, cumulative constraints, or pagination.

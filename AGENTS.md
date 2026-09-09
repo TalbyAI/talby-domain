@@ -1,11 +1,11 @@
 ## Agent skills
 
-### Flujo de integración
+### Integration workflow
 
-- `main` es la rama de integración protegida. Antes de editar archivos o crear commits, ejecuta `git branch --show-current`; si devuelve `main`, crea o cambia primero a una rama de trabajo (`feature/*`, `fix/*`, `docs/*`, `prototype/*` o `chore/*`).
-- Los cambios se integran en `main` mediante un Pull Request o mediante una operación equivalente ejecutada en GitHub. No actualices el remoto con `git push origin main`, ni hagas un merge local que después se publique directamente en `main`.
-- Mantén en la rama de trabajo todos los commits y cambios relacionados. Antes de abrir el Pull Request, verifica `git status --short` y `git diff origin/main...HEAD`.
-- Si `main` local contiene commits que todavía no están en `origin/main`, crea primero una rama que apunte al commit actual para conservarlos. Restablece `main` solo después de comprobar que el árbol de trabajo está limpio y que el destino es el commit esperado de `origin/main`; nunca uses ese mantenimiento para descartar trabajo no conservado.
+- `main` is the protected integration branch. Before editing files or creating commits, run `git branch --show-current`; if it returns `main`, first create or switch to a work branch (`feature/*`, `fix/*`, `docs/*`, `prototype/*`, or `chore/*`).
+- Changes are integrated into `main` through a Pull Request or an equivalent operation performed in GitHub. Do not update the remote with `git push origin main`, and do not locally merge work that will later be published directly to `main`.
+- Keep all related commits and changes on the work branch. Before opening a Pull Request, verify `git status --short` and `git diff origin/main...HEAD`.
+- If local `main` contains commits that are not yet in `origin/main`, first create a branch pointing at the current commit to preserve them. Reset `main` only after confirming that the working tree is clean and the destination is the expected `origin/main` commit; never use this maintenance to discard unpreserved work.
 
 ### Issue tracker
 
@@ -19,14 +19,33 @@ Use the five default triage labels. See `docs/agents/triage-labels.md`.
 
 This is a single-context repository. See `docs/agents/domain.md`.
 
-## Prototipos
+### Repository language policy
 
-Los prototipos son desechables: crearlos, probarlos o eliminar su carpeta no debe afectar a ninguna otra parte del repositorio.
+- Canonical repository documentation and human-readable comments, docstrings, and definitive definitions in production source are written in English, using the canonical vocabulary in `CONTEXT.md`.
+- New repository communications, including issue and Pull Request text, reviews, comments, and commit messages, are written in English.
+- Direct user-facing conversation with the agent remains in Spanish by default. This does not change the language of repository artifacts.
+- The in-scope corpus is tracked, human-authored documentation outside prototype directories: root guidance, the domain glossary, ADRs, agent and process guidance, research, specifications, designs, implementation plans, samples, and equivalent Markdown or text documentation added later. Production source documentation outside prototype directories is also in scope.
+- The current inventory is `AGENTS.md`, `CONTEXT.md`, `docs/adr/*.md`, `docs/agents/*.md`, `docs/research/*.md`, `docs/specification.md`, `docs/superpowers/plans/*.md`, `docs/superpowers/specs/*.md`, and `samples/*.md`. New files matching the same categories join the inventory automatically.
+- All content under `prototypes/` is excluded, including READMEs, source files, fixtures, reports, generated evidence, dependencies, and launch instructions. Historical GitHub issues, comments, reviews, and other already-published repository communication are also excluded.
+- Do not rename or reinterpret protected contract surfaces: code-facing identifiers, RDF IRIs, JSON keys, public API names and routes, runtime payload fields, protocol literals, declaration identifiers, serialized data, command-line syntax, and exact example values whose spelling carries contract meaning.
+- Preserve existing paths, filenames, ADR numbering, links, headings, anchors, examples, and cross-references unless a separate decision authorizes a change. The migration is documentation-only except for explicitly in-scope production comments or docstrings.
 
-- Ubicar cada prototipo en su propia subcarpeta `prototypes/<nombre>/`.
-- Cada prototipo debe tener su propio `.gitignore`; mantener sus dependencias, configuración, scripts, pruebas y artefactos dentro de su carpeta.
-- Para ejecutarlo o probarlo, entrar primero en su carpeta. Mantener allí las instrucciones y los comandos de ejecución.
-- No añadir recetas, scripts ni comandos específicos de prototipos en la raíz, incluidos atajos que deleguen la ejecución en su carpeta.
-- No crear referencias ni dependencias entre prototipos.
-- El código de producción y las pruebas del resto del repositorio no pueden referenciar, importar ni depender de prototipos, ni utilizar sus datos o utilidades.
-- Mantener los prototipos fuera de la compilación, las pruebas y los comandos generales del repositorio, de modo que eliminar cualquiera de sus carpetas no requiera cambios fuera de ella.
+#### Documentation review checklist
+
+- Confirm that the file is in scope and is outside `prototypes/`, generated content, and historical repository communication.
+- Confirm that human-readable prose uses English and the canonical domain terms.
+- Confirm that protected contract surfaces, code blocks, serialized examples, and command syntax are unchanged in meaning.
+- Confirm that links, headings, anchors, ADR numbering, examples, and cross-references still resolve.
+- Confirm that the diff contains no runtime, generated, prototype, or unrelated changes.
+
+## Prototypes
+
+Prototypes are disposable: creating, testing, or removing one must not affect any other part of the repository.
+
+- Place each prototype in its own `prototypes/<name>/` subdirectory.
+- Each prototype must have its own `.gitignore`; keep its dependencies, configuration, scripts, tests, and artifacts inside that directory.
+- To run or test it, enter its directory first. Keep execution instructions and commands there.
+- Do not add prototype-specific recipes, scripts, or commands to the root, including shortcuts that delegate execution to the prototype directory.
+- Do not create references or dependencies between prototypes.
+- Production code and tests elsewhere in the repository must not reference, import, or depend on prototypes, or use their data or utilities.
+- Keep prototypes outside the repository's general build, test, and command flows, so removing any prototype directory does not require changes outside it.

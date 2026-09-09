@@ -1,8 +1,8 @@
-# Modelo de datos de un módulo de proyectos 
+# Data model for a project module
 
-## Entidades principales
+## Main entities
 
-### Entidad EntityDescription
+### Entity EntityDescription
 
 ```ttl
 :EntityDescription a tdpo:Entity.
@@ -31,7 +31,7 @@
 
 ```
 
-### Entidad Client
+### Entity Client
 
 ```ttl
 :Client a tdpo:Entity.

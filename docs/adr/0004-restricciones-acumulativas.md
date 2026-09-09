@@ -1,5 +1,5 @@
-# Restricciones acumulativas al componer modelos
+# Cumulative constraints when composing models
 
-Un comando o modelo que reutiliza un campo conserva todas sus restricciones y solo puede añadir otras que se combinan con ellas. Se descarta sobrescribir o debilitar las restricciones para conservar el significado del campo en sus distintos usos.
+A command or model that reuses a field preserves all of its constraints and may only add constraints that combine with them. Overriding or weakening constraints is rejected so that the field keeps the same meaning across its uses.
 
-La primera iteración solo admite inclusión anidada mediante un campo nombrado, preservando las reglas de cada agrupación. Se aplaza el aplanado para simplificar su composición y validación. Los mensajes de cambios parciales se distinguen de los modelos completos y no debilitan las restricciones del estado resultante.
+The first iteration permits only Nested Inclusion through a named field, preserving each grouping's rules. Flattened Inclusion is deferred to simplify composition and validation. Partial Update Messages are distinguished from complete models and do not weaken the constraints of the resulting state.

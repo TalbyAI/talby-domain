@@ -1,5 +1,5 @@
-# Especificación progresiva en tres capas
+# Progressive specification in three layers
 
-La especificación separa contrato público de datos, comportamiento de negocio y decisiones técnicas, con opciones por defecto que permiten ejecutar un prototipo definiendo solo el contrato. Se elige esta progresión para explorar un servicio antes de completar su comportamiento e implementación, en lugar de exigir una definición exhaustiva inicial.
+The specification separates the public data contract, business behavior, and technical decisions, with defaults that allow a prototype to run while defining only the contract. This progression is chosen to explore a service before completing its behavior and implementation, rather than requiring an exhaustive definition at the outset.
 
-Los defaults pertenecen a un perfil explícito y deben distinguirse del comportamiento de negocio definido; su versionado se aplaza hasta la versión 1.0 del producto. Negocio añade condiciones semánticas y técnica implementa las garantías declaradas; las contradicciones deben detectarse, sin cambiar silenciosamente el comportamiento. El comportamiento exacto de los defaults y las fases de comprobación siguen pendientes.
+Defaults belong to an explicit profile and must be distinguished from defined business behavior; their versioning is deferred until product version 1.0. The business layer adds semantic conditions and the technical layer implements declared guarantees; contradictions must be detected without silently changing behavior. The exact behavior of defaults and the verification phases remain pending.
