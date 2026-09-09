@@ -31,6 +31,8 @@
 - Modify: none — production code is not involved.
 - Test: none — the asset is a self-contained manual prototype; its checks live in the interface.
 
+Code blocks in this plan reproduce exact excluded-prototype source, UI labels, fixtures, and payloads. Translate the surrounding plan prose, but preserve those blocks verbatim.
+
 ## Task 1: Create the isolated container and empty page
 
 **Files:**
@@ -62,6 +64,8 @@ Thumbs.db
 - [ ] **Step 3: Write the local instructions**
 
 Use this exact content in `README.md`:
+
+The following block is intentionally verbatim: it reproduces the excluded prototype's README and is not canonical repository prose to translate.
 
 ~~~markdown
 # Prototipo desechable: inspector del modelo efectivo

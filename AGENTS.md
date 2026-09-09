@@ -34,7 +34,9 @@ This is a single-context repository. See `docs/agents/domain.md`.
 
 - Confirm that the file is in scope and is outside `prototypes/`, generated content, and historical repository communication.
 - Confirm that human-readable prose uses English and the canonical domain terms.
-- Confirm that protected contract surfaces, code blocks, serialized examples, and command syntax are unchanged in meaning.
+- Treat code blocks, serialized examples, quoted protocol terms, machine-readable values, and exact prototype labels as protected examples: translate surrounding prose, but preserve their meaning and verify them rather than rewriting literals.
+- A canonical plan may therefore retain Spanish literals when a code block reproduces an excluded prototype's exact README, UI, fixture, or payload text; those literals are not repository prose and must not be changed by this migration.
+- Confirm that protected contract surfaces and command syntax are unchanged in meaning.
 - Confirm that links, headings, anchors, ADR numbering, examples, and cross-references still resolve.
 - Confirm that the diff contains no runtime, generated, prototype, or unrelated changes.
 

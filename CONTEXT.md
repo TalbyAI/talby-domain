@@ -134,10 +134,10 @@ Authenticated and recorded authorization from a user with the corresponding auth
 Current public route representing a contract operation.
 
 **Superseded Route**:
-Former route that continues to respond directly and communicates its successor through `Link: <URL-of-the-effective-route>; rel="successor-version"`.
+Former route that continues to respond directly and communicates its successor through `Link: <URL-de-la-ruta-efectiva>; rel="successor-version"`.
 
 **Redirected Route**:
-Former route that remains supported through `308 Permanent Redirect` to the effective route and includes `Location: URL-of-the-effective-route`, preserving the request method and body.
+Former route that remains supported through `308 Permanent Redirect` to the effective route and includes `Location: URL-de-la-ruta-efectiva`, preserving the request method and body.
 
 **Retired Route**:
 Route that is no longer supported and responds with `410 Gone`.

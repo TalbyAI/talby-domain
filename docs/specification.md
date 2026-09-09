@@ -151,7 +151,7 @@ The engine, mock, and client library share an error contract with a stable code,
 
 ## Prototype HTTP conventions
 
-Routes are derived from module, features, and declared name, with an explicit override. CRUD uses `POST` to create, `GET` to get or list, `PATCH` for partial update, and `DELETE` to delete. Custom commands and queries use `POST` under `/commands/{name}` and `/queries/{name}`, respectively, within their module and feature route.
+Routes are derived from module, features, and declared name, with an explicit override. CRUD uses `POST` to create, `GET` to get or list, `PATCH` for partial update, and `DELETE` to delete. Custom commands and queries use `POST` under `/commands/{nombre}` and `/queries/{nombre}`, respectively, within their module and feature route.
 
 Results are the JSON of the declared model, without an additional wrapper except for lists and errors. Concrete status codes and wrapper property names will be defined in HTTP contracts during detailed design.
 
