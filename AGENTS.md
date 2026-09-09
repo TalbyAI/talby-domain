@@ -10,6 +10,7 @@
 ### Issue tracker
 
 Issues are tracked in this repository's GitHub Issues. See `docs/agents/issue-tracker.md`.
+Before creating, reading, listing, updating, labeling, commenting on, closing, or triaging an issue or pull request, read `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 
