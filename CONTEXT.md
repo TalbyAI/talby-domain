@@ -112,3 +112,32 @@ Identidad de simulación con permisos asignados para comprobar el acceso a coman
 
 **Modelo semántico compartido**:
 Especificación única sobre la que operan la edición visual y la textual, independientemente de la disposición gráfica utilizada para representarla.
+
+### Evolución y gobernanza
+
+**Publicación**:
+Instantánea inmutable de una fuente y su modelo efectivo que se ofrece como contrato para consumidores, con un identificador y huellas de ambos que permiten reconstruir su comparación. No equivale a un cambio atómico individual de la fuente.
+
+**Línea base publicada**:
+Publicación seleccionada como referencia para comparar una nueva fuente. Puede ser anterior a la publicación inmediatamente precedente.
+
+**Fuente de gobernanza**:
+Fuente opcional que declara las políticas, autoridades y decisiones necesarias para gobernar un módulo, separada de sus fuentes semántica, visual y de mocking.
+
+**Gobernanza heredada**:
+Gobernanza que toma otra como base y añade extensiones sin debilitar sus reglas. Los conflictos entre la base y la extensión impiden obtener una gobernanza efectiva.
+
+**Aprobación de ruptura**:
+Autorización autenticada y registrada de un usuario con la autoridad correspondiente para publicar cambios incompatibles, vinculada a la línea base, la fuente candidata, el informe y las declaraciones afectadas. La aprobación permite publicar la ruptura, pero no la clasifica como compatible.
+
+**Ruta efectiva**:
+Ruta pública vigente que representa una operación del contrato.
+
+**Ruta sustituida**:
+Ruta anterior que continúa respondiendo directamente y comunica mediante una cabecera la ruta que debe utilizarse en adelante.
+
+**Ruta redirigida**:
+Ruta anterior que permanece soportada mediante `308 Permanent Redirect` a la ruta efectiva, conservando el método y el cuerpo de la petición.
+
+**Ruta retirada**:
+Ruta que ha dejado de estar soportada y responde con `410 Gone`.
