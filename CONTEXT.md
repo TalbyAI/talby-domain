@@ -112,3 +112,32 @@ Identidad de simulación con permisos asignados para comprobar el acceso a coman
 
 **Modelo semántico compartido**:
 Especificación única sobre la que operan la edición visual y la textual, independientemente de la disposición gráfica utilizada para representarla.
+
+### Evolución y gobernanza
+
+**Publicación**:
+Instantánea inmutable del conjunto de fuentes semántica, visual, de mocking y, cuando exista, de gobernanza, junto con su modelo efectivo, que se ofrece como contrato para consumidores. Versiona ese conjunto y conserva un identificador y una huella de cada fuente y del modelo efectivo. Esos metadatos permiten identificar y comparar snapshots, pero no reconstruir por sí solos el contenido de las fuentes o del modelo efectivo ni el informe de comparación. No equivale a un cambio atómico individual de la fuente.
+
+**Línea base publicada**:
+Publicación seleccionada como referencia para comparar una fuente candidata. El informe incluye todos los cambios incompatibles desde esta línea base hasta la publicación vigente, incluidas las publicaciones intermedias. La Aprobación de ruptura permanece vinculada a esta línea base. Puede ser anterior a la publicación inmediatamente precedente.
+
+**Fuente de gobernanza**:
+Fuente opcional que declara las políticas, autoridades y decisiones necesarias para gobernar un módulo, separada de sus fuentes semántica, visual y de mocking.
+
+**Gobernanza heredada**:
+Gobernanza que toma otra como base y añade extensiones sin debilitar sus reglas. Los conflictos entre la base y la extensión impiden obtener una gobernanza efectiva.
+
+**Aprobación de ruptura**:
+Autorización autenticada y registrada de un usuario con la autoridad correspondiente para publicar cambios incompatibles, vinculada a la línea base, la fuente candidata, el informe y las declaraciones afectadas. La aprobación permite publicar la ruptura, pero no la clasifica como compatible.
+
+**Ruta efectiva**:
+Ruta pública vigente que representa una operación del contrato.
+
+**Ruta sustituida**:
+Ruta anterior que continúa respondiendo directamente y comunica su sucesora mediante `Link: <URL-de-la-ruta-efectiva>; rel="successor-version"`.
+
+**Ruta redirigida**:
+Ruta anterior que permanece soportada mediante `308 Permanent Redirect` a la ruta efectiva e incluye `Location: URL-de-la-ruta-efectiva`, conservando el método y el cuerpo de la petición.
+
+**Ruta retirada**:
+Ruta que ha dejado de estar soportada y responde con `410 Gone`.
