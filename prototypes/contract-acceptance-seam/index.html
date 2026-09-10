@@ -49,7 +49,171 @@
   </main>
   <script>
     "use strict";
-    // Tasks 2–5 add the logical module and renderer.
+    const ContractAcceptanceProbe = (() => {
+      const effectiveModel = {
+        route: { value: "/projects", origin: "derivado" },
+        operations: ["create", "get", "list", "patch", "delete"],
+        fields: {
+          importe: { type: "ExactDecimal", origin: "declarado" },
+          periodo: { rule: "fin >= inicio", origin: "declarado" }
+        },
+        profileDefaults: { listLimit: { value: 20, origin: "default" } },
+        command: { name: "AprobarProyecto", origin: "declarado" },
+        event: { name: "ProjectApproved", origin: "declarado" }
+      };
+      const fixtures = {
+        valid: {
+          semanticSource: `@prefix c: <https://github.com/TalbyAI/talby-domain/vocab/contract#> .
+@prefix d: <urn:talby:prototype:declaration:> .
+d:Project a c:Entity ; c:name "Proyecto" .`,
+          mockingSource: `@prefix m: <https://github.com/TalbyAI/talby-domain/vocab/mocking#> .
+@prefix s: <urn:talby:prototype:scenario:> .
+s:ApproveKnownProject a m:Scenario .`,
+          effectiveModel,
+          samplePayload: {
+            clienteId: "cliente-1",
+            nombre: "Proyecto Atlas",
+            periodo: { inicio: "2026-01-01", fin: "2026-12-31" },
+            importe: "100.00"
+          },
+          verification: { status: "verified", diagnostics: [] }
+        },
+        missingReference: { verification: { status: "blocked", diagnostics: [
+          { code: "REFERENCE_NOT_FOUND", paths: ["/Proyecto/clienteId"] }
+        ] } },
+        unsupportedFunction: { verification: { status: "blocked", diagnostics: [
+          { code: "FUNCTION_UNSUPPORTED", paths: ["/Proyecto/Periodo"] }
+        ] } },
+        contradictory: { verification: { status: "blocked", diagnostics: [
+          { code: "DECLARATION_CONTRADICTION", paths: ["/Proyecto/importe"] }
+        ] } }
+      };
+
+      function verifySources(fixture) {
+        return fixture.verification;
+      }
+
+      function materializeEffectiveModel(fixture) {
+        if (fixture.verification.status !== "verified") return null;
+        return {
+          route: { value: "/projects", origin: "derivado" },
+          operations: ["create", "get", "list", "patch", "delete"],
+          fields: {
+            importe: { type: "ExactDecimal", origin: "declarado" },
+            periodo: { rule: "fin >= inicio", origin: "declarado" }
+          },
+          profileDefaults: { listLimit: { value: 20, origin: "default" } },
+          command: { name: "AprobarProyecto", origin: "declarado" },
+          event: { name: "ProjectApproved", origin: "declarado" }
+        };
+      }
+
+      function initialState() {
+        return {
+          stage: "sources-not-loaded",
+          selectedSource: null,
+          verification: null,
+          effectiveModel: null,
+          clientEnabled: false,
+          mockEnabled: false,
+          storageEnabled: false,
+          actor: null
+        };
+      }
+
+      function reduce(state, action) {
+        if (action.type === "reset") return initialState();
+        if (action.type === "loadSources" || action.type === "loadInvalidSource") {
+          const selectedSource = action.source || (action.type === "loadSources" ? "valid" : null);
+          if (!fixtures[selectedSource]) return state;
+          return { ...initialState(), stage: "sources-loaded", selectedSource };
+        }
+        if (action.type === "verify" && state.selectedSource) {
+          const verification = verifySources(fixtures[state.selectedSource]);
+          return {
+            ...state,
+            stage: verification.status === "verified" ? "verified" : "blocked",
+            verification,
+            effectiveModel: null,
+            clientEnabled: false,
+            mockEnabled: false,
+            storageEnabled: false
+          };
+        }
+        if (action.type === "materialize" && state.verification?.status === "verified") {
+          return {
+            ...state,
+            stage: "materialized",
+            effectiveModel: materializeEffectiveModel(fixtures[state.selectedSource]),
+            clientEnabled: true,
+            mockEnabled: true,
+            storageEnabled: true
+          };
+        }
+        if (action.type === "selectActor") return { ...state, actor: action.actor };
+        return state;
+      }
+
+      return { fixtures, walkthroughs: [], initialState, reduce };
+    })();
+
+    const elements = {
+      scope: document.querySelector("#scope"),
+      state: document.querySelector("#state"),
+      freePlay: document.querySelector("#free-play")
+    };
+    let state = ContractAcceptanceProbe.initialState();
+
+    function card(title, value) {
+      const item = document.createElement("article");
+      item.className = "card";
+      const heading = document.createElement("h3");
+      heading.textContent = title;
+      const content = document.createElement("pre");
+      content.textContent = value;
+      item.append(heading, content);
+      return item;
+    }
+
+    function render(currentState) {
+      const fixture = ContractAcceptanceProbe.fixtures[currentState.selectedSource];
+      elements.scope.textContent = "Logical contract-level probe; no parser, runtime, network, or persistence is run.";
+      elements.state.replaceChildren(
+        card("Stage", currentState.stage),
+        card("Selected source", currentState.selectedSource || "none"),
+        card("Semantic Source", fixture?.semanticSource || "not selected"),
+        card("Mocking Source", fixture?.mockingSource || "not selected"),
+        card("Verification", currentState.verification
+          ? currentState.verification.diagnostics.map(({ code, paths }) => `${code} ${paths.join(", ")}`).join("\n") || currentState.verification.status
+          : "not run"),
+        card("Effective model", currentState.effectiveModel ? JSON.stringify(currentState.effectiveModel, null, 2) : "not materialized"),
+        card("Client / mock / storage", [currentState.clientEnabled, currentState.mockEnabled, currentState.storageEnabled].every(Boolean) ? "available" : "blocked")
+      );
+      elements.freePlay.replaceChildren();
+      [
+        ["Load valid sources", { type: "loadSources" }],
+        ["Load missing reference", { type: "loadInvalidSource", source: "missingReference" }],
+        ["Load unsupported function", { type: "loadInvalidSource", source: "unsupportedFunction" }],
+        ["Load contradictory declaration", { type: "loadInvalidSource", source: "contradictory" }],
+        ["Verify sources", { type: "verify" }],
+        ["Materialize effective model", { type: "materialize" }],
+        ["Reset", { type: "reset" }]
+      ].forEach(([label, action]) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.textContent = label;
+        button.disabled = action.type === "materialize" && currentState.verification?.status !== "verified";
+        button.addEventListener("click", () => dispatch(action));
+        elements.freePlay.append(button);
+      });
+    }
+
+    function dispatch(action) {
+      state = ContractAcceptanceProbe.reduce(state, action);
+      render(state);
+    }
+
+    render(state);
   </script>
 </body>
 </html>
