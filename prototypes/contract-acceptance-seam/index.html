@@ -105,6 +105,22 @@ s:ApproveKnownProject a m:Scenario .`,
           { label: "Verify sources", action: { type: "verify" } },
           { label: "Materialize effective model", action: { type: "materialize" } }
         ]
+      }, {
+        title: "HTTP acceptance check",
+        steps: [
+          { label: "Load and materialize valid sources", action: { type: "loadSources" } },
+          { label: "Verify sources", action: { type: "verify" } },
+          { label: "Materialize effective model", action: { type: "materialize" } },
+          { label: "Act as editor", action: { type: "selectActor", actor: "editor" } },
+          { label: "Create project", action: { type: "request", operation: "create", input: { body: {
+            clienteId: "cliente-1", nombre: " Proyecto Atlas ", periodo: { inicio: "2026-01-01", fin: "2026-12-31" }, importe: "100.00"
+          } } } },
+          { label: "List projects", action: { type: "request", operation: "list", input: {} } },
+          { label: "Patch project", action: { type: "request", operation: "patch", input: { id: "project-1", body: { nombre: " Proyecto Atlas actualizado " } } } },
+          { label: "Reject invalid Periodo without changing storage", action: { type: "request", operation: "create", input: { body: {
+            clienteId: "cliente-1", nombre: "Rejected", periodo: { inicio: "2026-12-31", fin: "2026-01-01" }, importe: "100.00"
+          } } } }
+        ]
       }];
 
       function fixtureFor(source) {
@@ -136,14 +152,22 @@ s:ApproveKnownProject a m:Scenario .`,
         return { value, incidents: [] };
       }
 
+      function isIdentifier(value) {
+        return typeof value === "string" && /^[A-Za-z0-9_-]{1,128}$/.test(value);
+      }
+
+      function pointerSegment(value) {
+        return value.replace(/~/g, "~0").replace(/\//g, "~1");
+      }
+
       function validateProject(input, mode = "complete") {
         const incidents = [];
         const known = ["clienteId", "nombre", "periodo", "importe"];
         for (const key of Object.keys(input)) {
-          if (!known.includes(key)) incidents.push({ code: "UNKNOWN_FIELD", paths: [`/${key}`] });
+          if (!known.includes(key)) incidents.push({ code: "UNKNOWN_FIELD", paths: [`/${pointerSegment(key)}`] });
         }
         if (mode === "complete" && !input.nombre) incidents.push({ code: "REQUIRED", paths: ["/nombre"] });
-        if (input.clienteId && !/^[A-Za-z0-9_-]{1,128}$/.test(input.clienteId)) incidents.push({ code: "INVALID_IDENTIFIER", paths: ["/clienteId"] });
+        if (Object.hasOwn(input, "clienteId") && !isIdentifier(input.clienteId)) incidents.push({ code: "INVALID_IDENTIFIER", paths: ["/clienteId"] });
         if (input.periodo && input.periodo.fin < input.periodo.inicio) incidents.push({
           code: "PERIOD_END_BEFORE_START", paths: ["/periodo/inicio", "/periodo/fin"]
         });
@@ -180,8 +204,8 @@ s:ApproveKnownProject a m:Scenario .`,
           method,
           path,
           headers: { "X-Test-Actor": state.actor },
-          query: input.query,
-          body: input.body
+          ...(Object.hasOwn(input, "query") ? { query: input.query } : {}),
+          ...(Object.hasOwn(input, "body") ? { body: input.body } : {})
         };
       }
 
@@ -213,18 +237,20 @@ s:ApproveKnownProject a m:Scenario .`,
         if (!operation) return { state, response: problem(404, "ROUTE_NOT_FOUND", "Route not found"), transition };
         if (missing.length) return { state, response: problem(403, "FORBIDDEN", "Permission denied"), transition };
         const id = request.path.split("/")[2];
-        if (id && !/^[A-Za-z0-9_-]{1,128}$/.test(id)) {
+        if (id && !isIdentifier(id)) {
           return { state, response: problem(422, "INVALID_IDENTIFIER", "Identifier is invalid", [{ code: "INVALID_IDENTIFIER", paths: ["/id"] }]), transition };
         }
         if (operation === "create") {
-          const normalized = normalizeProject(request.body || {});
+          if (request.body === null) return { state, response: problem(422, "VALIDATION_FAILED", "Project validation failed", [{ code: "NULL_BODY", paths: ["/"] }]), transition };
+          const normalized = normalizeProject(request.body === undefined ? {} : request.body);
           const incidents = normalized.incidents.concat(validateProject(normalized.value));
           if (incidents.length) return { state, response: problem(422, "VALIDATION_FAILED", "Project validation failed", incidents), transition };
           const project = { id: `project-${state.projects.length + 1}`, ...normalized.value };
           return { state: { ...state, projects: [...state.projects, project] }, response: response(201, project), transition };
         }
         if (operation === "list") {
-          const query = request.query || {};
+          if (request.query === null) return { state, response: problem(400, "INVALID_QUERY", "Query is invalid", [{ code: "NULL_QUERY", paths: ["/query"] }]), transition };
+          const query = request.query === undefined ? {} : request.query;
           if (query.offset !== undefined && query.token !== undefined) return { state, response: problem(400, "PAGINATION_MIXED", "Offset and token cannot be combined"), transition };
           const signature = JSON.stringify({ limit: query.limit || 20, filter: query.filter || null });
           let index = Number(query.offset || 0);
@@ -242,12 +268,16 @@ s:ApproveKnownProject a m:Scenario .`,
           return { state, response: response(200, { items, pagination: { limit, token } }), transition };
         }
         const projectId = operation === "approve" ? request.body?.id : id;
+        if (operation === "approve" && !isIdentifier(projectId)) {
+          return { state, response: problem(422, "INVALID_IDENTIFIER", "Identifier is invalid", [{ code: "INVALID_IDENTIFIER", paths: ["/id"] }]), transition };
+        }
         const index = state.projects.findIndex(project => project.id === projectId);
         if (index < 0) return { state, response: problem(404, "PROJECT_NOT_FOUND", "Project not found"), transition };
         if (operation === "get") return { state, response: response(200, { ...state.projects[index] }), transition };
         if (operation === "delete") return { state: { ...state, projects: state.projects.filter(project => project.id !== projectId) }, response: response(204), transition };
         if (operation === "patch") {
-          const normalized = normalizeProject(request.body || {});
+          if (request.body === null) return { state, response: problem(422, "VALIDATION_FAILED", "Project validation failed", [{ code: "NULL_BODY", paths: ["/"] }]), transition };
+          const normalized = normalizeProject(request.body === undefined ? {} : request.body);
           const suppliedIncidents = normalized.incidents.concat(validateProject(normalized.value, "partial"));
           const project = { ...state.projects[index], ...normalized.value };
           const { id: ignoredId, ...projectInput } = project;
@@ -404,9 +434,14 @@ s:ApproveKnownProject a m:Scenario .`,
         const item = card(walkthrough.title, walkthrough.steps.map(({ label }, index) => `${index + 1}. ${label}`).join("\n"));
         const button = document.createElement("button");
         button.type = "button";
-        button.textContent = "Run source verification check (verified)";
+        button.textContent = walkthrough.title === "Source verification check" ? "Run source verification check (verified)" : "Run HTTP acceptance check";
         button.addEventListener("click", () => {
-          state = walkthrough.steps.reduce((next, { action }) => ContractAcceptanceProbe.reduce(next, action), ContractAcceptanceProbe.initialState());
+          [state, lastRequest, lastResponse, lastTransition] = walkthrough.steps.reduce(([next], { action }) => {
+            if (action.type !== "request") return [ContractAcceptanceProbe.reduce(next, action), lastRequest, lastResponse, lastTransition];
+            const request = ContractAcceptanceProbe.clientRequest(action.operation, action.input, next);
+            const result = ContractAcceptanceProbe.executeHttp(next, request);
+            return [result.state, request, result.response, result.transition];
+          }, [ContractAcceptanceProbe.initialState(), null, null, null]);
           render(state);
         });
         item.append(button);
