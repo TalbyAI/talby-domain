@@ -46,6 +46,10 @@
       <h2 id="walkthrough-title">Guided walkthroughs</h2>
       <div id="walkthroughs"></div>
     </section>
+    <section aria-labelledby="reports-title">
+      <h2 id="reports-title">Mocking and compatibility reports</h2>
+      <div id="reports" class="grid"></div>
+    </section>
   </main>
   <script>
     "use strict";
@@ -88,6 +92,7 @@ s:ApproveKnownProject a m:Scenario .`,
           { code: "DECLARATION_CONTRADICTION", paths: ["/Proyecto/importe"] }
         ] } }
       };
+      fixtures.validWithoutMocking = { ...fixtures.valid, mockingSource: null };
       const sourceNotFound = {
         status: "blocked",
         diagnostics: [{ code: "SOURCE_NOT_FOUND", paths: ["/sources"] }]
@@ -97,6 +102,19 @@ s:ApproveKnownProject a m:Scenario .`,
         reader: ["projects.read"],
         anonymous: []
       };
+      const conformanceVectors = [
+        { name: "trim", input: { clienteId: "cliente-1", nombre: " Proyecto Atlas ", periodo: { inicio: "2026-01-01", fin: "2026-12-31" }, importe: "100.00" } },
+        { name: "idempotent trim", input: { clienteId: "cliente-1", nombre: "Proyecto Atlas", periodo: { inicio: "2026-01-01", fin: "2026-12-31" }, importe: "100.00" } },
+        { name: "invalid Periodo", input: { clienteId: "cliente-1", nombre: "Proyecto Atlas", periodo: { inicio: "2026-12-31", fin: "2026-01-01" }, importe: "100.00" } },
+        { name: "exact decimal string preservation", input: { clienteId: "cliente-1", nombre: "Proyecto Atlas", periodo: { inicio: "2026-01-01", fin: "2026-12-31" }, importe: "100.00" } },
+        { name: "unknown field", input: { clienteId: "cliente-1", nombre: "Proyecto Atlas", periodo: { inicio: "2026-01-01", fin: "2026-12-31" }, importe: "100.00", extra: true } }
+      ];
+      const compatibilityBefore = [
+        { id: "decl:project", route: "/projects", input: ["nombre"], output: ["id", "nombre"] }
+      ];
+      const compatibilityAfter = [
+        { id: "decl:project", route: "/projects-v2", input: ["nombre", "clienteId"], output: ["id", "nombre", "estado"] }
+      ];
       const paginationBindings = new Map();
       const walkthroughs = [{
         title: "Source verification check",
@@ -129,6 +147,12 @@ s:ApproveKnownProject a m:Scenario .`,
           { label: "Reject mixed pagination without changing storage", action: { type: "request", operation: "list", input: { query: { offset: 0, token: "opaque-1" } } } },
           { label: "Reject invalid token without changing storage", action: { type: "request", operation: "list", input: { query: { token: "unknown" } } } }
         ]
+      }, {
+        title: "Conformance and compatibility check",
+        steps: [
+          { label: "Run conformance vectors", action: { type: "conformance" } },
+          { label: "Compare compatibility declarations", action: { type: "compatibility" } }
+        ]
       }];
 
       function fixtureFor(source) {
@@ -160,6 +184,12 @@ s:ApproveKnownProject a m:Scenario .`,
         return { value, incidents: [] };
       }
 
+      function matchScenarios(operation, count) {
+        if (operation !== "AprobarProyecto" || count === 0) return { status: "not-simulated", response: null, error: null };
+        if (count === 1) return { status: "matched", response: { approved: true }, error: null };
+        return { status: "ambiguous", response: null, error: { code: "SCENARIO_AMBIGUOUS" } };
+      }
+
       function isIdentifier(value) {
         return typeof value === "string" && /^[A-Za-z0-9_-]{1,128}$/.test(value);
       }
@@ -181,6 +211,47 @@ s:ApproveKnownProject a m:Scenario .`,
         });
         if ((mode === "complete" || Object.hasOwn(input, "importe")) && typeof input.importe !== "string") incidents.push({ code: "EXACT_DECIMAL_STRING_REQUIRED", paths: ["/importe"] });
         return incidents;
+      }
+
+      function runClientVector(vector) {
+        const value = { ...vector.input };
+        if (typeof value.nombre === "string") value.nombre = value.nombre.trim();
+        return { value, incidents: validateProject(value) };
+      }
+
+      function runEngineVector(vector) {
+        const normalized = normalizeProject(vector.input);
+        return { value: normalized.value, incidents: normalized.incidents.concat(validateProject(normalized.value)) };
+      }
+
+      function conformanceRow(vector) {
+        const client = runClientVector(vector);
+        const engine = runEngineVector(vector);
+        return {
+          name: vector.name,
+          input: vector.input,
+          client,
+          engine,
+          equal: JSON.stringify(client) === JSON.stringify(engine)
+        };
+      }
+
+      function runConformance() {
+        return conformanceVectors.map(conformanceRow);
+      }
+
+      function compareSources(before, after) {
+        return before.flatMap((previous) => {
+          const next = after.find((declaration) => declaration.id === previous.id);
+          if (!next) return [{ id: previous.id, category: "incompatible", reason: "Declaration is missing." }];
+          const entries = [];
+          const addedOutput = next.output.filter((field) => !previous.output.includes(field));
+          if (addedOutput.length) entries.push({ id: previous.id, category: "compatible", reason: `Output adds ${addedOutput.join(", ")}.` });
+          if (next.route !== previous.route) entries.push({ id: previous.id, category: "potentially-incompatible", reason: `Effective route moves from ${previous.route} to ${next.route}.` });
+          const addedInput = next.input.filter((field) => !previous.input.includes(field));
+          if (addedInput.length) entries.push({ id: previous.id, category: "incompatible", reason: `Required input adds ${addedInput.join(", ")}.` });
+          return entries;
+        });
       }
 
       function problem(status, code, detail, errors = []) {
@@ -353,7 +424,7 @@ s:ApproveKnownProject a m:Scenario .`,
         return state;
       }
 
-      return { fixtures, walkthroughs, initialState, reduce, normalizeProject, validateProject, clientRequest, executeHttp, logicalStorage };
+      return { fixtures, walkthroughs, initialState, reduce, normalizeProject, validateProject, matchScenarios, runClientVector, runEngineVector, runConformance, compareSources, compatibilityBefore, compatibilityAfter, clientRequest, executeHttp, logicalStorage };
     })();
 
     const elements = {
@@ -361,6 +432,7 @@ s:ApproveKnownProject a m:Scenario .`,
       state: document.querySelector("#state"),
       freePlay: document.querySelector("#free-play"),
       walkthroughs: document.querySelector("#walkthroughs"),
+      reports: document.querySelector("#reports"),
       lastRequest: document.querySelector("#last-request"),
       lastResponse: document.querySelector("#last-response"),
       incidents: document.querySelector("#incidents")
@@ -369,6 +441,9 @@ s:ApproveKnownProject a m:Scenario .`,
     let lastRequest = null;
     let lastResponse = null;
     let lastTransition = null;
+    let scenarioReport = null;
+    let conformanceReport = null;
+    let compatibilityReport = null;
 
     function card(title, value) {
       const item = document.createElement("article");
@@ -381,6 +456,46 @@ s:ApproveKnownProject a m:Scenario .`,
       return item;
     }
 
+    function reportTable(headers, rows) {
+      const table = document.createElement("table");
+      const head = document.createElement("thead");
+      const headRow = document.createElement("tr");
+      headers.forEach((header) => {
+        const cell = document.createElement("th");
+        cell.textContent = header;
+        headRow.append(cell);
+      });
+      head.append(headRow);
+      const body = document.createElement("tbody");
+      rows.forEach((row) => {
+        const rowElement = document.createElement("tr");
+        row.forEach((value) => {
+          const cell = document.createElement("td");
+          cell.textContent = value;
+          rowElement.append(cell);
+        });
+        body.append(rowElement);
+      });
+      table.append(head, body);
+      return table;
+    }
+
+    function renderReports() {
+      elements.reports.replaceChildren(
+        card("Mocking Source", scenarioReport ? JSON.stringify(scenarioReport, null, 2) : "Optional for CRUD; scenario matching not run."),
+        card("Conformance", conformanceReport ? "Client and engine projections" : "Not run."),
+        card("Compatibility", compatibilityReport ? "Declaration comparison" : "Not run.")
+      );
+      if (conformanceReport) elements.reports.children[1].append(reportTable(
+        ["Vector", "Input", "Client", "Engine", "Result"],
+        conformanceReport.map((row) => [row.name, JSON.stringify(row.input), JSON.stringify(row.client), JSON.stringify(row.engine), row.equal ? "PASS" : "FAILURE: client and engine differ"])
+      ));
+      if (compatibilityReport) elements.reports.children[2].append(reportTable(
+        ["Declaration Identifier", "Category", "Reason"],
+        compatibilityReport.map((entry) => [entry.id, entry.category, entry.reason])
+      ));
+    }
+
     function render(currentState) {
       const fixture = Object.hasOwn(ContractAcceptanceProbe.fixtures, currentState.selectedSource)
         ? ContractAcceptanceProbe.fixtures[currentState.selectedSource]
@@ -390,7 +505,7 @@ s:ApproveKnownProject a m:Scenario .`,
         card("Stage", currentState.stage),
         card("Selected source", currentState.selectedSource || "none"),
         card("Turtle logical adapter — Semantic Source", fixture?.semanticSource || "not selected; no Turtle parser"),
-        card("Turtle logical adapter — Mocking Source", fixture?.mockingSource || "not selected; no Turtle parser"),
+        card("Turtle logical adapter — Mocking Source", fixture?.mockingSource || "optional for CRUD; no Turtle parser"),
         card("Verification logical adapter", currentState.verification
           ? currentState.verification.diagnostics.map(({ code, paths }) => `${code} ${paths.join(", ")}`).join("\n") || currentState.verification.status
           : "not run; no RDF/SHACL verifier"),
@@ -406,6 +521,7 @@ s:ApproveKnownProject a m:Scenario .`,
       elements.freePlay.replaceChildren();
       const actions = [
         ["Load valid sources", { type: "loadSources" }],
+        ["Load valid sources without Mocking Source", { type: "loadSources", source: "validWithoutMocking" }],
         ["Load missing reference", { type: "loadInvalidSource", source: "missingReference" }],
         ["Load unsupported function", { type: "loadInvalidSource", source: "unsupportedFunction" }],
         ["Load contradictory declaration", { type: "loadInvalidSource", source: "contradictory" }],
@@ -427,7 +543,13 @@ s:ApproveKnownProject a m:Scenario .`,
         ["Invalid identifier", { type: "request", operation: "get", input: { id: "invalid!" } }],
         ["Mixed pagination", { type: "request", operation: "list", input: { query: { offset: 0, token: "opaque-1" } } }],
         ["Invalid token", { type: "request", operation: "list", input: { query: { token: "unknown" } } }],
-        ["Approve project-1", { type: "request", operation: "approve", input: { body: { id: "project-1" } } }]
+        ["Approve project-1", { type: "request", operation: "approve", input: { body: { id: "project-1" } } }],
+        ["Approve with no matching scenarios", { type: "scenario", operation: "AprobarProyecto", count: 0 }],
+        ["Approve with one matching scenario", { type: "scenario", operation: "AprobarProyecto", count: 1 }],
+        ["Approve with two matching scenarios", { type: "scenario", operation: "AprobarProyecto", count: 2 }],
+        ["Run conformance report", { type: "conformance" }],
+        ["Show conformance mismatch", { type: "conformance", mismatch: true }],
+        ["Run compatibility report", { type: "compatibility" }]
       );
       actions.forEach(([label, action]) => {
         const button = document.createElement("button");
@@ -442,10 +564,20 @@ s:ApproveKnownProject a m:Scenario .`,
         const item = card(walkthrough.title, walkthrough.steps.map(({ label }, index) => `${index + 1}. ${label}`).join("\n"));
         const button = document.createElement("button");
         button.type = "button";
-        button.textContent = walkthrough.title === "Source verification check" ? "Run source verification check (verified)" : "Run HTTP acceptance check";
+        button.textContent = walkthrough.title === "Source verification check" ? "Run source verification check (verified)" : `Run ${walkthrough.title.toLowerCase()}`;
         button.addEventListener("click", () => {
           const results = [];
           state = walkthrough.steps.reduce((next, { label, action }) => {
+            if (action.type === "conformance") {
+              conformanceReport = ContractAcceptanceProbe.runConformance();
+              results.push({ label, equal: conformanceReport.every((row) => row.equal) });
+              return next;
+            }
+            if (action.type === "compatibility") {
+              compatibilityReport = ContractAcceptanceProbe.compareSources(ContractAcceptanceProbe.compatibilityBefore, ContractAcceptanceProbe.compatibilityAfter);
+              results.push({ label, categories: compatibilityReport.map((entry) => entry.category) });
+              return next;
+            }
             if (action.type !== "request") return ContractAcceptanceProbe.reduce(next, action);
             const request = ContractAcceptanceProbe.clientRequest(action.operation, action.input, next);
             const result = ContractAcceptanceProbe.executeHttp(next, request);
@@ -460,9 +592,31 @@ s:ApproveKnownProject a m:Scenario .`,
         item.append(button);
         elements.walkthroughs.append(item);
       });
+      renderReports();
     }
 
     function dispatch(action) {
+      if (action.type === "scenario") {
+        scenarioReport = ContractAcceptanceProbe.matchScenarios(action.operation, action.count);
+        lastResponse = scenarioReport;
+        lastTransition = { logicalAdapter: "Mocking Source", operation: action.operation, matchingScenarios: action.count };
+        render(state);
+        return;
+      }
+      if (action.type === "conformance") {
+        conformanceReport = ContractAcceptanceProbe.runConformance();
+        if (action.mismatch) {
+          const row = conformanceReport[0];
+          conformanceReport[0] = { ...row, engine: { ...row.engine, value: { ...row.engine.value, nombre: "Mismatch" } }, equal: false };
+        }
+        render(state);
+        return;
+      }
+      if (action.type === "compatibility") {
+        compatibilityReport = ContractAcceptanceProbe.compareSources(ContractAcceptanceProbe.compatibilityBefore, ContractAcceptanceProbe.compatibilityAfter);
+        render(state);
+        return;
+      }
       if (action.type === "request") {
         if (!state.clientEnabled || !state.mockEnabled || !state.storageEnabled) return;
         lastRequest = ContractAcceptanceProbe.clientRequest(action.operation, action.input, state);
