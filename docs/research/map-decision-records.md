@@ -2,7 +2,7 @@
 
 This inventory covers the first-delivery map at [issue #1](https://github.com/TalbyAI/talby-domain/issues/1) and its current records: #2–#9, #11, and #21. It records which historical records receive additive English companion translations. Original issue bodies, comments, reviews, and other published history remain unchanged.
 
-The selected companion comment for each translated record contains the issue description and every published comment that carries a decision, resolution, or canonical status update. Contract identifiers, code blocks, serialized examples, command syntax, and exact technical values remain unchanged.
+The selected companion comment for each translated record contains the issue description and every published comment that carries a decision, resolution, proposal, or canonical status update. Contract identifiers, code blocks, serialized examples, command syntax, and exact technical values remain unchanged.
 
 | Record | Classification | Translation scope | Companion translation | Vocabulary or decision relevance |
 | --- | --- | --- | --- | --- |
