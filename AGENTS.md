@@ -27,7 +27,7 @@ This is a single-context repository. See `docs/agents/domain.md`.
 - Direct user-facing conversation with the agent remains in Spanish by default. This does not change the language of repository artifacts.
 - The in-scope corpus is tracked, human-authored documentation outside prototype directories: root guidance, the domain glossary, ADRs, agent and process guidance, research, specifications, designs, implementation plans, samples, and equivalent Markdown or text documentation added later. Production source documentation outside prototype directories is also in scope.
 - The current inventory is `AGENTS.md`, `CONTEXT.md`, `docs/adr/*.md`, `docs/agents/*.md`, `docs/research/*.md`, `docs/specification.md`, `docs/superpowers/plans/*.md`, `docs/superpowers/specs/*.md`, and `samples/*.md`. New files matching the same categories join the inventory automatically.
-- All content under `prototypes/` is excluded, including READMEs, source files, fixtures, reports, generated evidence, dependencies, and launch instructions. Historical GitHub issues, comments, reviews, and other already-published repository communication are also excluded.
+- All content under `prototypes/` is excluded, including READMEs, source files, fixtures, reports, generated evidence, dependencies, and launch instructions. Historical GitHub issues, comments, reviews, and other already-published repository communication are also excluded, except for the selected decision records listed in [`docs/research/map-decision-records.md`](docs/research/map-decision-records.md), which may receive additive English companion translations without editing or deleting their original history.
 - Do not rename or reinterpret protected contract surfaces: code-facing identifiers, RDF IRIs, JSON keys, public API names and routes, runtime payload fields, protocol literals, declaration identifiers, serialized data, command-line syntax, and exact example values whose spelling carries contract meaning.
 - Preserve existing paths, filenames, ADR numbering, links, heading structure, anchor names, examples, and cross-references unless a separate decision authorizes a change. The migration is documentation-only except for explicitly in-scope production comments or docstrings.
 
@@ -39,6 +39,7 @@ This is a single-context repository. See `docs/agents/domain.md`.
 - A canonical plan may therefore retain Spanish literals when a code block reproduces an excluded prototype's exact README, UI, fixture, or payload text; those literals are not repository prose and must not be changed by this migration.
 - Confirm that protected contract surfaces and command syntax are unchanged in meaning.
 - Confirm that links, headings, anchors, ADR numbering, examples, and cross-references still resolve.
+- For selected map decision records, confirm that English translations are additive, linked to the original record, and preserve its published history and protected literals.
 - Confirm that the diff contains no runtime, generated, prototype, or unrelated changes.
 
 ## Prototypes
