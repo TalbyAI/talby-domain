@@ -1,275 +1,275 @@
-# Especificación de servicios empresariales
+# Enterprise service specification
 
-Estado: requisitos aprobados por el usuario tras revisar el conjunto; entrevista cerrada. Las decisiones recogidas delimitan la primera entrega y la evolución prevista; todavía no constituyen una ontología ejecutable ni una implementación.
+Status: requirements approved by the user after reviewing the whole set; interview closed. The recorded decisions delimit the first delivery and the planned evolution; they are not yet an executable ontology or an implementation.
 
-## Resultado esperado de la primera entrega
+## Expected outcome of the first delivery
 
-Definir un contrato público en RDF/Turtle, comprobarlo mediante SHACL y verificación semántica, generar una biblioteca TypeScript y ejecutar un mock HTTP/JSON con SQLite. El caso de aceptación es gestión de proyectos. Se incluyen normalización y validación equivalentes entre cliente y motor, permisos de prueba, mocking declarativo y comparación de compatibilidad entre fuentes.
+Define a public contract in RDF/Turtle, check it through SHACL and semantic verification, generate a TypeScript library, and run an HTTP/JSON mock with SQLite. The acceptance case is project management. It includes equivalent normalization and validation between client and engine, test permissions, declarative mocking, and compatibility comparison between sources.
 
-Semántica, visualización y mocking se mantienen en fuentes separadas con ontologías propias. La primera entrega define el formato extensible; construir el editor visual completo queda para después. Para sus aserciones se adopta el [perfil acotado de CEL con tipos del host y RE2JS para patrones](adr/0007-perfil-cel-acotado.md), respaldado por la evaluación de portabilidad.
+Semantics, visualization, and mocking remain in separate sources with their own ontologies. The first delivery defines the extensible format; building the complete visual editor comes later. For its assertions, adopt the [bounded CEL profile with host types and RE2JS for patterns](adr/0007-perfil-cel-acotado.md), backed by the portability evaluation.
 
-El diseño detallado posterior concretará shapes, propiedades RDF, firmas de funciones, contratos HTTP y pruebas ejecutables. Las decisiones sobre workflows durables, persistencia avanzada, migraciones y asentamiento se conservan como dirección futura, fuera de la implementación inicial.
+Later detailed design will specify shapes, RDF properties, function signatures, HTTP contracts, and executable tests. Decisions about durable workflows, advanced persistence, migrations, and Materialization remain future direction outside the initial implementation.
 
-## Intención expresada
+## Stated intent
 
-Describir el funcionamiento de un bounded context de DDD mediante un DSL, ejecutarlo como prototipo en un entorno de pruebas y evolucionarlo fácilmente. El motor dinámico debe permitir posponer el asentamiento hasta que exista una necesidad de rendimiento y escalabilidad muy elevados.
+Describe the operation of a DDD bounded context through a DSL, run it as a prototype in a test environment, and evolve it easily. The dynamic engine should allow Materialization to be postponed until very high performance and scalability needs exist.
 
-El «95 %» expresa una aspiración de cobertura amplia, no un umbral numérico. El caso central son servicios que reciben comandos o eventos externos, aplican reglas sobre su modelo de datos y registran acciones asociadas a esas operaciones.
+The “95%” expresses an aspiration for broad coverage, not a numeric threshold. The central case is services that receive external commands or events, apply rules to their data model, and record actions associated with those operations.
 
-## Alcance solicitado
+## Requested scope
 
-- Modelo de datos: value types, validación, normalización, ontología, comandos, read models, eventos de dominio y de integración, queries, permisos y evolución con compatibilidad explícita.
-- Procesos de negocio: workflows, suscripciones a eventos, schedules e intervención humana.
-- APIs: operaciones públicas y mapeos a REST, gRPC, WebSockets, GraphQL y otros protocolos.
-- Ejecución dinámica: persistencia seleccionable, con al menos CRUD y event sourcing, sin excluir otras modalidades; CQRS con alcance pendiente de precisar.
-- Asentamiento: implementación independiente del DSL en un stack concreto.
+- Data model: value types, validation, normalization, ontology, commands, read models, domain and integration events, queries, permissions, and evolution with explicit compatibility.
+- Business processes: workflows, event subscriptions, schedules, and human intervention.
+- APIs: public operations and mappings to REST, gRPC, WebSockets, GraphQL, and other protocols.
+- Dynamic execution: selectable persistence, with at least CRUD and event sourcing, without excluding other modes; CQRS scope remains to be refined.
+- Materialization: implementation independent of the DSL on a concrete stack.
 
-## Evidencia existente
+## Existing evidence
 
-`samples/projects.md` explora entidades y propiedades con notación Turtle y vocabulario `tdpo`, incluidas validación y normalización. Turtle se ha elegido como serialización; el vocabulario concreto del ejemplo no constituye todavía una ontología aprobada.
+`samples/projects.md` explores entities and properties using Turtle notation and the `tdpo` vocabulary, including validation and normalization. Turtle has been selected as the serialization; the example's concrete vocabulary is not yet an approved ontology.
 
-## Autoría y ontologías
+## Authorship and ontologies
 
-Desarrolladores, analistas de negocio y product managers mantienen conjuntamente las especificaciones. Una herramienta visual debe asistir en su visualización, comprensión, exploración y creación.
+Developers, business analysts, and product managers maintain specifications jointly. A visual tool should assist with their visualization, understanding, exploration, and creation.
 
-Se adoptan RDF como modelo formal, Turtle como serialización común de las fuentes y SHACL para comprobar conformidad. Se empieza por vocabulario y conformidad modular. Cualquier deducción que afecte a la ejecución debe ser explícita y visible en el modelo efectivo. Las shapes concretas siguen pendientes.
+RDF is adopted as the formal model, Turtle as the common serialization for sources, and SHACL for checking conformance. Start with vocabulary and modular conformance. Any deduction that affects execution must be explicit and visible in the effective model. Concrete shapes remain pending.
 
-La edición visual y textual operan sobre un único modelo semántico compartido, con representación textual versionable. El editor visual debe preservar los elementos que no sepa representar. La información visual se guarda en una fuente separada, con una ontología propia y el mismo formato RDF que la semántica. Editar información semántica modifica su fuente; cambiar ubicación, colores u otros detalles visuales modifica la fuente visual. La disposición gráfica no determina el comportamiento.
+Visual and textual editing operate on one Shared Semantic Model with a versionable textual representation. The visual editor must preserve elements it cannot represent. Visual information is stored in a separate source with its own ontology and the same RDF format as semantics. Editing semantic information changes its source; changing location, colors, or other visual details changes the visual source. Graphical layout does not determine behavior.
 
-La ejecución selecciona explícitamente los archivos semánticos y, opcionalmente, una fuente de mocking. Las referencias deben resolverse entre las fuentes y ontologías cargadas; encontrar una IRI no provoca descargas automáticas. Referencias inexistentes o declaraciones contradictorias impiden iniciar el mock.
+Execution explicitly selects the semantic files and, optionally, a Mocking Source. References must resolve among the loaded sources and ontologies; finding an IRI does not trigger automatic downloads. Missing references or contradictory declarations prevent the mock from starting.
 
-Una tercera ontología extiende la capa de modelación para describir mocking de operaciones. Sus datos constituyen una fuente adicional opcional, seleccionable al ejecutar para simular los comandos que lo necesiten. Las tres ontologías describen aspectos distintos; sus fuentes concretas contienen los datos del servicio, su visualización y sus simulaciones.
+A third ontology extends the modeling layer to describe operation mocking. Its data forms an additional optional source that can be selected at runtime to simulate commands that need it. The three ontologies describe different aspects; their concrete sources contain service data, visualization, and simulations.
 
-Los escenarios iniciales se seleccionan por operación y condiciones sobre la entrada, y producen una respuesta o error declarado. Sin coincidencia se indica operación no simulada; varias coincidencias producen un error de ambigüedad. CRUD conserva su comportamiento derivado con SQLite. Los escenarios con estado quedan para una extensión posterior.
+Initial scenarios are selected by operation and input conditions and produce a declared response or error. With no match, the operation is reported as not simulated; multiple matches produce an ambiguity error. CRUD retains its derived behavior with SQLite. Stateful scenarios are deferred to a later extension.
 
-El vocabulario mínimo solicitado incluye tipos primitivos básicos, módulo, feature, entity, field, field group, validation rules y normalization rules. También deben cubrirse los conceptos ya acordados: comandos, eventos, modelos de lectura, queries, tipos de valor, referencias y colecciones. `Command` se define como especialización de `FieldGroup`.
+The requested minimum vocabulary includes primitive types, module, feature, entity, field, field group, validation rules, and normalization rules. It must also cover the already agreed concepts: commands, events, read models, queries, value types, references, and collections. `Command` is defined as a specialization of `FieldGroup`.
 
-## Tres capas de abstracción
+## Three abstraction layers
 
-Los nombres siguientes identifican las capas descritas por el usuario; no fijan palabras clave del DSL.
+The following names identify the layers described by the user; they do not fix DSL keywords.
 
-1. Capa de contrato: modelo de datos público, validación estructural y normalización desde la perspectiva del consumidor del servicio.
-2. Capa de negocio: procesos de tratamiento de datos, respuesta a eventos y comportamiento desde la perspectiva del experto del dominio.
-3. Capa técnica: capacidades y decisiones de implementación desde la perspectiva del arquitecto o technical leader.
+1. Contract Layer: public data model, structural validation, and normalization from the service consumer's perspective.
+2. Business Layer: data-processing workflows, responses to events, and behavior from the domain expert's perspective.
+3. Technical Layer: implementation capabilities and decisions from the architect's or technical leader's perspective.
 
-Debe ser posible obtener un primer prototipo definiendo solo la primera capa, generar una biblioteca cliente y producir mocks para pruebas de integración o desarrollo de un front-end. El motor puede ofrecer una API de demostración que guarde datos en SQLite sin implementar todavía la lógica de negocio.
+It must be possible to obtain a first prototype by defining only the first layer, generate a client library, and produce mocks for integration tests or front-end development. The engine may provide a demonstration API that stores data in SQLite without yet implementing business logic.
 
-Se acepta un perfil de prototipo explícito, con operaciones básicas y acceso de pruebas definido. Su versionado, al igual que el resto del sistema de versiones, se aplaza hasta la versión 1.0 del producto. La herramienta debe mostrar qué comportamiento procede de defaults y qué reglas de negocio faltan.
+An explicit Prototype Profile is accepted, with basic operations and defined test access. Its versioning, like the rest of the versioning system, is deferred until product version 1.0. The tool must show which behavior comes from defaults and which business rules are missing.
 
-La capa de negocio añade condiciones semánticas y la técnica implementa las garantías declaradas. Las contradicciones deben detectarse durante la declaración, verificación o ejecución, sin cambiar silenciosamente el comportamiento. SHACL comprueba la estructura de las especificaciones; la verificación comprueba referencias, tipos y funciones soportadas; la ejecución valida los datos normalizados.
+The Business Layer adds semantic conditions and the Technical Layer implements declared guarantees. Contradictions must be detected during declaration, verification, or execution without silently changing behavior. SHACL checks specification structure; verification checks supported references, types, and functions; execution validates normalized data.
 
-## Composición del modelo público
+## Public-model composition
 
-Se describen campos con sus reglas de normalización y validación y vistas que agrupan campos para representar comandos, eventos, modelos de lectura y otros contratos. Los modelos de entrada admiten reglas adicionales que combinan varios campos. Los comandos pueden componerse de campos individuales y agrupaciones de campos. También pueden declararse comandos y eventos de integración.
+Fields are described with their normalization and validation rules, and views group fields to represent commands, events, read models, and other contracts. Input models accept additional rules that combine multiple fields. Commands may be composed from individual fields and field groupings. Integration commands and events may also be declared.
 
-`Command` es una especialización de `FieldGroup`: declara directamente campos y reglas, más permisos, configuración API y referencias a resultados y errores. Puede contener otras agrupaciones mediante campos anidados. No se exige una declaración de agrupación de entrada adicional. Los metadatos de permisos y API no forman parte de los datos enviados.
+`Command` is a specialization of `FieldGroup`: it directly declares fields and rules, plus permissions, API configuration, and references to results and errors. It may contain other groupings through nested fields. An additional input-group declaration is not required. Permission and API metadata are not part of the data sent.
 
-`Query` es una agrupación especializada de parámetros con permisos, configuración API y resultado asociado. `ReadModel` y los tipos de evento son agrupaciones especializadas con sus metadatos propios. Un evento describe una ocurrencia y sus datos, y no exige un resultado de operación como un comando o query.
+`Query` is a specialized parameter grouping with permissions, API configuration, and an associated result. `ReadModel` and event types are specialized groupings with their own metadata. An event describes an occurrence and its data and does not require an operation result like a command or query.
 
-Todo comando o modelo que utiliza un campo incorpora todas sus restricciones. Solo puede añadir restricciones que se combinan con las originales; nunca debilitarlas. Se distingue un modelo completo de un mensaje de cambios parciales: en este último, ausencia significa no modificar, los valores presentes conservan sus restricciones y el estado resultante cumple todas las reglas. Esto no convierte los campos originales en opcionales.
+Every command or model that uses a field includes all of its constraints. It may only add constraints that combine with the originals; it may never weaken them. A complete model is distinguished from a Partial Update Message: in the latter, absence means no change, present values retain their constraints, and the resulting state satisfies every rule. This does not make the original fields optional.
 
-En la primera iteración las agrupaciones solo se incorporan anidadas, mediante un campo compuesto con nombre explícito. Se conserva la agrupación con sus reglas entre campos, aplicadas independientemente a cada inclusión. El aplanado queda fuera de esta iteración para simplificar la preservación de esas reglas. Si se incorpora más adelante, requerirá renombrados explícitos para resolver conflictos y conservará las referencias de las reglas dentro de cada inclusión.
+In the first iteration, groupings are included only as Nested Inclusions, through a composite field with an explicit name. The grouping and its cross-field rules are preserved and applied independently to each inclusion. Flattened Inclusion is outside this iteration to simplify preserving those rules. If added later, it will require explicit renames to resolve conflicts and will preserve rule references within each inclusion.
 
-En un mensaje de cambios parciales, una agrupación presente se sustituye completa y una ausente permanece intacta. La agrupación aportada conserva sus propias validaciones y debe cumplir las validaciones globales del comando que la contiene. No se admiten modificaciones parciales recursivas dentro de la agrupación en esta iteración.
+In a Partial Update Message, a present grouping is replaced completely and an absent grouping remains intact. The supplied grouping retains its own validations and must satisfy the global validations of the containing command. Recursive partial updates inside the grouping are not allowed in this iteration.
 
-Una entidad puede declarar explícitamente que dispone de CRUD por defecto; en ese caso, sus operaciones quedan presentes sin describir los comandos uno a uno. CRUD no se habilita por omisión. Cuando está habilitado, se derivan crear, obtener por identificador, listar con paginación, actualizar parcialmente y eliminar. El identificador debe estar declarado. Al actualizar, los campos ausentes permanecen intactos y se valida el estado resultante. Las operaciones derivadas deben poder inspeccionarse como contratos explícitos. Su interacción con vistas explícitas y el detalle de las respuestas y errores se concretarán en el diseño de los contratos derivados.
+An entity may explicitly declare that it has Default CRUD Operations; in that case its operations exist without describing commands one by one. CRUD is not enabled by default. When enabled, it derives create, get by identifier, list with pagination, partial update, and delete. The identifier must be declared. During update, absent fields remain intact and the resulting state is validated. Derived operations must be inspectable as explicit contracts. Their interaction with explicit views and the details of responses and errors will be specified in the derived-contract design.
 
-### Resultado del prototipo del modelo efectivo
+### Effective-model prototype outcome
 
-Estado: conclusiones confirmadas por revisión humana a partir del prototipo del [issue #5](https://github.com/TalbyAI/talby-domain/issues/5). El [inspector desechable](../prototypes/effective-contract-inspector/) aporta la evidencia de esta forma de materialización:
+Status: conclusions confirmed by human review based on the prototype from [issue #5](https://github.com/TalbyAI/talby-domain/issues/5). The [historical, non-normative disposable inspector](../prototypes/effective-contract-inspector/) provides evidence for this form of materialization:
 
-- El flujo visible es `fuente → verificación → materialización → inspección`; una fuente con referencias inexistentes o declaraciones contradictorias no produce un modelo efectivo parcial.
-- Cada elemento distingue su procedencia (`declarado`, `default` o `derivado`) como metadato interno del modelo efectivo, no como parte del payload HTTP público. Un valor explícito sustituye al default y conserva esa procedencia en la ruta, los permisos y los contratos CRUD.
-- CRUD explícitamente habilitado materializa exactamente crear, obtener, listar, actualizar parcialmente y eliminar, cada uno con contrato de entrada y salida inspeccionable. No se habilita automáticamente en ninguna entidad.
-- Un mensaje de cambios parciales conserva campos ausentes, reemplaza completamente una agrupación presente y valida el estado completo; no admite PATCH recursivo dentro de la agrupación en esta iteración.
-- Las inclusiones anidadas conservan sus campos y reglas en contexto, incluido `Periodo.fin >= Periodo.inicio`; el importe decimal se trata como decimal exacto.
+- The visible flow is `source → verification → materialization → inspection`; a source with missing references or contradictory declarations does not produce a partial effective model.
+- Each element distinguishes its origin (`declared`, `default`, or `derived`) as internal metadata of the effective model, not as part of the public HTTP payload. An explicit value replaces a default and retains that origin on the route, permissions, and CRUD contracts.
+- Explicitly enabled CRUD materializes exactly create, get, list, partial update, and delete, each with an inspectable input and output contract. No entity is enabled automatically.
+- A Partial Update Message preserves absent fields, completely replaces a present grouping, and validates the complete state; recursive PATCH inside the grouping is not supported in this iteration.
+- Nested Inclusions preserve their fields and rules in context, including `Periodo.fin >= Periodo.inicio`; the decimal amount is treated as exact decimal.
 
-La ruta se deriva de la jerarquía módulo/feature/entidad y admite override explícito; los permisos CRUD se derivan por operación y admiten override explícito. La estabilidad de los permisos derivados cuando cambia el nombre o la ubicación de una declaración queda pendiente.
+The route is derived from the module/feature/entity hierarchy and permits an explicit override; CRUD permissions are derived per operation and permit an explicit override. Stability of derived permissions when a declaration's name or location changes remains pending.
 
-Como dirección futura, fuera de la primera iteración, se registrará un mecanismo general de plantillas o plugins de definición. Podrá recibir modelos semánticos, visuales, de negocio o técnicos y producir definiciones en la misma área o en áreas dependientes, siempre hacia abajo; nunca podrá producir información en un área superior a sus entradas. El ticket deberá cuestionar y especificar todo el mecanismo, sin asumir investigación profunda previa ni una jerarquía completa entre áreas.
+As future direction, outside the first iteration, a general definition-template or plugin mechanism will be recorded. It may receive semantic, visual, business, or technical models and produce definitions in the same area or in dependent areas, always downward; it may never produce information in an area above its inputs. The ticket must question and specify the whole mechanism without assuming prior deep research or a complete hierarchy among areas.
 
-Estas conclusiones fijan la forma del modelo efectivo para la primera iteración, pero no resuelven todavía las shapes RDF, las firmas ejecutables, el mapeo HTTP detallado, SQLite o la generación de TypeScript.
+These conclusions fix the effective-model shape for the first iteration but do not yet resolve RDF shapes, executable signatures, detailed HTTP mapping, SQLite, or TypeScript generation.
 
-Los listados deben admitir tanto `offset + limit` como `continuationToken + limit`. El límite por defecto es 20 y el máximo 100, con orden estable por identificador. Cada listado declara las modalidades admitidas y una por defecto; los listados CRUD derivados admiten ambas. La petición selecciona una modalidad y se rechaza mezclar `offset` y token.
+Lists must support both `offset + limit` and `continuationToken + limit`. The default limit is 20 and the maximum is 100, with stable ordering by identifier. Each list declares its supported modes and one default; derived CRUD lists support both. The request selects a mode and mixing `offset` and token is rejected.
 
-El continuation token es opaco y queda vinculado a la consulta, sus filtros y orden. Un token inválido produce un error explícito. El prototipo continúa desde la última posición sin garantizar una instantánea inmutable de los datos entre páginas. Una garantía de snapshot podrá incorporarse como capacidad técnica posterior. La codificación del token y el mecanismo concreto de selección de modalidad se concretarán en el contrato HTTP.
+The continuation token is opaque and bound to the query, its filters, and ordering. An invalid token produces an explicit error. The prototype continues from the last position without guaranteeing an immutable snapshot of data between pages. A snapshot guarantee may be added later as a technical capability. Token encoding and the concrete mode-selection mechanism will be specified in the HTTP contract.
 
-Las colecciones son listas ordenadas y se sustituyen completas al actualizar. Las referencias a entidades validan tipo y formato del identificador; comprobar la existencia del destino es una regla adicional de negocio.
+Collections are ordered lists and are replaced completely during update. Entity references validate identifier type and format; checking target existence is an additional business rule.
 
-El servicio se describe como un módulo sin padre; el módulo no es una feature. Una feature tiene como padre un módulo u otra feature. Una entidad pertenece a un módulo o a una feature. Se admiten varios niveles de anidación. El módulo constituye la frontera de aislamiento respecto a otros servicios; las features solo organizan y no crean fronteras transaccionales o de despliegue.
+The service is described as a parentless module; a module is not a feature. A feature has a module or another feature as its parent. An entity belongs to a module or feature. Multiple nesting levels are allowed. The module forms the isolation boundary from other services; features only organize and do not create transaction or deployment boundaries.
 
-Los elementos declarados mantienen identificadores estables, separados de sus nombres y ubicación. El namespace organiza su representación en la API y en bibliotecas cliente. La jerarquía forma el namespace interno y la ruta pública de la API por defecto, salvo configuración explícita. Una reorganización puede cambiar rutas públicas aunque conserve la identidad de los elementos. Las referencias entre features se resuelven por identificador entre las fuentes cargadas.
+Declared elements retain stable identifiers separate from their names and location. The namespace organizes their representation in the API and client libraries. The hierarchy forms the internal namespace and the default public API route unless explicitly configured. Reorganization may change public routes while preserving element identity. References between features resolve by identifier among loaded sources.
 
-Se distinguen tipos de valor, entidades con identidad, referencias tipadas y colecciones con cardinalidad. El mock almacena los valores incluidos y representa las referencias mediante identificadores, sin asumir cargas automáticas ni borrados en cascada. La identidad de una entidad almacenada y el identificador estable de su declaración son conceptos distintos.
+Value types, entities with identity, typed references, and collections with cardinality are distinguished. The mock stores included values and represents references by identifiers without assuming automatic loads or cascading deletes. The identity of a stored entity and the stable identifier of its declaration are different concepts.
 
-El catálogo inicial incluye texto, booleano, entero, decimal exacto, fecha, instante temporal e identificador, además de enumeraciones y tipos de valor restringidos. No se impone UUID como formato de identificador.
+The initial catalog includes text, boolean, integer, exact decimal, date, temporal instant, and identifier, as well as enumerations and restricted value types. UUID is not imposed as an identifier format.
 
-El primer perfil HTTP/JSON y TypeScript utiliza estas representaciones:
+The first HTTP/JSON and TypeScript profile uses these representations:
 
-| Tipo | Representación |
+| Type | Representation |
 | --- | --- |
-| Texto, identificador, enumeración | Cadena. |
-| Booleano | Booleano. |
-| Entero | Número entero entre −9 007 199 254 740 991 y +9 007 199 254 740 991. |
-| Decimal exacto | Cadena decimal, sin conversión implícita a `number`. |
-| Fecha | Cadena `YYYY-MM-DD`. |
-| Instante | Cadena UTC con `Z` y precisión de milisegundos. |
+| Text, identifier, enumeration | String. |
+| Boolean | Boolean. |
+| Integer | Integer number from −9 007 199 254 740 991 to +9 007 199 254 740 991. |
+| Exact decimal | Decimal string, without implicit conversion to `number`. |
+| Date | `YYYY-MM-DD` string. |
+| Instant | UTC string with `Z` and millisecond precision. |
 
-Los decimales se representan como cadenas sin exponente, con límites de precisión y escala declarables y sin redondeo implícito. Los instantes se normalizan a UTC y se rechaza precisión superior a milisegundos cuando no pueda conservarse exactamente. Las fechas deben representar días válidos. Las formas léxicas exactas se concretarán en los contratos de las funciones del prototipo.
+Decimals are represented as strings without exponents, with declarable precision and scale limits and without implicit rounding. Instants are normalized to UTC, and precision greater than milliseconds is rejected when it cannot be preserved exactly. Dates must represent valid days. Exact lexical forms will be specified in the prototype function contracts.
 
-El modelo de cada entidad configura el prefijo de su identificador. La regla de formato admite prefijos y sufijos y permite únicamente caracteres ASCII `A-Z`, `a-z`, `0-9`, `-` y `_`, rechazando espacios y caracteres de control. La longitud es configurable por entidad, con un default de 1–128 caracteres incluyendo prefijo y sufijo. La comparación distingue mayúsculas; no se modifican automáticamente salvo normalización explícita. Los defaults se resuelven al declarar el tipo de identificador; sus usos conservan las restricciones resultantes sin debilitarlas.
+Each entity model configures the prefix of its identifier. The format rule permits prefixes and suffixes and only the ASCII characters `A-Z`, `a-z`, `0-9`, `-`, and `_`, rejecting spaces and control characters. Length is configurable per entity, with a default of 1–128 characters including prefix and suffix. Comparison is case-sensitive; values are not automatically modified except through explicit normalization. Defaults are resolved when the identifier type is declared; uses retain the resulting constraints without weakening them.
 
-La capa técnica elige cómo generar identificadores y debe cumplir todas las reglas del modelo. ULID con prefijo es una opción preferida para el prototipo, no un formato obligatorio del contrato. El prefijo es explícito y estable, independiente del namespace.
+The Technical Layer chooses how identifiers are generated and must satisfy every model rule. Prefixed ULID is a preferred option for the prototype, not a required contract format. The prefix is explicit and stable, independent of the namespace.
 
-La primera capa define únicamente el modelo público. En negocio se puede ampliar con campos y reglas privados. Se asume el modelo privado como extensión del público y se declaran mappings donde difieren. Los datos privados no deben quedar expuestos por esa extensión.
+The first layer defines only the public model. The business layer may extend it with private fields and rules. The Private Model is treated as an extension of the public model, with mappings declared where they differ. Private data must not be exposed by that extension.
 
-## Normalización y validación
+## Normalization and validation
 
-La ontología contiene un conjunto de reglas de normalización y validación. Primero se normaliza y después se valida: por ejemplo, aplicar `trim` y luego comprobar longitud máxima y una expresión regular.
+The ontology contains a set of normalization and validation rules. Normalize first and validate afterward: for example, apply `trim` and then check maximum length and a regular expression.
 
-El catálogo mínimo incluye obligatoriedad, admisión de `null`, longitud, rango, patrón, pertenencia a enumeración, cardinalidad y expresiones entre campos. `trim` es el primer normalizador. El catálogo crecerá según casos reales.
+The minimum catalog includes requiredness, acceptance of `null`, length, range, pattern, enumeration membership, cardinality, and cross-field expressions. `trim` is the first normalizer. The catalog will grow according to real cases.
 
-Los normalizadores se ejecutan en orden declarado sobre valores compatibles. Una incompatibilidad produce un error estructurado y no una conversión implícita. Después se validan los valores normalizados y las reglas entre campos. La obligatoriedad y la admisión de `null` son propiedades distintas; ausencia y `null` no se confunden.
+Normalizers run in declared order over compatible values. An incompatibility produces a structured error rather than an implicit conversion. Normalized values and cross-field rules are validated afterward. Requiredness and acceptance of `null` are distinct properties; absence and `null` are not confused.
 
-En payloads JSON de entrada se rechazan campos desconocidos. El cliente tolera propiedades adicionales en las respuestas y valida los campos que conoce. El mock debe comprobar que sus respuestas cumplen el contrato declarado. Esta política de payloads no decide cómo se preservan vocabularios de extensión en los documentos RDF.
+Unknown fields are rejected in input JSON payloads. The client tolerates additional properties in responses and validates the fields it knows. The mock must check that its responses satisfy the declared contract. This payload policy does not decide how extension vocabularies are preserved in RDF documents.
 
-Debe existir un lenguaje de expresiones de escritura sencilla. El catálogo de reglas crecerá según las necesidades de expresividad. Para la primera entrega se adopta el [perfil CEL acotado](adr/0007-perfil-cel-acotado.md): tipos y comparadores explícitos del host para decimal exacto, fecha e instante, y RE2JS para patrones en TypeScript. Decimal no se convierte a `double`; los tipos opacos se comparan mediante sus comparadores, también para igualdad. El verificador rechaza funciones, tipos y sintaxis fuera del perfil antes de ejecutar. Sus límites operativos son explícitos e iguales en cliente y motor. La evaluación no decide el stack del motor ni adopta CEL para futuras capas o entregas.
+There must be a simple-to-write expression language. The rule catalog will grow according to expressiveness needs. For the first delivery, adopt the [bounded CEL profile](adr/0007-perfil-cel-acotado.md): explicit host types and comparators for exact decimal, date, and instant, and RE2JS for patterns in TypeScript. Decimal is not converted to `double`; opaque types are compared through their comparators, including equality. The verifier rejects functions, types, and syntax outside the profile before execution. Its operational limits are explicit and equal in client and engine. Evaluation does not select the engine stack or adopt CEL for future layers or deliveries.
 
-El pipeline completo de normalización debe ser determinista e idempotente: `N(N(x)) = N(x)`. No depende del reloj, azar ni consultas externas. Los casos compartidos deben comprobar esta propiedad del pipeline completo, además de la equivalencia entre runtimes.
+The complete normalization pipeline must be deterministic and idempotent: `N(N(x)) = N(x)`. It does not depend on the clock, randomness, or external queries. Shared cases must check this property for the complete pipeline as well as equivalence between runtimes.
 
-Las funciones básicas tendrán semántica especificada e implementación en los runtimes. Las reglas compuestas se expresarán sobre esas funciones. Una función desconocida debe detectarse durante la verificación, nunca ignorarse. SHACL comprueba la declaración; el ejecutor aplica el comportamiento definido.
+Basic functions will have specified semantics and implementations in the runtimes. Compound rules will be expressed over those functions. An unknown function must be detected during verification and never ignored. SHACL checks the declaration; the executor applies the defined behavior.
 
-## Permisos y biblioteca cliente
+## Permissions and client library
 
-La primera entrega declara permisos nombrados por comando o query y permite asignarlos a actores de prueba para evaluar el acceso en el mock. Se deniega por defecto y se exige disponer de todos los permisos enumerados. El acceso anónimo requiere declaración explícita. CRUD deriva permisos por operación; el perfil de demostración proporciona un actor de prueba con ellos asignados y muestra claramente esas concesiones. Las políticas dependientes del estado del negocio quedan para la segunda capa. El mecanismo concreto de selección del actor queda para el diseño del ejecutor.
+The first delivery declares named permissions per command or query and allows assigning them to Test Actors to evaluate access in the mock. Access is denied by default and all listed permissions are required. Anonymous access requires an explicit declaration. CRUD derives permissions per operation; the demonstration profile provides a test actor with those permissions assigned and clearly shows the grants. Policies dependent on business state belong to the second layer. The concrete actor-selection mechanism belongs to executor design.
 
-La biblioteca TypeScript incluye tipos, llamadas HTTP y funciones explícitas de normalización y validación con las mismas reglas del motor. El servidor sigue verificando cada entrada. Casos compartidos deben comprobar la equivalencia entre cliente y motor y la idempotencia de la normalización.
+The TypeScript library includes types, HTTP calls, and explicit normalization and validation functions using the same rules as the engine. The server still verifies every input. Shared cases must check client/engine equivalence and normalization idempotence.
 
-## Errores
+## Errors
 
-Motor, mock y biblioteca cliente comparten un contrato de errores con código estable, mensaje y lista de incidencias. Cada incidencia de validación identifica la regla y las rutas de los campos afectados; una regla entre campos puede señalar varios. Se distinguen categorías de validación, errores de negocio declarados y fallos técnicos dentro del mismo contrato. Quedan pendientes el mapeo HTTP y la sintaxis exacta de las rutas.
+The engine, mock, and client library share an error contract with a stable code, message, and list of incidents. Each validation incident identifies the rule and paths of affected fields; a cross-field rule may identify several. Validation categories, Declared Business Errors, and technical failures are distinguished within the same contract. HTTP mapping and exact path syntax remain pending.
 
-## Convenciones HTTP del prototipo
+## Prototype HTTP conventions
 
-Las rutas se derivan del módulo, features y nombre declarado, con override explícito. CRUD utiliza `POST` para crear, `GET` para obtener o listar, `PATCH` para actualizar parcialmente y `DELETE` para eliminar. Comandos y queries personalizados utilizan `POST` bajo `/commands/{nombre}` y `/queries/{nombre}`, respectivamente, dentro de su ruta de módulo y features.
+Routes are derived from module, features, and declared name, with an explicit override. CRUD uses `POST` to create, `GET` to get or list, `PATCH` for partial update, and `DELETE` to delete. Custom commands and queries use `POST` under `/commands/{nombre}` and `/queries/{nombre}`, respectively, within their module and feature route.
 
-Los resultados son el JSON del modelo declarado, sin envoltorio adicional salvo listados y errores. Los códigos de estado concretos y los nombres de propiedades del envoltorio se definirán en los contratos HTTP durante el diseño detallado.
+Results are the JSON of the declared model, without an additional wrapper except for lists and errors. Concrete status codes and wrapper property names will be defined in HTTP contracts during detailed design.
 
-## Workflows y extensiones
+## Workflows and extensions
 
-El workflow y las actividades que interactúan con el modelo del servicio se declaran en el DSL. Las actividades declarativas tienen una frontera transaccional explícita: sus cambios se confirman juntos o ninguno. Una operación que atraviesa fronteras se expresa como varios pasos. Debe comprobarse que la modalidad de persistencia cumple la frontera declarada; la forma de definir esa frontera sigue pendiente.
+The workflow and activities that interact with the service model are declared in the DSL. Declarative activities have an explicit transaction boundary: their changes commit together or none do. An operation crossing boundaries is expressed as multiple steps. The persistence mode must be checked against the declared boundary; how to define that boundary remains pending.
 
-Las actividades en código se reservan para interacciones con sistemas externos, como cobros o envío de correos. Reciben entradas claras y definidas, devuelven resultados o errores y declaran sus efectos externos. No acceden directamente al estado del servicio principal, que conserva la autoridad sobre sus datos.
+External Activity steps are reserved for interactions with external systems, such as payments or email. They receive clear, defined inputs, return results or errors, and declare external effects. They do not directly access the main service state, which retains authority over its data.
 
-El motor interpreta la declaración e interactúa con servicios simples que ejecutan esas actividades externas. El motor de workflows debe ser durable y resiliente, tomando Temporal como referencia de comportamiento, sin decidir todavía una dependencia de ese producto. Tendrá reintentos automáticos y configuración declarativa del comportamiento de cada paso. Siguen pendientes el transporte, las políticas concretas de reintento, la gestión de resultados externos inciertos y la compensación.
+The engine interprets the declaration and interacts with simple services that execute those external activities. The workflow engine must be durable and resilient, using Temporal as a behavior reference without yet deciding on a dependency on that product. It will have automatic retries and declarative configuration for each step's behavior. Transport, concrete retry policies, handling of uncertain external results, and compensation remain pending.
 
-La interacción declarativa con otros servicios descritos mediante DSL está prevista, pero no es un objetivo principal de la primera iteración.
+Declarative interaction with other services described through the DSL is planned but is not a primary goal of the first iteration.
 
-Referencia contrastada: Temporal documenta [reintentos de actividades configurables](https://docs.temporal.io/encyclopedia/retry-policies), pero la [idempotencia de los efectos externos](https://temporal.io/blog/idempotency-and-durable-execution) requiere tratamiento específico. Por tanto, la petición de durabilidad y reintentos no resuelve todavía la política del DSL ante un cobro confirmado por el proveedor cuya respuesta se pierde. Esta decisión se reserva para la entrega de workflows.
+Cross-checked reference: Temporal documents [configurable activity retries](https://docs.temporal.io/encyclopedia/retry-policies), but [idempotence of external effects](https://temporal.io/blog/idempotency-and-durable-execution) requires specific treatment. Therefore, the request for durability and retries does not yet resolve DSL policy for a payment confirmed by the provider whose response is lost. This decision is reserved for workflow delivery.
 
-## Persistencia y evolución del prototipo
+## Persistence and prototype evolution
 
-La selección de persistencia podría ser una anotación técnica. Se desea comenzar con CRUD para comprobar la superficie del servicio y posteriormente especificar event sourcing. Se acepta que algunos cambios técnicos exijan reiniciar el estado persistido. Las herramientas de migración entre variantes de persistencia quedan para más adelante; no se promete conservación automática de datos al cambiar de modalidad.
+Persistence selection could be a technical annotation. The intention is to start with CRUD to check the service surface and later specify event sourcing. Some technical changes may require persisted state to be reset. Migration tools between persistence variants are deferred; automatic data preservation when changing modes is not promised.
 
-La generación final debe atender a la modalidad declarada en el DSL. Quedan pendientes la expresión de las fronteras transaccionales, la concurrencia, las proyecciones y las garantías observables entre modalidades.
+Final generation must honor the mode declared in the DSL. Expression of transaction boundaries, concurrency, projections, and observable guarantees between modes remain pending.
 
-## Asentamiento y trazabilidad
+## Materialization and traceability
 
-Una herramienta generará código optimizado para un stack concreto, capaz de ejecutar SQL y sin dependencia del motor dinámico original. Puede depender de bibliotecas de runtime creadas para optimizar este tipo de aplicaciones.
+A tool will generate optimized code for a concrete stack, able to execute SQL and independent of the original dynamic engine. It may depend on runtime libraries created to optimize this type of application.
 
-El asentamiento es unidireccional en el alcance actual. El código generado debe incluir suficiente trazabilidad para identificar y explicar su origen en la especificación.
+Materialization is one-way within the current scope. Generated code must include enough traceability to identify and explain its origin in the specification.
 
-Se pretende facilitar futuros diffs y actualizaciones con mayor confianza, y potencialmente sincronización en cualquiera de las dos direcciones. Esa sincronización futura no es una capacidad exigida en esta versión.
+The aim is to support future diffs and updates with greater confidence and potentially synchronize in either direction. That future synchronization is not a required capability in this version.
 
-## Compatibilidad del contrato público
+## Public-contract compatibility
 
-La primera entrega mantiene el informe de compatibilidad entre una fuente anterior y otra nueva, sin exigir versiones declaradas ni implementar gestión de versiones. Comparará entradas aceptadas, salidas y rutas, clasificando los cambios como compatibles, incompatibles o pendientes de revisión cuando no pueda determinarlo. Se mantiene separado de las migraciones de persistencia.
+The first delivery retains a compatibility report between an earlier source and a new one without requiring declared versions or implementing version management. It will compare accepted inputs, outputs, and routes, classifying changes as compatible, incompatible, or pending review when it cannot determine the result. It remains separate from persistence migrations.
 
-La declaración del autor no oculta incompatibilidades detectadas. Conservar el identificador de una declaración permite reconocer movimientos o renombrados, pero no convierte en compatible un cambio de ruta o contrato. Quedan pendientes las reglas concretas de comparación y el tratamiento de los cambios de normalización.
+The author's declaration does not hide detected incompatibilities. Preserving a declaration identifier allows moves or renames to be recognized, but does not make a route or contract change compatible. Concrete comparison rules and treatment of normalization changes remain pending.
 
-El diseño futuro prevé versiones explícitas del módulo, ontologías, funciones y perfil de defaults, así como la selección de fuentes cargadas; las fuentes visuales y de mocking indicarán a qué versión semántica corresponden. Implementar este sistema de versionado no es necesario antes de la versión 1.0 del producto. La selección de fuentes semánticas y de mocking sigue siendo necesaria para ejecutar el prototipo actual.
+Future design anticipates explicit versions for the module, ontologies, functions, and defaults profile, as well as selection of loaded sources; visual and mocking sources will indicate which semantic version they correspond to. Implementing this versioning system is not required before product version 1.0. Selecting semantic and mocking sources remains necessary to run the current prototype.
 
-## Primera entrega acordada
+## Agreed first delivery
 
-Definir correctamente el DSL de la capa pública para alcanzar un primer objetivo útil: contrato público → normalización y validación → biblioteca cliente generada → mock con SQLite, usando un servicio de ejemplo.
+Correctly define the public-layer DSL to reach a useful first objective: public contract → normalization and validation → generated client library → SQLite mock, using an example service.
 
-La visión global conserva las tres capas, workflows, actividades externas, modalidades de persistencia, editor visual y asentamiento. Su implementación no es requisito de esta primera entrega. El trabajo actual consiste en definir la especificación.
+The overall vision retains the three layers, workflows, external activities, persistence modes, visual editor, and Materialization. Implementing them is not required for this first delivery. The current work is to define the specification.
 
-El primer transporte será HTTP con JSON, la biblioteca cliente se generará para TypeScript y el mock persistirá en SQLite. Los contratos permanecen independientes del transporte. Se usa Turtle para las fuentes RDF. El perfil CEL queda fijado en el ADR correspondiente; siguen pendientes las shapes concretas y los detalles de los contratos de transporte y tipos.
+The first transport is HTTP with JSON, the client library is generated for TypeScript, and the mock persists in SQLite. Contracts remain transport-independent. Turtle is used for RDF sources. The CEL profile is fixed in the corresponding ADR; concrete shapes and details of transport and type contracts remain pending.
 
-### Casos de aceptación derivados de los acuerdos
+### Acceptance cases derived from the agreements
 
-Estos casos describen comprobaciones futuras, no pruebas ya implementadas o ejecutadas.
+These cases describe future checks, not tests already implemented or run.
 
-El servicio de ejemplo será gestión de proyectos, partiendo del contexto de `samples/projects.md`, que se conserva como muestra original. Incluirá clientes y proyectos, una referencia de proyecto a cliente, una agrupación `Periodo` con `fin >= inicio`, operaciones CRUD, un comando `AprobarProyecto` simulado, un importe decimal y un evento declarado para comprobar su contrato. No requiere implementar workflows de aprobación.
+The example service is project management, starting from the context in `samples/projects.md`, which remains as the original sample. It includes clients and projects, a project-to-client reference, a `Periodo` grouping with `fin >= inicio`, CRUD operations, a simulated `AprobarProyecto` command, a decimal amount, and a declared event to check its contract. Approval workflows do not need to be implemented.
 
-| Caso | Resultado requerido |
+| Case | Required result |
 | --- | --- |
-| Campo con `trim` y longitud mínima uno recibe espacios | Se normaliza a vacío y se rechaza con incidencia de validación. |
-| Normalizar un valor ya normalizado | Se conserva el mismo resultado; cliente y motor coinciden. |
-| Un comando añade una restricción a un campo reutilizado | Se aplican tanto la restricción original como la añadida. |
-| Actualización omite una agrupación o la aporta completa | La omitida se conserva; la aportada se sustituye y cumple reglas de agrupación y comando. |
-| Dos inclusiones anidadas de la misma agrupación | Cada una conserva y aplica sus reglas en su propio contexto. |
-| Identificador contiene espacio, control o un carácter fuera del alfabeto permitido | Se rechaza; el generador técnico debe producir valores conformes al modelo. |
-| Mover un elemento entre features | Conserva su identificador de declaración; el informe detecta el cambio de ruta derivada. |
-| Una operación simulada tiene cero, uno o varios escenarios coincidentes | Se informa no simulada, se obtiene respuesta/error o se informa ambigüedad, respectivamente. |
-| Función declarada no soportada por el runtime | La verificación detecta el problema; la función no se ignora. |
-| Comparar dos fuentes sin versión declarada | Se genera un informe de compatibilidad sin exigir gestión de versiones. |
-| Cliente recibe una propiedad adicional en la respuesta | Tolera la propiedad adicional y valida los campos conocidos. |
-| Comando recibe un campo JSON no declarado | Se rechaza con error estructurado. |
-| Actor carece de uno de los permisos exigidos | Se deniega el acceso aunque posea los demás. |
-| Demo ejecuta CRUD derivado | El actor de prueba dispone de concesiones visibles por operación. |
-| Importe decimal recorre cliente, HTTP, mock y SQLite | Conserva su valor exacto sin pasar implícitamente por `number`. |
-| CEL evalúa reglas de `Periodo` e importe decimal | Cliente y motor producen resultados equivalentes bajo el perfil adoptado y sus comparadores tipados; se rechaza sintaxis no admitida. |
-| Un patrón CEL recibe una entrada con salto de línea final | La coincidencia completa solo lo acepta si el patrón incluye explícitamente ese salto. |
-| Una fuente CEL, su AST, un patrón, sus repeticiones o su entrada exceden los límites del perfil | Cliente y motor rechazan la operación explícitamente, sin truncamiento ni cambios silenciosos. |
-| Listar proyectos mediante offset y mediante continuation token | Ambas modalidades están disponibles y respetan los límites declarados. |
-| Una petición mezcla offset y continuation token | Se rechaza con error explícito. |
-| Un token no corresponde a la consulta, filtros u orden de la petición | Se rechaza; no se reinicia silenciosamente el listado. |
-| Selección de fuentes contiene una referencia semántica inexistente | La verificación impide iniciar el mock sin intentar descargar la IRI. |
-| Un instante requeriría perder precisión al expresarlo en milisegundos | Se rechaza la pérdida de precisión; no se redondea implícitamente. |
+| A field with `trim` and minimum length one receives spaces | It normalizes to empty and is rejected with a validation incident. |
+| Normalize an already normalized value | The same result is preserved; client and engine agree. |
+| A command adds a constraint to a reused field | Both the original and added constraints are applied. |
+| An update omits a grouping or supplies it completely | The omitted grouping is preserved; the supplied grouping is replaced and satisfies grouping and command rules. |
+| Two Nested Inclusions of the same grouping | Each preserves and applies its rules in its own context. |
+| An identifier contains a space, control, or character outside the permitted alphabet | It is rejected; the technical generator must produce model-conforming values. |
+| Move an element between features | Its Declaration Identifier is preserved; the report detects the derived-route change. |
+| A simulated operation has zero, one, or several matching scenarios | Report not simulated, return a response/error, or report ambiguity, respectively. |
+| A declared function is unsupported by the runtime | Verification detects the problem; the function is not ignored. |
+| Compare two sources without a declared version | Produce a compatibility report without requiring version management. |
+| The client receives an additional response property | It tolerates the additional property and validates known fields. |
+| A command receives an undeclared JSON field | It is rejected with a structured error. |
+| An actor lacks one of the required permissions | Access is denied even if it has the others. |
+| Demo runs derived CRUD | The test actor has grants visible per operation. |
+| A decimal amount passes through client, HTTP, mock, and SQLite | It retains its exact value without implicit conversion through `number`. |
+| CEL evaluates `Periodo` and exact-decimal rules | Client and engine produce equivalent results under the adopted profile and typed comparators; unsupported syntax is rejected. |
+| A CEL pattern receives input with a final line break | Full matching accepts it only if the pattern explicitly includes that line break. |
+| A CEL source, its AST, a pattern, its repetitions, or its input exceeds profile limits | Client and engine explicitly reject the operation without truncation or silent changes. |
+| List projects through offset and continuation token | Both modes are available and respect declared limits. |
+| A request mixes offset and continuation token | It is rejected with an explicit error. |
+| A token does not match the request's query, filters, or ordering | It is rejected; the list is not silently restarted. |
+| Source selection contains a missing semantic reference | Verification prevents the mock from starting without trying to download the IRI. |
+| An instant would lose precision when expressed in milliseconds | Precision loss is rejected; it is not implicitly rounded. |
 
-## Árbol de decisiones
+## Decision tree
 
-Primera ronda resuelta: cobertura cualitativa; autoría conjunta; extensiones por actividad; persistencia seleccionable; asentamiento unidireccional con bibliotecas de runtime y trazabilidad.
+First round resolved: qualitative coverage; joint authorship; activity extensions; selectable persistence; one-way Materialization with runtime libraries and traceability.
 
-Segunda ronda resuelta: contrato público con validación y normalización; clientes y mocks desde la primera capa; demo con SQLite; perfil de prototipo explícito; refinamiento sin contradicciones silenciosas; ontologías para vocabulario y conformidad modular; actividades declarativas internas y actividades externas en código; reinicio permitido al cambiar persistencia y migraciones diferidas; modelo semántico compartido por texto y editor visual. El versionado del perfil se aplaza en la octava ronda.
+Second round resolved: public contract with validation and normalization; clients and mocks from the first layer; SQLite demo; explicit Prototype Profile; refinement without silent contradictions; ontologies for vocabulary and modular conformance; internal declarative activities and external activities in code; reset allowed when persistence changes and migrations deferred; Shared Semantic Model for text and visual editor. Profile versioning is deferred in the eighth round.
 
-Tercera ronda resuelta: campos reutilizables agrupados en vistas y contratos; reglas entre campos de entrada; CRUD habilitado por entidad; jerarquía módulo/features/entidades; modelo privado como extensión con mappings; normalización previa a validación; fronteras transaccionales explícitas; workflows durables con reintentos y configuración por paso; primera entrega centrada en contrato, cliente y mock con SQLite.
+Third round resolved: reusable fields grouped into views and contracts; cross-field input rules; CRUD enabled per entity; module/feature/entity hierarchy; Private Model as extension with mappings; normalization before validation; explicit transaction boundaries; durable workflows with retries and per-step configuration; first delivery focused on contract, client, and SQLite mock.
 
-Cuarta ronda resuelta: restricciones acumulativas sin debilitamiento; módulo sin padre y distinto de feature; entidades directamente en módulo o feature; jerarquía como namespace y ruta API por defecto; CRUD con actualización parcial y validación del resultado; lenguaje sencillo de expresiones y catálogo ampliable; normalizadores ordenados sin conversiones implícitas y distinción de ausencia y `null`. La composición se acota en la quinta ronda.
+Fourth round resolved: cumulative constraints without weakening; parentless module distinct from feature; entities directly in module or feature; hierarchy as namespace and default API route; CRUD with partial update and result validation; simple expression language and extensible catalog; ordered normalizers without implicit conversions and distinction between absence and `null`. Composition is narrowed in the fifth round.
 
-Quinta ronda resuelta: mensajes de cambios parciales distintos de modelos completos; únicamente composición anidada en la primera iteración; reglas preservadas por inclusión; identificadores estables independientes del namespace; tipos de valor, entidades, referencias y colecciones diferenciados; informe de compatibilidad desde la primera entrega.
+Fifth round resolved: Partial Update Messages distinct from complete models; only Nested Inclusion in the first iteration; rules preserved by inclusion; stable identifiers independent of namespace; value types, entities, references, and collections distinguished; compatibility report from the first delivery.
 
-Sexta ronda resuelta: sustitución completa de agrupaciones presentes con validación global del comando; RDF y SHACL; ontologías y fuentes distintas para semántica, visualización y mocking, con un formato compartido; vocabulario mínimo declarado; HTTP/JSON, cliente TypeScript y SQLite; fuente de mocking opcional seleccionable al ejecutar. La respuesta sobre vocabulario no fija todavía la lista concreta de primitivos.
+Sixth round resolved: complete replacement of present groupings with global command validation; RDF and SHACL; separate ontologies and sources for semantics, visualization, and mocking with a shared format; minimum vocabulary declared; HTTP/JSON, TypeScript client, and SQLite; optional Mocking Source selected at runtime. The vocabulary answer does not yet fix the concrete primitive list.
 
-Séptima ronda: se fijan Turtle, el catálogo básico con identificador no limitado a UUID, la semántica explícita e implementación de funciones y los mocks seleccionados por operación y condiciones con respuesta/error, ausencia y ambigüedad explícitas. Se prefiere ULID con prefijo por entidad como formato posible.
+Seventh round: Turtle, the basic catalog with an identifier not limited to UUID, explicit function semantics and implementation, and mocks selected by operation and conditions with explicit response/error, absence, and ambiguity are fixed. Prefixed ULID per entity is preferred as one possible format.
 
-Octava ronda resuelta: `Command` especializa `FieldGroup`; identificadores con prefijo/sufijo, alfabeto y longitud definidos por reglas del modelo y generación técnica; permisos nombrados y actores de prueba; cliente con normalización y validación equivalente al motor; versionado aplazado hasta la versión 1.0 del producto.
+Eighth round resolved: `Command` specializes `FieldGroup`; identifiers with prefix/suffix, alphabet, and length defined by model rules and technical generation; named permissions and Test Actors; client with normalization and validation equivalent to the engine; versioning deferred until product version 1.0.
 
-Novena ronda resuelta: identificadores ASCII con longitud configurable y default 1–128, comparación sensible a mayúsculas; compatibilidad entre fuentes sin versionado; pipeline de normalización determinista e idempotente; CEL solo como prototipo de evaluación; contrato común de errores con incidencias por regla y campos.
+Ninth round resolved: ASCII identifiers with configurable length and default 1–128, case-sensitive comparison; compatibility between sources without versioning; deterministic and idempotent normalization pipeline; CEL only as an evaluation prototype; common error contract with incidents per rule and field.
 
-Décima ronda resuelta: representaciones iniciales de tipos; rechazo de campos JSON desconocidos en entradas y tolerancia del cliente en salidas; autorización por defecto denegada con todos los permisos requeridos y actor demo explícito; queries, read models y eventos como agrupaciones especializadas; gestión de proyectos como ejemplo de aceptación.
+Tenth round resolved: initial type representations; rejection of unknown JSON fields in inputs and client tolerance in outputs; access denied by default with all required permissions and an explicit demo actor; queries, read models, and events as specialized groupings; project management as the acceptance example.
 
-Undécima ronda resuelta: convenciones HTTP y resultados sin envoltorio adicional salvo listados/errores; paginación por offset o continuation token con limit; listas ordenadas y sustitución completa; existencia de referencias como regla de negocio; carga explícita de fuentes sin descargas por IRI; rechazo de pérdida de precisión; catálogo mínimo y fases de validación. La aceptación de «para el resto» se ha aplicado a las demás recomendaciones de Q55–Q59.
+Eleventh round resolved: HTTP conventions and results without an additional wrapper except lists/errors; pagination by offset or continuation token with limit; ordered lists and complete replacement; reference existence as a business rule; explicit source loading without IRI downloads; rejection of precision loss; minimum catalog and validation phases. The acceptance of “the rest” was applied to the remaining Q55–Q59 recommendations.
 
-Duodécima ronda resuelta: modalidades declaradas por listado con un default, CRUD con ambas modalidades, elección por petición sin mezclar offset y token, token opaco vinculado a consulta/filtros/orden y error explícito ante token inválido. El prototipo no promete un snapshot entre páginas.
+Twelfth round resolved: modes declared per list with one default, CRUD with both modes, request selection without mixing offset and token, opaque token bound to query/filters/order, and explicit error for an invalid token. The prototype does not promise a snapshot between pages.
 
-La entrevista de requisitos queda cerrada con la aprobación del conjunto por el usuario. La siguiente etapa es el diseño detallado de la primera entrega: shapes, firmas de funciones, nombres de propiedades, contratos HTTP y casos ejecutables. Estos artefactos todavía no están implementados ni validados.
+The requirements interview is closed with the user's approval of the set. The next stage is detailed design for the first delivery: shapes, function signatures, property names, HTTP contracts, and executable cases. These artifacts are not yet implemented or validated.
 
-La investigación factual sobre representación, conformidad y expresiones está recogida a continuación. RDF, SHACL y Turtle están elegidos. Tras la evaluación del prototipo se aprueba el perfil CEL de la primera entrega recogido en el ADR; las rondas anteriores conservan el estado histórico de la entrevista.
+Factual research on representation, conformance, and expressions is recorded below. RDF, SHACL, and Turtle are selected. After prototype evaluation, the first-delivery CEL profile recorded in the ADR is approved; earlier rounds retain the historical interview state.
 
-Trabajo de diseño detallado: incorporar el perfil CEL evaluado; formas léxicas y funciones de tipos; reglas automatizables del informe de compatibilidad; contratos HTTP y errores; materialización de las modalidades de paginación; ejemplo Turtle completo y pruebas de aceptación ejecutables.
+Detailed design work: incorporate the evaluated CEL profile; lexical forms and type functions; automatable compatibility-report rules; HTTP contracts and errors; Materialization of pagination modes; complete Turtle example; and executable acceptance tests.
 
-Ramas reservadas para entregas posteriores: concurrencia y persistencia avanzada; resultados externos inciertos; procesos duraderos, compensaciones e intervención humana; ejecución de proyecciones y queries complejas; editor visual; operación; conformidad entre motor e implementación asentada; continuidad durante el asentamiento.
+Branches reserved for later deliveries: concurrency and advanced persistence; uncertain external results; durable processes, compensation, and human intervention; projection execution and complex queries; visual editor; operations; conformance between engine and materialized implementation; continuity during Materialization.
 
-## Referencias técnicas y opciones pendientes
+## Technical references and pending options
 
-- RDF ofrece el modelo de grafo y Turtle la sintaxis elegida para las fuentes. [W3C Turtle](https://www.w3.org/TR/turtle/).
-- SHACL, ya elegido, permite validar grafos mediante shapes. SHACL 1.0 exige que los grafos permanezcan inmutables durante la validación; inferimos que el pipeline que transforma datos mediante normalizadores necesita semántica adicional. Tampoco define el ejecutor de escenarios mock. [W3C SHACL](https://www.w3.org/TR/shacl/#validation).
-- Las IRIs permiten referenciar los mismos elementos desde distintas fuentes. RDF no define la carga automática de documentos por referenciarlos; habrá que especificar qué fuentes se cargan y validan juntas. [W3C RDF Concepts](https://www.w3.org/TR/rdf11-concepts/#referents).
-- CEL permite expresiones comprobables contra un entorno de tipos y funciones; no define el DSL completo. El perfil adoptado fija las extensiones y los límites necesarios para la primera entrega, con evidencia compartida entre hosts. [Descripción de CEL](https://cel.dev/overview/cel-overview), [definición del lenguaje](https://github.com/cel-expr/cel-spec/blob/master/doc/langdef.md#extension-functions).
-- CEL no tiene decimal exacto nativo: sus números estándar son `int`, `uint` y `double`. El perfil adoptado representa decimal exacto, fecha e instante mediante tipos y funciones explícitos del host, conforme al ADR. [Tipos numéricos](https://github.com/cel-expr/cel-spec/blob/master/doc/langdef.md#numeric-values), [tipos abstractos](https://github.com/cel-expr/cel-spec/blob/master/doc/langdef.md#abstract-types).
-- ULID codifica 128 bits en 26 caracteres y admite lectura sin distinción de mayúsculas. Validarlo requiere comprobar también su rango, no solo longitud y alfabeto. Los prefijos por entidad y la forma textual normalizada serían convenciones del proyecto adicionales al formato ULID. [Especificación ULID](https://github.com/ulid/spec#specification), [desbordamiento](https://github.com/ulid/spec#overflow-errors-when-parsing-base32-strings).
-- Para implementaciones numéricas binary64, JSON identifica como interoperable el rango entero ±9 007 199 254 740 991 y permite límites de precisión por implementación. El perfil elegido restringe el entero inicial a ese rango y representa decimales exactos como cadenas. [RFC 8259, sección 6](https://www.rfc-editor.org/rfc/rfc8259#section-6).
-- RFC 3339 define fecha completa `YYYY-MM-DD` e instantes con desplazamiento o `Z`, con fracción de segundo opcional. El perfil elegido utiliza salida UTC con `Z` y precisión de milisegundos. [RFC 3339, sección 5.6](https://www.rfc-editor.org/rfc/rfc3339#section-5.6).
+- RDF provides the graph model and Turtle the selected syntax for sources. [W3C Turtle](https://www.w3.org/TR/turtle/).
+- SHACL, already selected, validates graphs through shapes. SHACL 1.0 requires graphs to remain immutable during validation; we infer that a pipeline transforming data through normalizers needs additional semantics. It also does not define a mock-scenario executor. [W3C SHACL](https://www.w3.org/TR/shacl/#validation).
+- IRIs allow the same elements to be referenced from different sources. RDF does not define automatic document loading by reference; the sources loaded and validated together must be specified. [W3C RDF Concepts](https://www.w3.org/TR/rdf11-concepts/#referents).
+- CEL permits expressions checked against an environment of types and functions; it does not define the complete DSL. The adopted profile fixes the extensions and limits needed for the first delivery, with shared evidence across hosts. [CEL overview](https://cel.dev/overview/cel-overview), [language definition](https://github.com/cel-expr/cel-spec/blob/master/doc/langdef.md#extension-functions).
+- CEL has no native exact decimal: its standard numbers are `int`, `uint`, and `double`. The adopted profile represents exact decimal, date, and instant through explicit host types and functions, according to the ADR. [Numeric types](https://github.com/cel-expr/cel-spec/blob/master/doc/langdef.md#numeric-values), [abstract types](https://github.com/cel-expr/cel-spec/blob/master/doc/langdef.md#abstract-types).
+- ULID encodes 128 bits in 26 characters and permits case-insensitive reading. Validating it also requires checking its range, not only length and alphabet. Per-entity prefixes and normalized textual form would be project conventions beyond the ULID format. [ULID specification](https://github.com/ulid/spec#specification), [overflow](https://github.com/ulid/spec#overflow-errors-when-parsing-base32-strings).
+- For binary64 numeric implementations, JSON identifies the integer range ±9 007 199 254 740 991 as interoperable and permits implementation precision limits. The selected profile restricts the initial integer to that range and represents exact decimals as strings. [RFC 8259, section 6](https://www.rfc-editor.org/rfc/rfc8259#section-6).
+- RFC 3339 defines complete dates `YYYY-MM-DD` and instants with an offset or `Z`, with an optional fractional second. The selected profile uses UTC output with `Z` and millisecond precision. [RFC 3339, section 5.6](https://www.rfc-editor.org/rfc/rfc3339#section-5.6).

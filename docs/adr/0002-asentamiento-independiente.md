@@ -1,3 +1,3 @@
-# Asentamiento unidireccional sin el motor original
+# One-way materialization without the original engine
 
-El asentamiento genera una implementación para un stack concreto que puede usar bibliotecas de runtime especializadas, pero no depende del motor dinámico original. Se acepta una transición unidireccional para permitir la optimización cuando sea necesaria, posponiendo la sincronización bidireccional. El código generado conservará trazabilidad hacia la especificación para explicar su origen y facilitar futuros diffs.
+Materialization produces an implementation for a concrete stack that may use specialized runtime libraries, but it does not depend on the original dynamic engine. A one-way transition is accepted to allow optimization when needed, while deferring bidirectional synchronization. Generated code will retain traceability to the specification so that its origin can be explained and future diffs can be made easier.

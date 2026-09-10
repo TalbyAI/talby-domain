@@ -1,163 +1,163 @@
-# Formas léxicas y catálogo inicial de funciones
+# Lexical forms and initial function catalog
 
-Investigación y decisión propuesta, 6 de septiembre de 2026. Contexto: [Decidir las formas léxicas y el catálogo inicial de funciones](https://github.com/TalbyAI/talby-domain/issues/2). Este documento es un activo de investigación; la resolución de ese ticket es el registro canónico de la decisión. No contiene una implementación ni decide adoptar CEL.
+Research and proposed decision, September 6, 2026. Context: [Decide lexical forms and the initial function catalog](https://github.com/TalbyAI/talby-domain/issues/2). This document is a research asset; resolution of that ticket is the canonical decision record. It contains no implementation and does not decide to adopt CEL.
 
-## Base y resultado
+## Basis and outcome
 
-Se han leído [la especificación](../specification.md), [el lenguaje del contexto](../../CONTEXT.md), [restricciones acumulativas](../adr/0004-restricciones-acumulativas.md) e [identidad independiente del namespace](../adr/0005-identidad-independiente-del-namespace.md). El perfil siguiente concreta sus cuestiones abiertas. Conserva las cadenas para decimal, fecha, instante e identificador; normalización antes de restricciones; ausencia distinta de `null`; y acumulación de reglas.
+The [specification](../specification.md), [context language](../../CONTEXT.md), [cumulative constraints](../adr/0004-restricciones-acumulativas.md), and [identity independent of namespace](../adr/0005-identidad-independiente-del-namespace.md) were read. The following profile makes its open questions concrete. It preserves strings for decimal, date, instant, and identifier; normalization before constraints; absence distinct from `null`; and rule accumulation.
 
-**Recomendación:** distinguir entrada léxica aceptada, valor tipado y salida canónica. Decimal e instante llevan una canonicalización intrínseca visible en el modelo efectivo; `trim` es opcional y declarado. La escala escrita de un decimal no constituye información del valor: `1.20` y `1.2` representan el mismo valor. Si una futura necesidad exige preservar presentación o precisión medida, necesitará otro campo o tipo de valor.
+**Recommendation:** distinguish accepted lexical input, typed value, and canonical output. Decimal and instant have intrinsic canonicalization visible in the effective model; `trim` is optional and declared. The written scale of a decimal is not value information: `1.20` and `1.2` represent the same value. If a future need requires preserving presentation or measured precision, it will need another field or value type.
 
-Todo lo señalado como **perfil** es una elección de este proyecto, no una exigencia de un estándar. Las firmas son contratos abstractos de comportamiento, no nombres RDF, API TypeScript ni sintaxis CEL definitivos.
+Everything marked **profile** is a project choice, not a standard requirement. The signatures are abstract behavior contracts, not final RDF names, TypeScript APIs, or CEL syntax.
 
-## Qué establecen las fuentes
+## What the sources establish
 
-- JSON permite límites de implementación sobre números; el intervalo entero interoperable con binary64 es ±9 007 199 254 740 991. Su gramática puede admitir secuencias UTF-16 aisladas como escapes, con comportamiento impredecible entre implementaciones. Esto justifica comprobar enteros y texto antes de tratarlos como valores del contrato. [RFC 8259, números](https://www.rfc-editor.org/rfc/rfc8259#section-6), [Unicode](https://www.rfc-editor.org/rfc/rfc8259#section-8.2).
-- XSD separa espacios léxico y de valores. `decimal` no requiere coma flotante; `totalDigits` y `fractionDigits` restringen valores, no ceros redundantes escritos. En XSD 1.1, `totalDigits=t` exige una representación `i/10^n` con `abs(i)<10^t` y `0≤n≤t`; por ello `0.001` requiere al menos tres, no un único dígito. Su representación decimal canónica omite el punto para valores enteros y lo conserva para valores fraccionarios. La gramática de entrada del perfil es más restrictiva: rechaza `+1`, `.1` y `1.`; aceptación léxica y canonicalización son decisiones separadas. [XSD decimal](https://www.w3.org/TR/xmlschema11-2/#decimal), [totalDigits](https://www.w3.org/TR/xmlschema11-2/#rf-totalDigits), [fractionDigits](https://www.w3.org/TR/xmlschema11-2/#rf-fractionDigits).
-- RFC 3339 admite desplazamientos, fracción opcional y segundos intercalares bajo condiciones. `-00:00` expresa que el desplazamiento local es desconocido, aunque se conoce el tiempo UTC. El año usa cuatro dígitos; el calendario es gregoriano. Un perfil puede restringir estas opciones. [RFC 3339, formato y restricciones](https://www.rfc-editor.org/rfc/rfc3339#section-5.6), [desplazamiento desconocido](https://www.rfc-editor.org/rfc/rfc3339#section-4.3).
-- ECMAScript `trim` elimina WhiteSpace y LineTerminator en los extremos y aplica conversión a texto; el catálogo aquí conserva el conjunto de caracteres, pero rechaza esa coerción. [TrimString](https://tc39.es/ecma262/multipage/text-processing.html#sec-trimstring), [WhiteSpace](https://tc39.es/ecma262/multipage/ecmascript-language-lexical-grammar.html#sec-white-space).
-- RE2 no admite referencias hacia atrás ni lookaround; sus repeticiones contadas tienen un límite de 1000. SHACL `sh:pattern` usa las expresiones de SPARQL y no equivale automáticamente a un validador de payload de otro motor. Un subconjunto explícito evita confundir estos contratos. [Sintaxis RE2](https://github.com/google/re2/wiki/Syntax), [SHACL pattern](https://www.w3.org/TR/shacl/#PatternConstraintComponent).
-- CEL declara números `int`, `uint` y `double`, y mecanismos de extensión. La disponibilidad real de tipos y funciones decimales equivalentes queda para el prototipo previsto, no se deduce del lenguaje. [Definición CEL](https://github.com/cel-expr/cel-spec/blob/master/doc/langdef.md#numeric-values).
+- JSON permits implementation limits on numbers; the integer range interoperable with binary64 is ±9 007 199 254 740 991. Its grammar may admit isolated UTF-16 sequences as escapes, with unpredictable behavior between implementations. This justifies checking integers and text before treating them as contract values. [RFC 8259, numbers](https://www.rfc-editor.org/rfc/rfc8259#section-6), [Unicode](https://www.rfc-editor.org/rfc/rfc8259#section-8.2).
+- XSD separates lexical and value spaces. `decimal` does not require floating point; `totalDigits` and `fractionDigits` constrain values, not redundant written zeroes. In XSD 1.1, `totalDigits=t` requires a representation `i/10^n` with `abs(i)<10^t` and `0≤n≤t`; therefore `0.001` requires at least three digits, not one. Its canonical decimal representation omits the point for integer values and retains it for fractional values. The profile's input grammar is more restrictive: it rejects `+1`, `.1`, and `1.`; lexical acceptance and canonicalization are separate decisions. [XSD decimal](https://www.w3.org/TR/xmlschema11-2/#decimal), [totalDigits](https://www.w3.org/TR/xmlschema11-2/#rf-totalDigits), [fractionDigits](https://www.w3.org/TR/xmlschema11-2/#rf-fractionDigits).
+- RFC 3339 permits offsets, an optional fraction, and leap seconds under conditions. `-00:00` says that the local offset is unknown even though the UTC time is known. The year uses four digits; the calendar is Gregorian. A profile may restrict these options. [RFC 3339, format and restrictions](https://www.rfc-editor.org/rfc/rfc3339#section-5.6), [unknown offset](https://www.rfc-editor.org/rfc/rfc3339#section-4.3).
+- ECMAScript `trim` removes WhiteSpace and LineTerminator at the edges and coerces to text; the catalog here preserves the character set but rejects that coercion. [TrimString](https://tc39.es/ecma262/multipage/text-processing.html#sec-trimstring), [WhiteSpace](https://tc39.es/ecma262/multipage/ecmascript-language-lexical-grammar.html#sec-white-space).
+- RE2 does not support backreferences or lookaround; its counted repetitions have a limit of 1000. SHACL `sh:pattern` uses SPARQL expressions and is not automatically equivalent to a payload validator in another engine. An explicit subset avoids confusing these contracts. [RE2 syntax](https://github.com/google/re2/wiki/Syntax), [SHACL pattern](https://www.w3.org/TR/shacl/#PatternConstraintComponent).
+- CEL declares `int`, `uint`, and `double` numbers and extension mechanisms. The actual availability of equivalent decimal types and functions is left to the planned prototype and is not inferred from the language. [CEL definition](https://github.com/cel-expr/cel-spec/blob/master/doc/langdef.md#numeric-values).
 
-## Texto, booleano y entero
+## Text, boolean, and integer
 
-**Perfil:** texto es una secuencia de valores escalares Unicode. Se rechazan sustitutos UTF-16 aislados en la frontera de entrada; no se aplica NFC, case folding ni una transformación dependiente del locale. Longitud significa número de valores escalares, no bytes, unidades UTF-16 ni grafemas. `😀` mide uno; `e` seguido de U+0301 mide dos y es distinto de `é`. El identificador ASCII tiene la misma longitud en estas unidades.
+**Profile:** text is a sequence of Unicode scalar values. Isolated UTF-16 surrogates are rejected at the input boundary; NFC, case folding, and locale-dependent transformation are not applied. Length means the number of scalar values, not bytes, UTF-16 units, or graphemes. `😀` has length one; `e` followed by U+0301 has length two and differs from `é`. The ASCII identifier has the same length in these units.
 
-Booleano solo acepta los valores JSON `true` y `false`. Entero acepta un número JSON finito, matemáticamente entero y dentro del intervalo aprobado. `1.0` y `1e0` son números enteros tras decodificar JSON; `"1"` no lo es. Cero negativo numérico se representa como cero. Un adaptador que recibe un número ya redondeado por un decodificador no puede recuperar su escritura original; el contrato valida el valor JSON decodificado, no certifica la exactitud del lexema numérico previo. Para datos cuyo lexema deba conservar exactitud se utiliza decimal como cadena.
+Boolean accepts only JSON values `true` and `false`. Integer accepts a finite JSON number that is mathematically integral and within the approved range. `1.0` and `1e0` are integers after JSON decoding; `"1"` is not. Numeric negative zero is represented as zero. An adapter receiving a number already rounded by a decoder cannot recover its original spelling; the contract validates the decoded JSON value and does not certify the exactness of the prior numeric lexeme. Data whose lexeme must retain exactness uses decimal as a string.
 
-## Decimal exacto
+## Exact decimal
 
-**Perfil de entrada**, sobre toda la cadena: `-?[0-9]+(\.[0-9]+)?`. Los dígitos son ASCII. Se aceptan ceros iniciales y finales para canonicalizarlos. Se rechazan `+`, espacios, exponente, separadores de miles, coma, `.5`, `1.`, NaN e infinito. Un número JSON nunca se convierte a decimal.
+**Input profile**, over the whole string: `-?[0-9]+(\.[0-9]+)?`. Digits are ASCII. Leading and trailing zeroes are accepted for canonicalization. `+`, spaces, exponents, thousands separators, commas, `.5`, `1.`, NaN, and infinity are rejected. A JSON number is never converted to decimal.
 
-**Canonicalización obligatoria:** quitar ceros iniciales de la parte entera dejando uno si queda vacía; quitar ceros finales de la fracción; quitar el punto si no queda fracción; quitar `-` cuando el valor es cero. No se redondea ni se pasa por `number`/`double`. La salida es `0` o una cadena que cumple la gramática anterior, sin ceros redundantes. Para las entradas aceptadas, esta canonicalización sigue la forma canónica de `xsd:decimal` en XSD 1.1; cualquier mapeo RDF futuro debe ser explícito.
+**Required canonicalization:** remove leading zeroes from the integer part, leaving one if it becomes empty; remove trailing fractional zeroes; remove the point if no fraction remains; remove `-` when the value is zero. Do not round or pass through `number`/`double`. The output is `0` or a string satisfying the grammar above, without redundant zeroes. For accepted inputs, this canonicalization follows the XSD 1.1 canonical form of `xsd:decimal`; any future RDF mapping must be explicit.
 
-**Precisión y escala de valor:** para el decimal canónico, `s` es la longitud de la fracción (cero si no existe). Sea `i` el entero formado al retirar punto y ceros iniciales, con un dígito para cero. Definir `p=max(dígitos(abs(i)),s,1)`. Una declaración `precision=P` exige `p≤P`; `scale=S` exige `s≤S`. Es la semántica de límite de valor de XSD 1.1, no una obligación de escribir exactamente S decimales, ni la capacidad de columnas SQL `DECIMAL(P,S)`.
+**Value precision and scale:** for the canonical decimal, `s` is the fractional-part length (zero when absent). Let `i` be the integer formed by removing the point and leading zeroes, with one digit for zero. Define `p=max(digits(abs(i)),s,1)`. A declaration `precision=P` requires `p≤P`; `scale=S` requires `s≤S`. This is the XSD 1.1 value-limit semantics, not a requirement to write exactly S decimal places or the capacity of SQL `DECIMAL(P,S)` columns.
 
-`P` es entero positivo, `S` entero no negativo; en este perfil ambos tienen techo 4096. Omitir cualquiera no introduce una restricción de negocio para ese parámetro. Al resolver una declaración o composición, si ambos límites existen, el límite de escala efectivo es `min(S,P)`; por tanto `S>P` se normaliza a `P` y no se rechaza. Esta normalización forma parte del contrato y la aplican igual cliente y motor. Al acumular límites se utiliza el más restrictivo.
+`P` is a positive integer and `S` is a non-negative integer; both have a ceiling of 4096 in this profile. Omitting either introduces no business constraint for that parameter. When resolving a declaration or composition, if both limits exist, the effective scale limit is `min(S,P)`; therefore `S>P` is normalized to `P` and not rejected. This normalization is part of the contract and is applied equally by client and engine. When accumulating limits, use the more restrictive one.
 
-**Límite operativo de perfil propuesto:** máximo 4096 dígitos ASCII en la entrada decimal, contando ceros redundantes y excluyendo signo/punto. No es un default de precisión o escala del dominio. Se comprueba antes de construir enteros grandes; cliente y motor aplican el mismo techo. Declaraciones que exijan capacidades superiores no son soportadas por este perfil y se detectan en verificación. Cambiar el techo requiere otro perfil efectivo explícito; nunca truncar. Esta elección limita recursos, no deriva de las fuentes ni promete exactitud ilimitada. Los dos límites son independientes: declarar scale=4096 es un máximo permitido, pero no garantiza representar un valor no nulo de escala exactamente 4096, pues el cero entero obligatorio consumiría otro dígito léxico.
+**Proposed profile operational limit:** at most 4096 ASCII digits in decimal input, counting redundant zeroes and excluding the sign and point. This is not a domain precision or scale default. Check it before constructing large integers; client and engine apply the same ceiling. Declarations requiring greater capacity are unsupported by this profile and detected during verification. Changing the ceiling requires another explicit effective profile; never truncate. This choice limits resources; it does not derive from sources or promise unlimited exactness. The two limits are independent: declaring `scale=4096` is a permitted maximum, but does not guarantee representing a non-zero value with exactly 4096 fractional places because the required integer zero consumes another lexical digit.
 
-| Entrada | Canon | p | s | Observación |
+| Input | Canonical | p | s | Note |
 | --- | --- | --- | --- | --- |
-| `0001.2300` | `1.23` | 3 | 2 | Conserva el valor |
-| `-0.000` | `0` | 1 | 0 | Un único cero |
-| `0.001` | `0.001` | 3 | 3 | Rechaza precision=2 |
-| `1000.00` | `1000` | 4 | 0 | No cuenta ceros de presentación |
-| `12.340` | `12.34` | 4 | 2 | Acepta scale=2 |
-| `12.345` | `12.345` | 5 | 3 | Rechaza scale=2; no redondea |
-| `9007199254740993.01` | Igual | 18 | 2 | Exactitud superior a number |
-| `1e2`, `+1`, `1.`, `.1`, número JSON `1` | Error | — | — | Formato o tipo incorrecto |
+| `0001.2300` | `1.23` | 3 | 2 | Preserves value |
+| `-0.000` | `0` | 1 | 0 | One zero |
+| `0.001` | `0.001` | 3 | 3 | Rejects precision=2 |
+| `1000.00` | `1000` | 4 | 0 | Presentation zeroes do not count |
+| `12.340` | `12.34` | 4 | 2 | Accepts scale=2 |
+| `12.345` | `12.345` | 5 | 3 | Rejects scale=2; does not round |
+| `9007199254740993.01` | Same | 18 | 2 | Greater precision than number |
+| `1e2`, `+1`, `1.`, `.1`, JSON number `1` | Error | — | — | Incorrect format or type |
 
-## Fecha civil
+## Civil date
 
-**Perfil:** exactamente diez caracteres ASCII `YYYY-MM-DD`, año 0001–9999, mes 01–12, día válido en calendario gregoriano proléptico. Año divisible por 4 es bisiesto salvo siglos no divisibles por 400. No se admiten año cero, años con signo, fecha ordinal, semana ISO, hora ni zona. La fecha se conserva; no se interpreta como medianoche de una zona.
+**Profile:** exactly ten ASCII characters `YYYY-MM-DD`, year 0001–9999, month 01–12, and a valid day in the proleptic Gregorian calendar. A year divisible by 4 is a leap year except for centuries not divisible by 400. Year zero, signed years, ordinal dates, ISO weeks, time, and zone are not accepted. The date is preserved; it is not interpreted as midnight in a zone.
 
-Comparar por tupla `(año,mes,día)` o por la cadena canónica da el mismo orden. `2000-02-29` es válida; `1900-02-29`, `2025-02-29`, `2026-04-31`, `2026-9-06` y `0000-01-01` se rechazan. No delegar la validación a un parser que ajuste días inexistentes.
+Comparing the tuple `(year,month,day)` or the canonical string gives the same order. `2000-02-29` is valid; `1900-02-29`, `2025-02-29`, `2026-04-31`, `2026-9-06`, and `0000-01-01` are rejected. Do not delegate validation to a parser that adjusts nonexistent days.
 
-## Instante
+## Instant
 
-**Perfil de entrada:** fecha válida del apartado anterior, `T` mayúscula, hora `HH:mm:ss`, fracción opcional `.[0-9]+`, y `Z` mayúscula o desplazamiento `+HH:mm` / `-HH:mm`. Hora 00–23, minutos y segundos 00–59; desplazamiento de 00:00 a 23:59. Se rechaza `-00:00` para no descartar su significado de desconocimiento. No se admiten `t`/`z`, espacio por T, hora local sin zona, `24:00:00`, segundos intercalares ni anotaciones de zona.
+**Input profile:** a valid date from the previous section, uppercase `T`, time `HH:mm:ss`, an optional `.[0-9]+` fraction, and uppercase `Z` or an offset `+HH:mm` / `-HH:mm`. Hour 00–23, minutes and seconds 00–59; offset from 00:00 to 23:59. Reject `-00:00` so its unknown-offset meaning is not discarded. Lowercase `t`/`z`, a space instead of T, local time without a zone, `24:00:00`, leap seconds, and zone annotations are not accepted.
 
-La entrada con desplazamiento expresa un instante; se resta ese desplazamiento y se produce exactamente `YYYY-MM-DDTHH:mm:ss.sssZ`. La conversión debe conservar año UTC entre 0001 y 9999; desbordamientos se rechazan. La fracción ausente equivale a `.000`; una o dos cifras se completan con ceros. Más de tres cifras solo se acepta cuando **todas** las posteriores a la tercera son cero. Techo operativo propuesto: 4096 cifras de fracción, comprobado antes de procesarla. Se rechaza pérdida de precisión, sin redondeo.
+An input with an offset expresses an instant; subtract that offset and produce exactly `YYYY-MM-DDTHH:mm:ss.sssZ`. Conversion must preserve a UTC year between 0001 and 9999; overflows are rejected. An absent fraction equals `.000`; one or two digits are padded with zeroes. More than three digits is accepted only when **all** digits after the third are zero. Proposed operational ceiling: 4096 fraction digits, checked before processing. Reject precision loss without rounding.
 
-La regla de fecha/hora se verifica antes de convertir. No usar el locale ni la zona del proceso, reloj, calendario de segundos intercalares o consulta externa. Los milisegundos pueden compararse exactamente como enteros en el rango del perfil; también se pueden comparar las cadenas UTC canónicas. No comparar cadenas de entrada con offsets diferentes.
+Validate the date/time rule before converting. Do not use the process locale or zone, clock, leap-second calendar, or an external query. Milliseconds can be compared exactly as integers within the profile range; canonical UTC strings can also be compared. Do not compare input strings with different offsets.
 
-| Entrada | Resultado |
+| Input | Result |
 | --- | --- |
 | `2026-09-06T12:34:56+02:00` | `2026-09-06T10:34:56.000Z` |
 | `2026-01-01T00:15:00+01:00` | `2025-12-31T23:15:00.000Z` |
 | `2026-09-06T00:00:00.12Z` | `2026-09-06T00:00:00.120Z` |
 | `2026-09-06T00:00:00.123000Z` | `2026-09-06T00:00:00.123Z` |
-| `2026-09-06T00:00:00.123001Z` | Error de precisión |
-| `2016-12-31T23:59:60Z` | Error de formato del perfil |
-| `0001-01-01T00:00:00+01:00` | Error de rango UTC |
-| `2026-09-06T00:00:00-00:00` | Error de desplazamiento no admitido |
+| `2026-09-06T00:00:00.123001Z` | Precision error |
+| `2016-12-31T23:59:60Z` | Profile-format error |
+| `0001-01-01T00:00:00+01:00` | UTC-range error |
+| `2026-09-06T00:00:00-00:00` | Unsupported-offset error |
 
-## Identificador de entidad
+## Entity identifier
 
-**Perfil:** una cadena no vacía formada exclusivamente por `[A-Za-z0-9_-]`; longitud total inclusiva, con defaults 1 y 128 resueltos al declarar el tipo. `prefix` es explícito por entidad (puede declararse vacío); `suffix` omitido equivale a vacío. Ambos deben usar el mismo alfabeto. Se exige que el valor empiece/termine exactamente con ellos, con comparación sensible a mayúsculas.
+**Profile:** a non-empty string consisting exclusively of `[A-Za-z0-9_-]`; inclusive total length, with defaults 1 and 128 resolved when the type is declared. `prefix` is explicit per entity and may be empty; an omitted `suffix` is equivalent to empty. Both use the same alphabet. The value must start/end exactly with them, with case-sensitive comparison.
 
-Prefijo y sufijo son restricciones literales, no regex; no se quitan al almacenar o comparar. Pueden solaparse: con prefijo `ab` y sufijo `bc`, `abc` es válido si cumple longitud. No se impone una longitud adicional a una supuesta parte central. El generador técnico puede exigir más espacio, pero esa capacidad se comprueba aparte. Una referencia exige el tipo de entidad esperado y todas las restricciones de su identificador; no comprueba existencia.
+Prefix and suffix are literal constraints, not regexes; they are not removed when storing or comparing. They may overlap: with prefix `ab` and suffix `bc`, `abc` is valid if it meets the length. No additional length is imposed on a supposed central part. The technical generator may require more space, but that capacity is checked separately. A reference requires the expected entity type and all its identifier constraints; it does not check existence.
 
-`prj_A-1` y `prj_a-1` son distintos; `prj_á`, espacios y controles fallan. No hay lowercase, ULID ni UUID implícito. Una cadena inválida con espacios solo puede recuperarse si el modelo declara explícitamente `trim`. Los identificadores de declaración RDF son otro concepto y no se restringen con este alfabeto.
+`prj_A-1` and `prj_a-1` differ; `prj_á`, spaces, and controls fail. There is no implicit lowercase conversion, ULID, or UUID. A string invalid because of spaces can be recovered only if the model explicitly declares `trim`. RDF declaration identifiers are another concept and are not restricted by this alphabet.
 
-Al verificar, los límites deben ser enteros, mínimo≥1 y máximo≥mínimo. Prefijos/sufijos incompatibles entre reglas o ningún valor posible bajo el máximo son contradicciones; no basta sumar sus longitudes porque pueden solaparse. Una implementación puede comprobar satisfacibilidad de las posiciones exigidas por ambos para las longitudes candidatas. No se introduce un máximo de negocio global por encima del máximo elegido por entidad; límites de payload pertenecen al contrato técnico común.
+During verification, limits must be integers, minimum≥1, and maximum≥minimum. Prefixes/suffixes incompatible across rules, or no value possible under the maximum, are contradictions; simply adding their lengths is insufficient because they may overlap. An implementation may check satisfiability of both required positions for candidate lengths. No global business maximum is introduced above the maximum selected per entity; payload limits belong to the common technical contract.
 
-## Normalización y ausencia
+## Normalization and absence
 
-**Perfil:** `normalize(model,input)` devuelve un valor normalizado o incidencias. Primero comprueba estructura y tipos JSON, distinguiendo ausencia, `null` y valor. Sobre valores presentes no nulos ejecuta los normalizadores declarados, en orden, y después canonicalización del tipo. Todos los normalizadores iniciales operan sobre cadena; no convierten números, objetos o booleanos. Una cadena se somete a `trim` antes de analizar decimal/fecha/instante si esa regla está declarada.
+**Profile:** `normalize(model,input)` returns a normalized value or incidents. First check structure and JSON types, distinguishing absence, `null`, and a value. For present non-null values, run declared normalizers in order and then type canonicalization. All initial normalizers operate on strings; they do not convert numbers, objects, or booleans. A string is passed through `trim` before parsing decimal/date/instant when that rule is declared.
 
-`trim(s:String) -> String` elimina exclusivamente el siguiente conjunto fijo en ambos extremos, hasta encontrar otro carácter:
+`trim(s:String) -> String` removes only the following fixed set from both edges, until another character is found:
 
 `U+0009–U+000D, U+0020, U+00A0, U+1680, U+2000–U+200A, U+2028, U+2029, U+202F, U+205F, U+3000, U+FEFF`.
 
-No elimina U+0085, U+180E ni U+200B; no cambia espacios interiores. La tabla es parte del perfil, sin depender de futuras tablas Unicode del runtime. `trim(null)` invocado directamente es error de tipo; el pipeline no lo invoca sobre `null` ni ausencia. `trim(" \u00A0x\uFEFF")` produce `x`; `trim("x y")` conserva el espacio interior; una cadena solo de espacios del conjunto produce vacío.
+It does not remove U+0085, U+180E, or U+200B; it does not change interior spaces. The table is part of the profile and does not depend on future Unicode runtime tables. Calling `trim(null)` directly is a type error; the pipeline does not call it for `null` or absence. `trim(" \u00A0x\uFEFF")` produces `x`; `trim("x y")` preserves the interior space; a string containing only characters from the set produces empty.
 
-La canonicalización decimal e instante es intrínseca y aparece en el modelo efectivo, después de las reglas de texto declaradas. Fecha e identificador no tienen otra transformación intrínseca. Esto fija un único orden y mantiene la salida del tipo canónica. En el catálogo inicial solo se admite `trim` como normalizador configurable: sus repeticiones y su composición con las canonicalizaciones son idempotentes. No se presume que futuros normalizadores individualmente idempotentes formen un pipeline idempotente; añadirlos requiere demostrar esa propiedad de la composición.
+Decimal and instant canonicalization is intrinsic and appears in the effective model after declared text rules. Date and identifier have no other intrinsic transformation. This fixes one order and keeps the type output canonical. The initial catalog permits only `trim` as a configurable normalizer: repetitions and composition with canonicalization are idempotent. Do not assume that future individually idempotent normalizers form an idempotent pipeline; adding them requires demonstrating that composition property.
 
-Tras normalizar se aplican todas las restricciones y después las reglas entre campos que tengan entradas válidas. No se inventan valores ausentes ni defaults de datos. En mensajes de cambios parciales se conserva la semántica ya aprobada de sustitución de agrupaciones y validación del estado resultante; este perfil no convierte campos obligatorios en opcionales.
+After normalization, apply all constraints and then the rules between fields that have valid inputs. Do not invent absent values or data defaults. Partial Update Messages retain the approved semantics of replacing groupings and validating the resulting state; this profile does not make required fields optional.
 
-## Firmas y semántica del catálogo inicial
+## Signatures and semantics of the initial catalog
 
-`Result<T>` significa éxito con T o error estructurado; `Check` significa conformidad o incidencias, no un booleano que confunda incompatibilidad con incumplimiento. Los nombres siguientes son las identidades lógicas del catálogo pendiente de materializar. `Decimal`, `Date`, `Instant` e `EntityId<E>` son valores tipados representados por cadenas; `String` no se acepta implícitamente donde se requiere uno de ellos.
+`Result<T>` means success with T or a structured error; `Check` means conformance or incidents, not a boolean that confuses incompatibility with failure. The following names are the logical identities of the catalog awaiting materialization. `Decimal`, `Date`, `Instant`, and `EntityId<E>` are typed values represented by strings; `String` is not implicitly accepted where one of them is required.
 
-| Función | Firma abstracta | Semántica |
+| Function | Abstract signature | Semantics |
 | --- | --- | --- |
-| `decimal` | `(String) -> Result<Decimal>` | Gramática, límite operativo y canonicalización anteriores |
-| `date` | `(String) -> Result<Date>` | Fecha válida; conserva cadena |
-| `instant` | `(String) -> Result<Instant>` | Canon UTC exacto y límites anteriores |
-| `entityId` | `(EntityType, String) -> Result<EntityId<E>>` | Alfabeto y restricciones efectivas del tipo; sin existencia |
-| `trim` | `(String) -> String` | Conjunto fijo de extremos |
-| `required` | `(Presence, Boolean) -> Check` | Si true, ausencia falla; `null` cuenta como presente |
-| `nullable` | `(PresentValue, Boolean) -> Check` | Si false, `null` falla; no hace obligatorio un campo |
-| `length` | `(String, min?, max?) -> Check` | Número de valores escalares; límites inclusivos |
-| `range` | `(T, lower?, upper?, lowerInclusive=true, upperInclusive=true) -> Check` | T entero, decimal, fecha o instante; extremos del mismo tipo |
-| `precision` | `(Decimal, P) -> Check` | p≤P según definición anterior |
-| `scale` | `(Decimal, S) -> Check` | s≤S; sin rellenar ni redondear |
-| `pattern` | `(String, Pattern) -> Check` | Coincidencia completa con el subconjunto siguiente |
-| `oneOf` | `(T, List<T>) -> Check` | Pertenencia exacta a un conjunto no vacío de escalares del mismo tipo |
-| `cardinality` | `(List<T>, min?, max?) -> Check` | Número de elementos, incluidos `null` si el elemento lo admite |
-| `compareDecimal` | `(Decimal, Decimal) -> -1\|0\|1` | Comparación numérica exacta, sin number |
-| `compareDate` | `(Date, Date) -> -1\|0\|1` | Orden civil |
-| `compareInstant` | `(Instant, Instant) -> -1\|0\|1` | Orden temporal UTC |
-| `assert` | `(TypedExpression<Boolean>, FieldPaths) -> Check` | True cumple; false produce incidencia en las rutas declaradas; error de evaluación se distingue |
+| `decimal` | `(String) -> Result<Decimal>` | Grammar, operational limit, and preceding canonicalization |
+| `date` | `(String) -> Result<Date>` | Valid date; preserves string |
+| `instant` | `(String) -> Result<Instant>` | Exact UTC canonical form and preceding limits |
+| `entityId` | `(EntityType, String) -> Result<EntityId<E>>` | Type's effective alphabet and constraints; no existence |
+| `trim` | `(String) -> String` | Fixed edge set |
+| `required` | `(Presence, Boolean) -> Check` | If true, absence fails; `null` counts as present |
+| `nullable` | `(PresentValue, Boolean) -> Check` | If false, `null` fails; does not make a field required |
+| `length` | `(String, min?, max?) -> Check` | Number of scalar values; inclusive limits |
+| `range` | `(T, lower?, upper?, lowerInclusive=true, upperInclusive=true) -> Check` | T is integer, decimal, date, or instant; endpoints have the same type |
+| `precision` | `(Decimal, P) -> Check` | p≤P according to the preceding definition |
+| `scale` | `(Decimal, S) -> Check` | s≤S; no padding or rounding |
+| `pattern` | `(String, Pattern) -> Check` | Full match using the following subset |
+| `oneOf` | `(T, List<T>) -> Check` | Exact membership in a non-empty set of same-type scalars |
+| `cardinality` | `(List<T>, min?, max?) -> Check` | Number of elements, including `null` when the element permits it |
+| `compareDecimal` | `(Decimal, Decimal) -> -1\|0\|1` | Exact numeric comparison, without number |
+| `compareDate` | `(Date, Date) -> -1\|0\|1` | Civil ordering |
+| `compareInstant` | `(Instant, Instant) -> -1\|0\|1` | UTC temporal ordering |
+| `assert` | `(TypedExpression<Boolean>, FieldPaths) -> Check` | True passes; false produces an incident on declared paths; evaluation error is distinguished |
 
-Las funciones de parseo son explícitas en expresiones; los adaptadores de campos las aplican por el tipo declarado y muestran esa operación en el contrato efectivo. Validadores `length`, `pattern` y demás no canonicalizan ni hacen coerción. Un valor con fallo de tipo/formato no se suministra a reglas que requieren ese tipo; se evitan incidencias derivadas falsas sin omitir reglas de otros campos válidos.
+Parsing functions are explicit in expressions; field adapters apply them for the declared type and show that operation in the effective contract. `length`, `pattern`, and other validators do not canonicalize or coerce. A value with a type/format failure is not supplied to rules that require that type; this avoids false derived incidents without omitting rules for other valid fields.
 
-`oneOf` compara texto e identificadores por secuencia exacta; decimal por valor canónico, fecha por fecha e instante por instante canónico. Los literales de la enumeración se comprueban/canonicalizan al verificar el modelo; duplicados tras ese proceso se rechazan como declaración redundante. Listas u objetos no son miembros de enumeraciones de este perfil.
+`oneOf` compares text and identifiers by exact sequence, decimal by canonical value, date by date, and instant by canonical instant. Enumeration literals are checked/canonicalized while verifying the model; duplicates after that process are rejected as a redundant declaration. Lists and objects are not members of enumerations in this profile.
 
-Los límites de longitud/cardinalidad son enteros no negativos; extremos numéricos/temporales se validan al declarar. Rango sin ningún extremo y longitud/cardinalidad sin límites son declaraciones vacías y se rechazan. Se rechazan intervalo invertido, intervalo abierto reducido a un punto y referencias de campo/funciones inexistentes. El conjunto efectivo es la conjunción de restricciones, nunca el último valor escrito. No se promete resolver satisfacibilidad de expresiones arbitrarias; se comprueban contradicciones estructurales y de límites detectables.
+Length/cardinality limits are non-negative integers; numeric/temporal endpoints are validated when declared. A range with no endpoint and length/cardinality with no limits are empty declarations and are rejected. Reject an inverted interval, an open interval reduced to one point, and references to nonexistent fields/functions. The effective set is the conjunction of constraints, never the last written value. Arbitrary expression satisfiability is not promised; detectable structural and limit contradictions are checked.
 
-`required=false` no anula un true heredado; `nullable=true` no anula un false heredado. Los mínimos efectivos crecen y los máximos decrecen. Los patrones y expresiones originales permanecen; las enumeraciones se intersectan. Los normalizadores heredados se conservan antes de los añadidos en cada uso; no se puede sustituir su orden silenciosamente.
+`required=false` does not cancel an inherited true; `nullable=true` does not cancel an inherited false. Effective minima increase and maxima decrease. Original patterns and expressions remain; enumerations are intersected. Inherited normalizers remain before additions in each use; their order cannot be silently replaced.
 
-No se necesita todavía aritmética decimal general para comprobar un importe y `fin>=inicio`: bastan comparación exacta y constantes tipadas. División, redondeo, calendarios, conversión de moneda, generación de identificadores y consultas externas quedan fuera del catálogo inicial. Si el prototipo descubre una regla de aceptación que las exige, habrá una nueva decisión sobre esa operación, sin heredar defaults del motor de expresiones.
+General decimal arithmetic is not yet needed to check an amount and `fin>=inicio`: exact comparison and typed constants suffice. Division, rounding, calendars, currency conversion, identifier generation, and external queries are outside the initial catalog. If the prototype finds an acceptance rule requiring them, there will be a new decision about that operation; expression-engine defaults are not inherited.
 
-## Perfil de patrones
+## Pattern profile
 
-**Elección:** coincidencia de toda la cadena, sensible a mayúsculas, sin flags ni locale. Se aceptan literales escalares Unicode, concatenación, alternancia `|`, grupos `(...)` y `(?:...)`, clases positivas de caracteres ASCII con rangos ASCII, y repeticiones `?`, `*`, `+`, `{n}`, `{n,m}`, `{n,}`. Los límites contados son enteros no negativos, no superan 1000 y cumplen n≤m cuando aparecen ambos; cada átomo admite como máximo un cuantificador. Los metacaracteres se pueden escapar literalmente; `\n`, `\r` y `\t` representan esos caracteres. Dentro de una clase, guion literal va escapado o al inicio/final; `]` y barra inversa se escapan.
+**Choice:** full-string matching, case-sensitive, without flags or locale. Accepted forms are Unicode scalar literals, concatenation, alternation `|`, groups `(...)` and `(?:...)`, positive ASCII character classes with ASCII ranges, and repetitions `?`, `*`, `+`, `{n}`, `{n,m}`, `{n,}`. Counted limits are non-negative integers, no greater than 1000, and satisfy n≤m when both occur; each atom permits at most one quantifier. Metacharacters may be escaped literally; `\n`, `\r`, and `\t` represent those characters. Inside a class, a literal hyphen is escaped or placed first/last; `]` and backslash are escaped.
 
-Se rechazan comodín `.`, clases negadas, `\w`/`\d`/`\s`, propiedades Unicode, límites de palabra, backreferences, lookaround, flags, cuantificadores lazy/posesivos y anclas interiores. Se permite un único `^` inicial y `$` final opcionales como escritura redundante de coincidencia completa; no alteran la semántica. El punto literal se escribe `\.`. El parser del perfil rechaza cualquier sintaxis no listada, antes de llegar al runtime; no basta que un motor acepte el patrón.
+Reject wildcard `.`, negated classes, `\w`/`\d`/`\s`, Unicode properties, word boundaries, backreferences, lookaround, flags, lazy/possessive quantifiers, and interior anchors. One optional initial `^` and final `$` are allowed as redundant full-match spelling; they do not change semantics. A literal point is written `\.`. The profile parser rejects any syntax not listed before reaching the runtime; it is not enough for an engine to accept the pattern.
 
-La coincidencia completa exige consumir también un salto de línea final: no implementar solo añadiendo `$`, cuya semántica puede permitir una coincidencia anterior al salto. Capturas no son observables. La operación debe comportarse por valores escalares y ofrecer ejecución sin backtracking exponencial; cómo conseguirlo en TypeScript y el otro runtime es materia del prototipo.
+Full matching must consume a final line break as well: do not implement it only by adding `$`, whose semantics may allow a match before the line break. Captures are not observable. The operation must work over scalar values and provide execution without exponential backtracking; how to achieve that in TypeScript and the other runtime belongs to the prototype.
 
-El patrón exploratorio de `samples/projects.md`, `^([\w-]+)(\.([\w-]+))*$`, se expresa en este perfil como `[A-Za-z0-9_-]+(\.[A-Za-z0-9_-]+)*`. Es una traducción para intención ASCII; no una afirmación de equivalencia con todas las variantes Unicode de `\w`. Acepta `uno.dos-3`; rechaza `.uno`, `uno..dos`, `uno.` y `uno\n` (salto real).
+The exploratory pattern in `samples/projects.md`, `^([\w-]+)(\.([\w-]+))*$`, is expressed in this profile as `[A-Za-z0-9_-]+(\.[A-Za-z0-9_-]+)*`. This translates the ASCII intent; it does not claim equivalence with every Unicode variant of `\w`. It accepts `uno.dos-3`; rejects `.uno`, `uno..dos`, `uno.`, and `uno\n` (a real line break).
 
-## Casos de conformidad que debe recibir el prototipo
+## Conformance cases the prototype must receive
 
-Las tablas anteriores son vectores de contrato, no pruebas ejecutadas. El prototipo debe materializarlos como datos compartidos y ejecutar al menos:
+The preceding tables are contract vectors, not executed tests. The prototype must materialize them as shared data and execute at least:
 
-1. Igual éxito/error y canon en cliente y motor para cada límite decimal, fecha, instante e identificador; una cifra no cero después del milisegundo debe fallar.
-2. `N(N(x))=N(x)` en valores válidos, incluidos `trim` antes de decimal/instante, cadenas vacías y dos inclusiones de una misma agrupación. El segundo paso usa la misma declaración efectiva.
-3. Entero fuera de rango, booleano como cadena, sustituto Unicode aislado, longitud de emoji/combinación y límites inclusivos/exclusivos.
-4. Las cuatro combinaciones required/nullable sobre ausencia, `null` y valor: ausencia solo depende de required; `null` presente solo de nullable; valor sigue las reglas del tipo.
-5. Restricciones heredadas más añadidas, enumeraciones que se vacían, rangos contradictorios y campos desconocidos. Un mal campo no impide informar sobre otro independiente.
-6. `r1=decimal("0.1")` y `r2=decimal("0.10")`; solo si ambos resultados son éxito se ejecuta `compareDecimal(r1.value,r2.value)=0`. Si cualquiera es error, el caso produce un error de parseo y no invoca `compareDecimal`; además, comparación con valores superiores al entero seguro; `compareDate(fin,inicio)>=0`; offsets diferentes que expresan el mismo instante.
-7. Longitud total de identificador 1/128/129 bajo defaults; prefijo/sufijo, solapamiento y diferencia de mayúsculas; referencia con formato válido no consulta existencia.
-8. Patrón con salto final, Unicode astral literal, sintaxis no admitida y entrada adversaria para comprobar la garantía de ejecución elegida.
-9. 4096 dígitos decimales frente a 4097, contando ceros redundantes; fracción temporal con esos tamaños; ningún lado aplica un techo secreto menor.
+1. Equal success/error and canonical output in client and engine for every decimal, date, instant, and identifier limit; a non-zero digit after the millisecond must fail.
+2. `N(N(x))=N(x)` for valid values, including `trim` before decimal/instant, empty strings, and two inclusions of the same grouping. The second step uses the same effective declaration.
+3. Out-of-range integer, boolean as string, isolated Unicode surrogate, emoji/combining length, and inclusive/exclusive limits.
+4. The four required/nullable combinations for absence, `null`, and value: absence depends only on required; present `null` only on nullable; value follows type rules.
+5. Inherited plus added constraints, emptied enumerations, contradictory ranges, and unknown fields. A bad field does not prevent reporting an independent one.
+6. `r1=decimal("0.1")` and `r2=decimal("0.10")`; run `compareDecimal(r1.value,r2.value)=0` only if both results succeed. If either is an error, the case produces a parse error and does not invoke `compareDecimal`; also compare values above the safe integer, check `compareDate(fin,inicio)>=0`, and compare different offsets expressing the same instant.
+7. Total identifier length 1/128/129 under defaults; prefix/suffix, overlap, and case difference; a correctly formatted reference does not query existence.
+8. Pattern with final line break, literal astral Unicode, unsupported syntax, and adversarial input to check the selected execution guarantee.
+9. 4096 versus 4097 decimal digits, counting redundant zeroes; temporal fraction with those sizes; neither side applies a smaller secret ceiling.
 
-## Qué queda para otras decisiones
+## What remains for other decisions
 
-La investigación permite cerrar la elección de gramáticas y semántica con este perfil si se adopta en el ticket. No queda una pregunta factual que impida la evaluación de expresiones. El techo 4096 es una política propuesta y revisable con evidencia del prototipo, no una capacidad medida.
+The research can close the grammar and semantic choice with this profile if it is adopted in the ticket. No factual question remains that prevents expression evaluation. The 4096 ceiling is a proposed policy that can be revised with prototype evidence, not a measured capability.
 
-Permanecen en sus trabajos correspondientes: viabilidad de las funciones/regex en CEL y TypeScript; nombres RDF/shapes, APIs exportadas y diagnóstico estable de funciones; códigos y sintaxis de rutas de incidencias, orden público de errores y límites generales de payload; almacenamiento exacto en SQLite; informe de compatibilidad del perfil. No son dependencias para especificar las reglas de esta investigación. Ninguna implementación se considera ya verificada.
+The corresponding work remains elsewhere: feasibility of CEL and TypeScript functions/regexes; RDF/shapes names, exported APIs, and stable function diagnostics; incident-route codes and syntax, public error ordering, and general payload limits; exact SQLite storage; and the profile compatibility report. They are not dependencies for specifying these research rules. No implementation is considered verified yet.

@@ -1,71 +1,71 @@
-# Diseño: inspector del modelo efectivo y CRUD derivado
+# Effective-model inspector and derived CRUD design
 
-## Pregunta
+## Question
 
-¿Qué forma inspeccionable produce la carga y verificación de fuentes, cómo distingue declaraciones de opciones por defecto y cómo materializa CRUD, mensajes de cambios parciales, permisos y rutas derivadas?
+What inspectable shape should loading and verifying sources produce, how should declarations be distinguished from defaults, and how should CRUD, Partial Update Messages, permissions, and derived routes be materialized?
 
-## Decisión
+## Decision
 
-Crear un prototipo lógico autocontenido que priorice la inspección del modelo efectivo. La persona podrá seguir el flujo `source → verify → materialize → inspect` y ver, para cada dato, si procede de la fuente, del perfil de prototipo o de una derivación.
+Create a self-contained logical prototype that prioritizes inspection of the effective model. A person can follow the `source → verify → materialize → inspect` flow and see, for each datum, whether it comes from the source, the Prototype Profile, or a derivation.
 
-El prototipo no ejecutará HTTP, SQLite ni generación real de TypeScript. Su objetivo es validar la forma del modelo y de sus contratos derivados antes de diseñar esas implementaciones.
+The prototype will not run HTTP, SQLite, or real TypeScript generation. Its purpose is to validate the shape of the model and its derived contracts before designing those implementations.
 
-## Forma del artefacto
+## Artifact shape
 
-El prototipo vivirá en `prototypes/effective-contract-inspector/` y tendrá:
+The prototype will live in `prototypes/effective-contract-inspector/` and will have:
 
-- una página HTML autocontenida, abrible directamente sin instalación;
-- un README mínimo con el modo de ejecución;
-- un `.gitignore` propio, sin dependencias ni artefactos generados.
+- a self-contained HTML page that opens directly without installation;
+- a minimal README with the run mode;
+- its own `.gitignore`, with no dependencies or generated artifacts.
 
-La página será una envoltura fina sobre un módulo puro dentro de su único `script`. El módulo no conocerá el DOM y expondrá transformaciones sobre datos planos:
+The page will be a thin wrapper around a pure module inside its single `script`. The module will not know about the DOM and will expose transformations over plain data:
 
 `source → verify(source) → materialize(source, profile) → inspect(effectiveModel)`.
 
-## Modelo visible
+## Visible model
 
-El estado de la página mostrará siempre:
+The page state will always show:
 
-1. la fuente cargada;
-2. la etapa alcanzada (`cargada`, `verificada` o `materializada`);
-3. los diagnósticos de verificación;
-4. el modelo efectivo, si la verificación permite materializarlo.
+1. the loaded source;
+2. the reached stage (`cargada`, `verificada`, or `materializada`);
+3. verification diagnostics;
+4. the effective model, when verification allows it to be materialized.
 
-Cada declaración, default y elemento derivado incluirá su origen visible: `declarado`, `default` o `derivado`. Para cada operación derivada se mostrarán la ruta pública, los permisos, el contrato de entrada/salida y las reglas aplicables.
+Each declaration, default, and derived element will include a visible origin: `declarado`, `default`, or `derivado`. Each derived operation will show its public route, permissions, input/output contract, and applicable rules.
 
-El ejemplo será un módulo `gestion`, una feature `proyectos` y una entidad `Proyecto`, con identificador, una agrupación anidada `Periodo` y un importe decimal. El contenido será pequeño y representativo; no intentará cubrir todo el lenguaje.
+The example will be a `gestion` module, a `proyectos` feature, and a `Proyecto` entity, with an identifier, a nested `Periodo` grouping, and a decimal amount. The content will be small and representative; it will not attempt to cover the whole language.
 
-## Interacción
+## Interaction
 
-La exploración libre ofrecerá acciones para:
+Free exploration will offer actions to:
 
-- cargar la fuente mínima;
-- verificarla;
-- materializar el modelo efectivo;
-- cargar una variante con declaraciones explícitas;
-- cargar una variante inválida;
-- reiniciar.
+- load the minimum source;
+- verify it;
+- materialize the effective model;
+- load a variant with explicit declarations;
+- load an invalid variant;
+- reset.
 
-Cada acción actualizará el estado completo y señalará qué cambió.
+Each action will update the complete state and indicate what changed.
 
-Habrá tres pestañas guiadas. Cada una reinicia a un estado conocido y avanza con botones reales:
+There will be three guided tabs. Each resets to a known state and advances with real buttons:
 
-1. **CRUD explícitamente habilitado**: carga una entidad que declara `crud: true`, verifica y materializa las cinco operaciones: crear, obtener, listar, actualizar parcialmente y eliminar.
-2. **Declaración explícita**: muestra un override de ruta y permisos declarados; esos valores sustituyen los defaults correspondientes y el inspector conserva la procedencia.
-3. **Verificación bloqueante**: carga una referencia inexistente o una contradicción, muestra el diagnóstico y deja claro que no se produce un modelo efectivo parcial.
+1. **Explicitly enabled CRUD**: load an entity declaring `crud: true`, verify it, and materialize the five operations: create, get, list, partial update, and delete.
+2. **Explicit declaration**: show a declared route and permission override; those values replace the corresponding defaults and the inspector preserves their origin.
+3. **Blocking verification**: load a missing reference or contradiction, show the diagnostic, and make clear that no partial effective model is produced.
 
-## Evidencia de la decisión
+## Decision evidence
 
-El prototipo será satisfactorio si permite observar sin leer código que:
+The prototype is satisfactory if it allows the following to be observed without reading code:
 
-- CRUD explícitamente habilitado deriva exactamente las cinco operaciones acordadas;
-- un PATCH conserva los campos ausentes, sustituye completa una agrupación presente y valida el estado resultante;
-- las reglas de una inclusión anidada permanecen visibles en su contexto;
-- un override explícito gana al default;
-- los permisos y rutas muestran si son declarados o derivados;
-- una referencia inexistente o contradicción bloquea la materialización;
-- ningún default se confunde con comportamiento declarado.
+- explicitly enabled CRUD derives exactly the five agreed operations;
+- a PATCH preserves absent fields, fully replaces a present grouping, and validates the resulting state;
+- the rules of a Nested Inclusion remain visible in context;
+- an explicit override wins over a default;
+- permissions and routes show whether they are declared or derived;
+- a missing reference or contradiction blocks materialization;
+- no default is confused with declared behavior.
 
-## Límites
+## Limits
 
-No se incluirán persistencia, red, servidor, dependencias, generación de cliente, comparación de fuentes ni pruebas separadas. El HTML debe seguir siendo un activo desechable y aislado del código de producción.
+The prototype will not include persistence, networking, a server, dependencies, client generation, source comparison, or separate tests. The HTML must remain a disposable asset isolated from production code.

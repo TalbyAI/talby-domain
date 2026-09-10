@@ -1,29 +1,23 @@
-# Continuation token: contenido, codificación y vinculación
+# Continuation token: contents, encoding, and binding
 
-Investigación para [#6, «Decidir la codificación y vinculación del continuation token»](https://github.com/TalbyAI/talby-domain/issues/6), 7 de septiembre de 2026. El ticket es hijo del [mapa de la primera entrega (#1)](https://github.com/TalbyAI/talby-domain/issues/1).
+Research for [#6, “Decide continuation-token encoding and binding”](https://github.com/TalbyAI/talby-domain/issues/6), September 7, 2026. The ticket is a child of the [first-delivery map (#1)](https://github.com/TalbyAI/talby-domain/issues/1).
 
-Este documento decide solo el contrato conceptual del continuation token. No implementa el token ni fija todavía rutas, estados HTTP o el envoltorio de listados, que pertenecen al [#7](https://github.com/TalbyAI/talby-domain/issues/7).
+This document decides only the conceptual contract of the continuation token. It does not implement the token or yet fix routes, HTTP statuses, or the list wrapper; those belong to [#7](https://github.com/TalbyAI/talby-domain/issues/7).
 
-## Recomendación
+## Recommendation
 
-Usar un token autónomo, opaco para el consumidor, con **JWE Compact Serialization**, `alg=dir` y `enc=A256GCM` como perfil inicial. El contenido cifrado y autenticado contiene una huella de la petición efectiva y la posición de continuación; no contiene datos de autorización ni se interpreta como un permiso. Este perfil limita la visibilidad a un ámbito tenant-only.
+Use a self-contained token that is opaque to the consumer, with **JWE Compact Serialization**, `alg=dir`, and `enc=A256GCM` as the initial profile. The encrypted and authenticated content contains a fingerprint of the effective request and the continuation position; it contains no authorization data and is not interpreted as a permission. This profile limits visibility to a tenant-only scope.
 
-La huella debe calcularse después de normalizar la entrada y aplicar defaults. La
-petición efectiva se materializa con el esquema I-JSON único definido abajo; no
-se serializa directamente la petición original:
+The fingerprint must be calculated after normalizing the input and applying defaults. The effective request is materialized using the single I-JSON schema defined below; the original request is not serialized directly:
 
 ```text
 canonicalJson = JCS(petición-efectiva)
 requestHash = base64url_sin_relleno(SHA-256(UTF-8(canonicalJson)))
 ```
 
-### Esquema canónico de petición efectiva
+### Canonical effective-request schema
 
-Este es el único esquema del perfil para `requestHash`; todos sus miembros de
-primer nivel son obligatorios, `filters` puede ser una lista vacía y `ordering`
-no puede estar vacía. Los identificadores de operación, recurso y campo son
-`Identificadores de declaración` estables del contrato, no nombres de ruta ni
-etiquetas visibles.
+This is the only schema in the profile for `requestHash`; all its top-level members are required, `filters` may be an empty list, and `ordering` may not be empty. Operation, resource, and field identifiers are stable **Declaration Identifiers** from the contract, not route names or visible labels.
 
 ```json
 {
@@ -56,52 +50,16 @@ etiquetas visibles.
 }
 ```
 
-- `filters` contiene predicados atómicos ya normalizados. Cada objeto exige
-  `field`, `operator` y `operands`; `operands` conserva el orden semántico del
-  operador y solo puede estar vacío para operadores sin operandos. Si el
-  operador declara semántica de conjunto, sus operandos se ordenan
-  lexicográficamente por sus bytes JCS; en los demás casos se conserva su orden.
-  La lista de filtros se ordena lexicográficamente por los bytes UTF-8 de su
-  propia representación JCS. Un operador desconocido o una aridad incompatible
-  se rechazan.
-- `ordering` es la secuencia efectiva, incluidos defaults, con precedencia de
-  izquierda a derecha. Cada elemento exige dirección y semántica de `null`.
-  `tieBreaker: true` identifica las claves estables añadidas para hacer total
-  el orden; la última clave debe ser un desempate único, normalmente el
-  identificador de entidad. No se repite un campo.
-- `scope.tenant` contiene el tenant efectivo o `null` para un ámbito global
-  explícito. La ausencia nunca se usa en este esquema: un default se materializa
-  como miembro, y un campo sin default que falte hace que la petición se rechace.
-  `null` es un valor presente y solo se admite donde el contrato lo declara
-  nullable.
-- Este perfil solo admite visibilidad tenant-only: para una combinación de
-  operación, recurso y tenant, todo principal autorizado observa el mismo
-  conjunto de filas. Las diferencias de permisos pueden permitir o denegar la
-  operación, pero no filtrar sus resultados. Por eso no se incluye una
-  identidad de principal ni una política por usuario en `scope`. Si una
-  política produce conjuntos distintos para dos principales del mismo tenant,
-  el listado no puede emitir ni aceptar este perfil; deberá declarar una
-  variante futura con una huella canónica de la política efectiva.
-- `operands` usa las formas canónicas de
-  [`formas-lexicas.md`](formas-lexicas.md): texto e identificadores como cadenas
-  de escalares Unicode sin NFC, case folding ni locale; decimal como cadena
-  decimal canónica; fecha e instante como sus cadenas canónicas; booleano como
-  booleano JSON; y `null` solo cuando el tipo y el operador lo permiten. Las
-  colecciones admitidas conservan el orden definido por el operador. Objetos no
-  soportados, números no interoperables, sustitutos Unicode aislados, campos o
-  claves duplicados y valores que no cumplan su forma se rechazan antes de
-  calcular la huella.
-- Todo argumento que cambie el conjunto o el orden de resultados debe tener una
-  representación en este esquema. `page_token`, `limit` y `offset` no la tienen:
-  `page_token` y `limit` quedan fuera de la huella, y una petición con `offset`
-  no puede usar este perfil.
+- `filters` contains already-normalized atomic predicates. Each object requires `field`, `operator`, and `operands`; `operands` preserves the operator's semantic order and may be empty only for operators with no operands. If an operator declares set semantics, its operands are sorted lexicographically by their JCS bytes; otherwise their order is preserved. The filter list is sorted lexicographically by the UTF-8 bytes of its own JCS representation. An unknown operator or incompatible arity is rejected.
+- `ordering` is the effective sequence, including defaults, with left-to-right precedence. Each element requires a direction and null semantics. `tieBreaker: true` identifies stable keys added to make the ordering total; the last key must be a unique tie-breaker, normally the entity identifier. A field is not repeated.
+- `scope.tenant` contains the effective tenant or `null` for an explicit global scope. Absence is never used in this schema: a default is materialized as a member, and a field without a default that is missing causes the request to be rejected. `null` is a present value and is accepted only where the contract declares it nullable.
+- This profile permits tenant-only visibility: for a combination of operation, resource, and tenant, every authorized principal observes the same row set. Permission differences may allow or deny the operation, but may not filter its results. Therefore, principal identity and a per-user policy are not included in `scope`. If a policy produces different sets for two principals in the same tenant, the list cannot issue or accept this profile; it must declare a future variant with a canonical fingerprint of the effective policy.
+- `operands` uses the canonical forms from [`formas-lexicas.md`](formas-lexicas.md): text and identifiers as Unicode scalar-value strings without NFC, case folding, or locale; decimal as a canonical decimal string; date and instant as their canonical strings; boolean as a JSON boolean; and `null` only when the type and operator allow it. Supported collections preserve the order defined by the operator. Unsupported objects, non-interoperable numbers, isolated Unicode surrogates, duplicate fields or keys, and values that do not meet their form are rejected before the fingerprint is calculated.
+- Every argument that changes the result set or ordering must have a representation in this schema. `page_token`, `limit`, and `offset` do not: `page_token` and `limit` are outside the fingerprint, and a request with `offset` cannot use this profile.
 
-`JCS` se aplica al objeto I-JSON después de estas decisiones semánticas. La
-salida no lleva espacios ni salto de línea final; el hash usa exactamente sus
-bytes UTF-8 y `base64url_sin_relleno` no contiene `=`.
+`JCS` is applied to the I-JSON object after these semantic decisions. The output has no spaces or final line break; the hash uses exactly its UTF-8 bytes and `base64url_sin_relleno` contains no `=`.
 
-Vectores que deben producir exactamente el mismo JSON canónico y hash en cada
-runtime:
+Vectors that must produce exactly the same canonical JSON and hash in every runtime:
 
 **Vector A**
 
@@ -112,19 +70,18 @@ requestHash = Dqcm2yIU_2kRQxMALXLku7ryn1vCWbqVw5e_GfdgmoI
 
 **Vector B**
 
-El valor de entrada `budget` era `"1.20"` y la petición tenía ámbito global;
-la forma efectiva conserva `"1.2"` y materializa `tenant: null`.
+The input value for `budget` was `"1.20"` and the request had global scope; the effective form preserves `"1.2"` and materializes `tenant: null`.
 
 ```text
 JCS = {"filters":[{"field":"budget","operands":["1.2"],"operator":"gte"},{"field":"startsAt","operands":["2026-09-07T12:00:00.000Z"],"operator":"lt"}],"operation":"projects.list.v1","ordering":[{"direction":"asc","field":"id","nulls":"last","tieBreaker":true}],"scope":{"resource":"projects","tenant":null}}
 requestHash = 24Av_HVtLDjyn9zo9czY81GdYINTWFNCQNUkPsVWZg0
 ```
 
-El `limit` se valida con las reglas generales del listado, pero no forma parte de la huella: [AIP-158](https://google.aip.dev/158) exige conservar los demás argumentos y permite cambiar `page_size` en peticiones posteriores. La decisión local de no mezclar `offset` y token permanece vigente en el mapa del proyecto.
+`limit` is validated using the general list rules but is not part of the fingerprint: [AIP-158](https://google.aip.dev/158) requires the other arguments to remain the same and permits `page_size` to change in later requests. The local decision not to mix `offset` and token remains in force in the project map.
 
-## Forma mínima propuesta
+## Proposed minimum form
 
-### Cabecera JWE protegida
+### Protected JWE header
 
 ```json
 {
@@ -135,9 +92,9 @@ El `limit` se valida con las reglas generales del listado, pero no forma parte d
 }
 ```
 
-`kid` solo selecciona una clave de un catálogo local. La cabecera puede ser visible; no debe incluir filtros, consulta, posición ni otro estado interno.
+`kid` only selects a key from a local catalog. The header may be visible; it must not include filters, the query, the position, or other internal state.
 
-### Payload cifrado
+### Encrypted payload
 
 ```json
 {
@@ -150,90 +107,85 @@ El `limit` se valida con las reglas generales del listado, pero no forma parte d
 }
 ```
 
-- `v` permite rechazar versiones no soportadas sin intentar reinterpretarlas.
-- `op` evita reutilizar el token en otra operación; debe coincidir exactamente con la operación actual.
-- `iat` y `exp` son fechas numéricas. `exp` es obligatorio en este perfil; la duración concreta es configuración del servicio y debe ser finita y documentada.
-- `requestHash` vincula consulta, filtros, ámbito tenant-only y orden sin
-  repetirlos en claro en el token.
-- `position` es un cursor keyset autocontenido: contiene todos los valores del `ordering`, incluidos los marcadores de `null`, en el mismo orden efectivo y con el desempate único. Su estructura privada queda dentro del texto cifrado y no requiere ninguna consulta de estado por token. El ejecutor valida su forma y tipos al usarlo; un cursor que no pueda reconstruir la posición se rechaza. No se elige un cursor con estado en backend para este perfil.
+- `v` allows unsupported versions to be rejected without trying to reinterpret them.
+- `op` prevents reuse of the token for another operation; it must match the current operation exactly.
+- `iat` and `exp` are numeric dates. `exp` is required in this profile; the exact duration is service configuration and must be finite and documented.
+- `requestHash` binds the query, filters, tenant-only scope, and ordering without repeating them in clear text in the token.
+- `position` is a self-contained keyset cursor: it contains all values from `ordering`, including null markers, in the same effective order and with the unique tie-breaker. Its private structure remains inside the ciphertext and does not require a token-state lookup. The executor validates its form and types when using it; a cursor that cannot reconstruct the position is rejected. A backend-state cursor is not chosen for this profile.
 
-La estructura anterior es una **decisión propuesta para Talby**, no un formato definido por JWE, JWT, AIP-158 o JCS. Los nombres pueden cambiar en el contrato HTTP; las propiedades semánticas no deberían cambiar sin revisar esta decisión.
+The structure above is a **proposed decision for Talby**, not a format defined by JWE, JWT, AIP-158, or JCS. Names may change in the HTTP contract; semantic properties should not change without revisiting this decision.
 
-## Qué establecen las fuentes
+## What the sources establish
 
-### Paginación y opacidad
+### Pagination and opacity
 
-- [AIP-158, Opacity](https://google.aip.dev/158#opacity) exige que los page tokens sean cadenas opacas, seguras para URL y no analizables por el usuario; también advierte que codificar en Base64 un token transparente no es ofuscación suficiente.
-- La misma guía limita el token a indicar desde dónde continuar y exige autorizar la petición como cualquier otra, por lo que un token nunca debe conceder acceso por sí mismo. También pide que los argumentos distintos de `page_size` se mantengan iguales y que una discrepancia produzca `INVALID_ARGUMENT`. [AIP-158, page token](https://google.aip.dev/158#guidance)
-- AIP-158 permite que un servicio expire tokens almacenados y no exige que el cliente conozca el mecanismo. Esto respalda una expiración finita, pero no determina la duración de Talby. [AIP-158, Expiring page tokens](https://google.aip.dev/158#expiring-page-tokens)
+- [AIP-158, Opacity](https://google.aip.dev/158#opacity) requires page tokens to be opaque, URL-safe strings that are not parseable by the user; it also warns that Base64-encoding a transparent token is not sufficient obfuscation.
+- The same guide limits the token to indicating where to continue and requires the request to be authorized like any other request, so a token must never grant access by itself. It also asks for arguments other than `page_size` to remain equal and for a discrepancy to produce `INVALID_ARGUMENT`. [AIP-158, page token](https://google.aip.dev/158#guidance)
+- AIP-158 allows a service to expire stored tokens and does not require the client to know the mechanism. This supports finite expiration but does not determine Talby's duration. [AIP-158, Expiring page tokens](https://google.aip.dev/158#expiring-page-tokens)
 
-### Integridad, confidencialidad y codificación
+### Integrity, confidentiality, and encoding
 
-- [RFC 7515](https://www.rfc-editor.org/rfc/rfc7515.html#section-3.1) define JWS Compact como `BASE64URL(header).BASE64URL(payload).BASE64URL(signature)`. JWS protege el contenido mediante firma o MAC; Base64url solo representa octetos y no los oculta.
-- [RFC 7516](https://www.rfc-editor.org/rfc/rfc7516.html#section-3.1) define JWE como mensaje cifrado y protegido contra modificaciones. Su forma compacta tiene cinco segmentos Base64url: cabecera protegida, clave cifrada, IV, ciphertext y etiqueta de autenticación. Por tanto, JWE cubre simultáneamente la confidencialidad del cursor y su autenticidad.
-- [RFC 7518](https://www.rfc-editor.org/rfc/rfc7518.html#section-4.4) clasifica `dir` como uso directo de una clave simétrica compartida y [A256GCM](https://www.rfc-editor.org/rfc/rfc7518.html#section-5.3) como cifrado autenticado recomendado. Si se eligiera JWS/HS256 en una variante sin estado sensible, la clave debe tener al menos 256 bits y la comparación del MAC debe ser constante en tiempo. [RFC 7518, HMAC](https://www.rfc-editor.org/rfc/rfc7518.html#section-3.2)
-- [RFC 4648](https://www.rfc-editor.org/rfc/rfc4648.html#section-3) define el alfabeto URL-safe y exige rechazar caracteres fuera del alfabeto salvo que el protocolo diga expresamente lo contrario. También exige una codificación canónica, con bits de relleno correctos; JOSE especifica Base64url sin `=` final. [RFC 7515, Base64url](https://www.rfc-editor.org/rfc/rfc7515.html#section-2)
-- [RFC 8785](https://www.rfc-editor.org/rfc/rfc8785.html#section-1) define JCS como representación JSON determinista, UTF-8 y ordenada, apta para producir una representación hashable para operaciones criptográficas. JCS no decide cuándo dos expresiones de filtros tienen el mismo significado: esa normalización semántica es responsabilidad del contrato de Talby.
+- [RFC 7515](https://www.rfc-editor.org/rfc/rfc7515.html#section-3.1) defines JWS Compact as `BASE64URL(header).BASE64URL(payload).BASE64URL(signature)`. JWS protects content through a signature or MAC; Base64url only represents octets and does not hide them.
+- [RFC 7516](https://www.rfc-editor.org/rfc/rfc7516.html#section-3.1) defines JWE as a message encrypted and protected against modification. Its compact form has five Base64url segments: protected header, encrypted key, IV, ciphertext, and authentication tag. Therefore JWE covers cursor confidentiality and authenticity together.
+- [RFC 7518](https://www.rfc-editor.org/rfc/rfc7518.html#section-4.4) classifies `dir` as direct use of a shared symmetric key and [A256GCM](https://www.rfc-editor.org/rfc/rfc7518.html#section-5.3) as recommended authenticated encryption. If JWS/HS256 were selected for a variant without sensitive state, the key would need at least 256 bits and MAC comparison would need to be constant-time. [RFC 7518, HMAC](https://www.rfc-editor.org/rfc/rfc7518.html#section-3.2)
+- [RFC 4648](https://www.rfc-editor.org/rfc/rfc4648.html#section-3) defines the URL-safe alphabet and requires characters outside it to be rejected unless the protocol expressly says otherwise. It also requires canonical encoding with correct padding bits; JOSE specifies Base64url without a final `=`. [RFC 7515, Base64url](https://www.rfc-editor.org/rfc/rfc7515.html#section-2)
+- [RFC 8785](https://www.rfc-editor.org/rfc/rfc8785.html#section-1) defines JCS as deterministic, UTF-8, ordered JSON representation suitable for producing a hashable representation for cryptographic operations. JCS does not decide when two filter expressions have the same meaning; that semantic normalization is Talby's contract responsibility.
 
-### Validación criptográfica y temporal
+### Cryptographic and temporal validation
 
-- [RFC 8725](https://www.rfc-editor.org/rfc/rfc8725.html#section-3.1) exige que la aplicación configure el conjunto de algoritmos permitido y no acepte otro solo porque aparezca en `alg` o `enc`; cada clave debe estar asociada al algoritmo previsto. También exige validar todas las operaciones criptográficas y usar UTF-8. [RFC 8725, §§3.1–3.7](https://www.rfc-editor.org/rfc/rfc8725.html#section-3)
-- RFC 8725 recomienda tipar explícitamente nuevos usos y hacer mutuamente excluyentes las reglas de validación para evitar sustitución entre clases de token. [RFC 8725, §§3.11–3.12](https://www.rfc-editor.org/rfc/rfc8725.html#section-3.11)
-- [RFC 7519](https://www.rfc-editor.org/rfc/rfc7519.html#section-4.1) define la semántica de `exp` (no aceptar a partir del vencimiento), `nbf`, `iat`, `aud` y `jti`. `jti` puede ayudar a prevenir replay, pero hacerlo exige conservar estado de tokens consumidos; no es necesario para que una página pueda reintentarse.
+- [RFC 8725](https://www.rfc-editor.org/rfc/rfc8725.html#section-3.1) requires the application to configure the permitted algorithm set and not accept another merely because it appears in `alg` or `enc`; each key must be associated with its intended algorithm. It also requires validating every cryptographic operation and using UTF-8. [RFC 8725, §§3.1–3.7](https://www.rfc-editor.org/rfc/rfc8725.html#section-3)
+- RFC 8725 recommends explicitly typing new uses and making validation rules mutually exclusive to prevent substitution between token classes. [RFC 8725, §§3.11–3.12](https://www.rfc-editor.org/rfc/rfc8725.html#section-3.11)
+- [RFC 7519](https://www.rfc-editor.org/rfc/rfc7519.html#section-4.1) defines the semantics of `exp` (do not accept from expiration onward), `nbf`, `iat`, `aud`, and `jti`. `jti` may help prevent replay, but doing so requires retaining state for consumed tokens; it is not necessary for a page to be retried.
 
-### Orden y estado entre páginas
+### Ordering and state between pages
 
-- [PostgreSQL, `LIMIT` y `OFFSET`](https://www.postgresql.org/docs/current/queries-limit.html) advierte que un orden que no determine de forma única las filas produce subconjuntos impredecibles.
-- [Elasticsearch, `search_after`](https://www.elastic.co/docs/reference/elasticsearch/rest-apis/paginate-search-results#search-after) exige repetir la misma query y sort, recomienda un desempate único y explica que un cambio de estado entre peticiones puede cambiar el orden; un PIT es el mecanismo explícito para conservar el estado. Sin PIT, la documentación advierte que pueden faltar o duplicarse resultados.
+- [PostgreSQL, `LIMIT` and `OFFSET`](https://www.postgresql.org/docs/current/queries-limit.html) warns that an ordering that does not uniquely determine rows produces unpredictable subsets.
+- [Elasticsearch, `search_after`](https://www.elastic.co/docs/reference/elasticsearch/rest-apis/paginate-search-results#search-after) requires repeating the same query and sort, recommends a unique tie-breaker, and explains that state changes between requests may change ordering; a PIT is the explicit mechanism for preserving state. Without PIT, the documentation warns that results may be missing or duplicated.
 
-Estos documentos son ejemplos de contratos de paginación de primera parte, no dependencias ni requisitos directos para el motor de Talby.
+These documents are examples of first-party pagination contracts, not dependencies or direct requirements for the Talby engine.
 
-## Reglas de validación y seguridad
+## Validation and security rules
 
-Las siguientes reglas son la **inferencia de diseño** que aplica esos hechos al alcance de la primera entrega:
+The following rules are the **design inference** that applies those facts to the first-delivery scope:
 
-1. **Formato antes de descifrar:** aceptar solo la forma JWE Compact de cinco segmentos, sin espacios, saltos de línea ni caracteres fuera de Base64url y con un límite de longitud del perfil técnico. No hacer normalizaciones tolerantes ni doble decodificación.
-2. **Algoritmos fijados por configuración:** aceptar únicamente `typ`, `alg`, `enc` y `kid` del perfil local. `kid` se resuelve en una tabla local de claves directas de exactamente 32 octetos (256 bits); no se usa para construir consultas, cargar URLs o seleccionar claves arbitrarias. Para `alg=dir`, el segundo segmento JWE de clave cifrada debe estar vacío. Para `enc=A256GCM`, el IV debe medir 12 octetos (96 bits) y la etiqueta 16 octetos (128 bits), una vez decodificados sus segmentos Base64url. El generador obtiene un IV aleatorio nuevo mediante un CSPRNG para cada token y no mantiene un registro por token. Por tanto, este perfil ofrece una garantía probabilística de no colisión, no una prohibición absoluta: los emisores y reinicios deben obtener salidas independientes, y el despliegue debe limitar el total de tokens emitidos por cada clave, sumando todos los emisores y reinicios, a `N ≤ 2^32`. Así, la cota de cumpleaños `N(N-1)/(2·2^96)` queda por debajo de `2^-32`; el cupo agregado se coordina por clave y la clave se rota antes de alcanzarlo. Si no puede coordinar ese cupo global, debe usar otro perfil con asignación única de IV o estado. La validación sin estado no puede detectar por sí sola un IV repetido; si un emisor o control operativo detecta una repetición, debe retirar la clave afectada y hacer inválidos sus tokens, mientras que cualquier token con formato, descifrado o etiqueta no válidos se rechaza como continuation token inválido. Si falla el CSPRNG o se agota el cupo, no se emite el token. No aceptar `none`, otro `enc`, ni compresión no declarada; RFC 8725 desaconseja comprimir entradas de cifrado porque puede filtrar información por tamaño.
-3. **Autenticar antes de confiar:** descifrar y verificar la etiqueta de autenticación antes de leer `v`, `op`, `exp`, `requestHash` o `position`. Cualquier fallo criptográfico produce token inválido.
-4. **Payload estricto:** exigir UTF-8, JSON válido sin campos duplicados y el esquema de la versión conocida. Rechazar tipos, campos obligatorios ausentes, campos desconocidos si el perfil no los permite, posiciones vacías o excesivamente grandes y hashes con una longitud distinta de 32 octetos.
-5. **Tiempo:** exigir `exp` presente y posterior al reloj actual, aplicar solo una tolerancia pequeña y explícita para desfase, y rechazar `iat > exp` o una edad máxima del token. La duración concreta es decisión de despliegue; no se deduce de los RFC.
-6. **Vinculación de operación:** comparar `op` con la operación de listado actual. Si varios módulos comparten claves, añadir una identidad de emisor/audiencia y validarla; no reutilizar una clave global sin separar propósitos.
-7. **Vinculación de petición:** reconstruir el objeto efectivo del esquema canónico con la misma normalización, defaults y reglas del ejecutor; incluir identidad de operación, filtros, ámbito que afecte al resultado, orden efectivo, direcciones, colación/semántica de `null` y desempate. Excluir `page_token` y `limit`; incluir cualquier parámetro adicional que cambie el conjunto o su orden. Comparar el `requestHash` recalculado con el del token y rechazar discrepancias.
-8. **Orden total:** el orden predeterminado por identificador ya satisface el requisito local. Para otro orden, añadir el identificador estable como desempate cuando sea compatible y hacer que ese orden efectivo, no solo el texto pedido por el cliente, participe en la huella.
-9. **Autorización independiente:** volver a autorizar cada petición y comprobar el ámbito/tenant actual. El token no sustituye permisos y no puede convertirse en una concesión de acceso. Este perfil exige la restricción tenant-only descrita en el esquema: una política por usuario que cambie las filas visibles impide emitir o aceptar el token, en vez de hacer pasar por equivalentes dos peticiones con el mismo `scope`. Una variante futura podrá incluir una huella canónica de esa política en la petición efectiva.
-10. **Error observable único:** alteración, formato inválido, clave desconocida, expiración, operación distinta, huella distinta o cursor no utilizable deben producir un error explícito de continuation token inválido y nunca reiniciar el listado silenciosamente. El detalle interno puede registrarse, pero no debe revelar si falló la firma, la consulta, el tenant o la posición.
-11. **Replay:** permitir reintentar el mismo token mientras sea válido; es la semántica útil para repetir una petición fallida. No declarar tokens de un solo uso ni añadir una lista de `jti` consumidos sin una decisión posterior que acepte ese estado adicional.
+1. **Format before decryption:** accept only the five-segment JWE Compact form, without spaces, line breaks, or characters outside Base64url, and with a technical-profile length limit. Do not perform tolerant normalization or double decoding.
+2. **Algorithms fixed by configuration:** accept only the `typ`, `alg`, `enc`, and `kid` values of the local profile. Resolve `kid` in a local table of direct keys exactly 32 octets (256 bits); do not use it to construct queries, load URLs, or select arbitrary keys. For `alg=dir`, the second JWE encrypted-key segment must be empty. For `enc=A256GCM`, the IV must be 12 octets (96 bits) and the tag 16 octets (128 bits) after their Base64url segments are decoded. The generator obtains a new random IV through a CSPRNG for each token and keeps no per-token registry. Therefore this profile provides a probabilistic non-collision guarantee, not an absolute prohibition: issuers and restarts must obtain independent outputs, and deployment must limit the total tokens issued per key, across all issuers and restarts, to `N ≤ 2^32`. Thus the birthday bound `N(N-1)/(2·2^96)` stays below `2^-32`; the aggregate quota is coordinated per key and the key is rotated before it is reached. If that global quota cannot be coordinated, use another profile with unique-IV assignment or state. Stateless validation cannot detect a repeated IV by itself; if an issuer or operational control detects a repeat, it must retire the affected key and invalidate its tokens, while any token with invalid format, decryption, or tag is rejected as an invalid continuation token. If the CSPRNG fails or the quota is exhausted, do not issue the token. Do not accept `none`, another `enc`, or undeclared compression; RFC 8725 discourages compressing encrypted inputs because size can leak information.
+3. **Authenticate before trusting:** decrypt and verify the authentication tag before reading `v`, `op`, `exp`, `requestHash`, or `position`. Any cryptographic failure produces an invalid token.
+4. **Strict payload:** require UTF-8, valid JSON without duplicate fields, and the known version's schema. Reject wrong types, missing required fields, unknown fields when the profile does not allow them, empty or excessively large positions, and hashes with a length other than 32 octets.
+5. **Time:** require `exp` to be present and later than the current clock, apply only a small explicit clock-skew tolerance, and reject `iat > exp` or a maximum token age. The exact duration is a deployment decision; it is not derived from the RFCs.
+6. **Operation binding:** compare `op` with the current list operation. If multiple modules share keys, add and validate issuer/audience identity; do not reuse a global key without separating purposes.
+7. **Request binding:** rebuild the effective object from the canonical schema using the executor's same normalization, defaults, and rules; include operation identity, filters, any scope affecting results, effective ordering, directions, collation/null semantics, and tie-breaker. Exclude `page_token` and `limit`; include every additional parameter that changes the set or ordering. Compare the recalculated `requestHash` with the token's value and reject discrepancies.
+8. **Total ordering:** identifier ordering already satisfies the local default. For another ordering, add the stable identifier as a tie-breaker when compatible, and make that effective ordering—not only the text requested by the client—participate in the fingerprint.
+9. **Independent authorization:** authorize every request again and check the current scope/tenant. The token does not replace permissions and cannot become an access grant. This profile requires the tenant-only restriction described in the schema: a per-user policy that changes visible rows prevents the token from being issued or accepted, rather than treating two requests with the same `scope` as equivalent. A future variant may include a canonical fingerprint of that policy in the effective request.
+10. **Single observable error:** alteration, invalid format, unknown key, expiration, different operation, different fingerprint, or unusable cursor must produce an explicit invalid-continuation-token error and must never silently restart the list. Internal detail may be logged, but must not reveal whether signature, query, tenant, or position validation failed.
+11. **Replay:** allow the same token to be retried while valid; this is the useful semantics for repeating a failed request. Do not declare one-use tokens or add a consumed-`jti` list without a later decision that accepts that additional state.
 
-## Qué significa «sin snapshot»
+## Meaning of “without snapshot”
 
-El token propuesto conserva autenticidad, confidencialidad y posición; no conserva una vista de lectura. Cada petición posterior ejecuta la consulta autorizada contra el estado disponible entonces, usando la misma petición efectiva y la posición del token.
+The proposed token preserves authenticity, confidentiality, and position; it does not preserve a read view. Each later request runs the authorized query against the state available at that time, using the same effective request and the token's position.
 
-Por tanto, inserciones, eliminaciones o cambios de valores de ordenación entre páginas pueden producir omisiones, repeticiones, aparición de elementos o desaparición de elementos. La firma/cifrado no evita ninguno de esos efectos. Esta es una **inferencia explícita del contrato**, respaldada por la distinción de Elasticsearch entre paginación stateless y PIT: una garantía entre páginas requeriría un mecanismo separado de snapshot/PIT, `resourceVersion`, transacción de lectura o almacenamiento equivalente.
+Therefore, inserts, deletions, or changes to ordering values between pages may cause omissions, repetitions, elements to appear, or elements to disappear. Signing/encryption prevents none of these effects. This is an **explicit contract inference**, supported by Elasticsearch's distinction between stateless pagination and PIT: a between-page guarantee would require a separate snapshot/PIT mechanism, `resourceVersion`, read transaction, or equivalent storage.
 
-La respuesta no debe prometer «resultado consistente», «vista congelada», «exactly once» ni ausencia de duplicados. Si en el futuro se exige esa garantía, será otra decisión: el token deberá ligar además un identificador de snapshot y su expiración, y el servicio deberá conservar o reconstruir ese estado.
+The response must not promise “consistent results,” a “frozen view,” “exactly once,” or the absence of duplicates. If that guarantee is required in the future, it will be another decision: the token must also bind a snapshot identifier and its expiration, and the service must retain or reconstruct that state.
 
-## Alternativas descartadas para esta entrega
+## Alternatives rejected for this delivery
 
-- **JSON o Base64 sin protección:** no vincula la petición de forma fiable y deja el estado legible o modificable; contradice la opacidad exigida por AIP-158.
-- **JWS/HS256 con payload transparente:** autentica el contenido, pero no oculta un cursor o filtros incluidos en el payload. Solo sería suficiente si se demuestra que todo el payload es público y no representa estado interno.
-- **Handle aleatorio con estado en servidor:** proporciona opacidad fuerte, pero añade almacenamiento, expiración, limpieza y una superficie de estado que no es necesaria para el perfil autónomo JWE.
-- **Token de un solo uso:** impediría reintentos normales y exige guardar `jti` consumidos; no aporta valor para la paginación inicial.
-- **Snapshot/PIT implícito:** convertiría la continuación en una garantía de consistencia y exigiría persistir/retener una vista. Está fuera del alcance fijado por el mapa.
+- **Unprotected JSON or Base64:** does not reliably bind the request and leaves state readable or modifiable; it contradicts the opacity required by AIP-158.
+- **JWS/HS256 with transparent payload:** authenticates the content but does not hide a cursor or filters in the payload. It would be sufficient only if all payload content were proven public and did not represent internal state.
+- **Random handle with server-side state:** provides strong opacity but adds storage, expiration, cleanup, and a state surface that is not necessary for the self-contained JWE profile.
+- **One-use token:** would prevent normal retries and requires storing consumed `jti` values; it adds no value for initial pagination.
+- **Implicit snapshot/PIT:** would turn continuation into a consistency guarantee and require retaining a view. It is outside the scope fixed by the map.
 
-## Implicaciones para el contrato posterior
+## Implications for the later contract
 
-- El contrato HTTP debe documentar `continuationToken + limit`, la exclusión mutua con `offset` y el error estable para token inválido; los códigos HTTP exactos quedan para [#7](https://github.com/TalbyAI/talby-domain/issues/7).
-- Las pruebas de aceptación deben cambiar filtros, orden, operación y ámbito por separado y comprobar que cada cambio se rechaza; deben comprobar que cambiar solo `limit` sí continúa. Cliente y motor deben comparar los vectores JCS anteriores, incluidos sus bytes UTF-8 y `requestHash`, y comprobar que las dos escrituras equivalentes se reducen a la misma petición efectiva.
-- La aceptación criptográfica debe generar un token válido y comprobar cinco segmentos, segundo segmento vacío, clave directa de 32 octetos, IV de 12 octetos y etiqueta de 16 octetos. Dos tokens generados con la misma clave y payload deben llevar IV distintos en el caso de prueba; el despliegue debe comprobar el cupo agregado por clave y rotarla antes de superar `N`. Un CSPRNG ausente o un cupo agotado impiden emitir. Una clave de 16/24/31/33 octetos, un segundo segmento no vacío, un IV de otra longitud, una etiqueta distinta de 16 octetos, una etiqueta inválida o un payload manipulado deben rechazarse; la validación no requiere un lookup para detectar repeticiones de IV.
-- Debe existir un caso de token manipulado, expirado, de otra operación y con cursor inválido, y ningún caso debe reiniciar silenciosamente.
-- Debe verificarse la restricción tenant-only: dos principales autorizados para el
-  mismo tenant y la misma petición observan el mismo conjunto y `requestHash`;
-  si una política por usuario cambiaría las filas visibles, el listado rechaza
-  este perfil antes de emitir o validar el token y no trata las peticiones como
-  equivalentes.
-- La evidencia no debe inspeccionar la estructura interna de `position`; solo el comportamiento público, que no requiere lookup de estado por token y la ausencia de exposición del payload cifrado.
+- The HTTP contract must document `continuationToken + limit`, mutual exclusion with `offset`, and the stable error for an invalid token; exact HTTP status codes belong to [#7](https://github.com/TalbyAI/talby-domain/issues/7).
+- Acceptance tests must change filters, ordering, operation, and scope separately and verify that each change is rejected; they must verify that changing only `limit` continues. Client and engine must compare the previous JCS vectors, including their UTF-8 bytes and `requestHash`, and verify that equivalent spellings reduce to the same effective request.
+- Cryptographic acceptance must generate a valid token and check five segments, an empty second segment, a 32-octet direct key, a 12-octet IV, and a 16-octet tag. The test must inject a deterministic CSPRNG seam that returns the distinct 12-octet IVs `000102030405060708090a0b` and `0c0d0e0f1011121314151617` on successive calls, then assert that the first and second tokens use those exact IVs; production must still obtain fresh IVs from an independent CSPRNG. Deployment must enforce the aggregate per-key quota and rotate before exceeding `N`. A missing CSPRNG or exhausted quota prevents issuance. A 16/24/31/33-octet key, a non-empty second segment, an IV of another length, a tag other than 16 octets, an invalid tag, or a modified payload must be rejected; validation does not need a lookup to detect repeated IVs.
+- There must be a manipulated, expired, wrong-operation, and invalid-cursor token case, and no case may silently restart.
+- The tenant-only restriction must be verified: two principals authorized for the same tenant and request observe the same set and `requestHash`; if a per-user policy would change visible rows, the list rejects this profile before issuing or validating the token and does not treat the requests as equivalent.
+- Evidence must not inspect the internal structure of `position`; it should inspect only public behavior, which requires no per-token state lookup and must not expose the encrypted payload.
 
-## Fuentes primarias
+## Primary sources
 
 - [Google AIP-158 — Pagination](https://google.aip.dev/158).
 - [RFC 4648 — Base-N Encodings](https://www.rfc-editor.org/rfc/rfc4648.html).
@@ -248,4 +200,4 @@ La respuesta no debe prometer «resultado consistente», «vista congelada», «
 - [PostgreSQL documentation — `LIMIT` and `OFFSET`](https://www.postgresql.org/docs/current/queries-limit.html).
 - [Elasticsearch Reference — Paginate search results](https://www.elastic.co/docs/reference/elasticsearch/rest-apis/paginate-search-results).
 
-Los hechos normativos y documentales están atribuidos a esas fuentes. El formato de payload, el uso de JWE para ocultar `position`, la huella `requestHash`, la exclusión de `limit`, la política de replay y la ausencia de snapshot son decisiones o inferencias específicas de Talby, señaladas como tales arriba.
+Normative and documentary facts are attributed to those sources. The payload format, using JWE to hide `position`, the `requestHash` fingerprint, excluding `limit`, replay policy, and absence of a snapshot are Talby-specific decisions or inferences, identified as such above.
