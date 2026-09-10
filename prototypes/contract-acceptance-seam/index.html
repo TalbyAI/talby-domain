@@ -164,9 +164,10 @@ s:ApproveKnownProject a m:Scenario .`,
         ]
       }, {
         title: "Conformance/compatibility",
+        completion: "Compatibility categories: compatible, potentially-incompatible, incompatible",
         steps: [
           { label: "Run conformance vectors — equal", action: { type: "conformance" } },
-          { label: "Compare declarations — compatible", action: { type: "compatibility" } }
+          { label: "Compare declarations — compatible, potentially-incompatible, incompatible", action: { type: "compatibility" } }
         ]
       }];
 
@@ -461,6 +462,7 @@ s:ApproveKnownProject a m:Scenario .`,
     let compatibilityReport = null;
     let activeWalkthrough = 0;
     let walkthroughStep = 0;
+    let restoreWalkthroughFocus = false;
 
     function card(title, value) {
       const item = document.createElement("article");
@@ -557,7 +559,7 @@ s:ApproveKnownProject a m:Scenario .`,
         tab.id = `walkthrough-tab-${index}`;
         tab.setAttribute("role", "tab");
         tab.setAttribute("aria-selected", String(activeWalkthrough === index));
-        if (activeWalkthrough === index) tab.setAttribute("aria-controls", `walkthrough-panel-${index}`);
+        tab.setAttribute("aria-controls", "walkthrough-panel");
         tab.textContent = walkthrough.title;
         tab.addEventListener("click", () => {
           state = ContractAcceptanceProbe.reduce(state, { type: "reset" });
@@ -571,7 +573,7 @@ s:ApproveKnownProject a m:Scenario .`,
       const walkthrough = ContractAcceptanceProbe.walkthroughs[activeWalkthrough];
       const panel = document.createElement("article");
       panel.className = "card";
-      panel.id = `walkthrough-panel-${activeWalkthrough}`;
+      panel.id = "walkthrough-panel";
       panel.setAttribute("role", "tabpanel");
       panel.setAttribute("aria-labelledby", `walkthrough-tab-${activeWalkthrough}`);
       const heading = document.createElement("h3");
@@ -584,15 +586,34 @@ s:ApproveKnownProject a m:Scenario .`,
         steps.append(item);
       });
       const next = document.createElement("button");
+      let completion = null;
       next.type = "button";
-      next.textContent = walkthroughStep < walkthrough.steps.length ? `Run step ${walkthroughStep + 1}` : "Walkthrough complete";
-      next.disabled = walkthroughStep >= walkthrough.steps.length;
-      next.addEventListener("click", () => {
-        const step = walkthrough.steps[walkthroughStep++];
-        dispatch(step.action);
-      });
-      panel.append(heading, steps, next);
+      if (walkthroughStep < walkthrough.steps.length) {
+        next.textContent = `Run step ${walkthroughStep + 1}`;
+        next.addEventListener("click", () => {
+          const step = walkthrough.steps[walkthroughStep++];
+          restoreWalkthroughFocus = true;
+          dispatch(step.action);
+        });
+      } else {
+        completion = document.createElement("p");
+        completion.textContent = walkthrough.completion || "Walkthrough complete";
+        next.textContent = `Restart ${walkthrough.title}`;
+        next.addEventListener("click", () => {
+          state = ContractAcceptanceProbe.reduce(state, { type: "reset" });
+          [lastRequest, lastResponse, lastTransition, scenarioReport, conformanceReport, compatibilityReport] = [null, null, null, null, null, null];
+          walkthroughStep = 0;
+          render(state);
+        });
+      }
+      panel.append(heading, steps);
+      if (completion) panel.append(completion);
+      panel.append(next);
       elements.walkthroughs.replaceChildren(tablist, panel);
+      if (restoreWalkthroughFocus) {
+        next.focus();
+        restoreWalkthroughFocus = false;
+      }
     }
 
     function render(currentState) {
