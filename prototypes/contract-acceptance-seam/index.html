@@ -88,6 +88,22 @@ s:ApproveKnownProject a m:Scenario .`,
           { code: "DECLARATION_CONTRADICTION", paths: ["/Proyecto/importe"] }
         ] } }
       };
+      const sourceNotFound = {
+        status: "blocked",
+        diagnostics: [{ code: "SOURCE_NOT_FOUND", paths: ["/sources"] }]
+      };
+      const walkthroughs = [{
+        title: "Source verification check",
+        steps: [
+          { label: "Load valid sources", action: { type: "loadSources" } },
+          { label: "Verify sources", action: { type: "verify" } },
+          { label: "Materialize effective model", action: { type: "materialize" } }
+        ]
+      }];
+
+      function fixtureFor(source) {
+        return Object.hasOwn(fixtures, source) ? fixtures[source] : null;
+      }
 
       function verifySources(fixture) {
         return fixture.verification;
@@ -125,11 +141,14 @@ s:ApproveKnownProject a m:Scenario .`,
         if (action.type === "reset") return initialState();
         if (action.type === "loadSources" || action.type === "loadInvalidSource") {
           const selectedSource = action.source || (action.type === "loadSources" ? "valid" : null);
-          if (!fixtures[selectedSource]) return state;
+          if (!fixtureFor(selectedSource)) {
+            return { ...initialState(), stage: "blocked", selectedSource, verification: sourceNotFound };
+          }
           return { ...initialState(), stage: "sources-loaded", selectedSource };
         }
         if (action.type === "verify" && state.selectedSource) {
-          const verification = verifySources(fixtures[state.selectedSource]);
+          const fixture = fixtureFor(state.selectedSource);
+          const verification = fixture ? verifySources(fixture) : sourceNotFound;
           return {
             ...state,
             stage: verification.status === "verified" ? "verified" : "blocked",
@@ -154,13 +173,14 @@ s:ApproveKnownProject a m:Scenario .`,
         return state;
       }
 
-      return { fixtures, walkthroughs: [], initialState, reduce };
+      return { fixtures, walkthroughs, initialState, reduce };
     })();
 
     const elements = {
       scope: document.querySelector("#scope"),
       state: document.querySelector("#state"),
-      freePlay: document.querySelector("#free-play")
+      freePlay: document.querySelector("#free-play"),
+      walkthroughs: document.querySelector("#walkthroughs")
     };
     let state = ContractAcceptanceProbe.initialState();
 
@@ -176,18 +196,22 @@ s:ApproveKnownProject a m:Scenario .`,
     }
 
     function render(currentState) {
-      const fixture = ContractAcceptanceProbe.fixtures[currentState.selectedSource];
+      const fixture = Object.hasOwn(ContractAcceptanceProbe.fixtures, currentState.selectedSource)
+        ? ContractAcceptanceProbe.fixtures[currentState.selectedSource]
+        : null;
       elements.scope.textContent = "Logical contract-level probe; no parser, runtime, network, or persistence is run.";
       elements.state.replaceChildren(
         card("Stage", currentState.stage),
         card("Selected source", currentState.selectedSource || "none"),
-        card("Semantic Source", fixture?.semanticSource || "not selected"),
-        card("Mocking Source", fixture?.mockingSource || "not selected"),
-        card("Verification", currentState.verification
+        card("Turtle logical adapter — Semantic Source", fixture?.semanticSource || "not selected; no Turtle parser"),
+        card("Turtle logical adapter — Mocking Source", fixture?.mockingSource || "not selected; no Turtle parser"),
+        card("Verification logical adapter", currentState.verification
           ? currentState.verification.diagnostics.map(({ code, paths }) => `${code} ${paths.join(", ")}`).join("\n") || currentState.verification.status
-          : "not run"),
+          : "not run; no RDF/SHACL verifier"),
         card("Effective model", currentState.effectiveModel ? JSON.stringify(currentState.effectiveModel, null, 2) : "not materialized"),
-        card("Client / mock / storage", [currentState.clientEnabled, currentState.mockEnabled, currentState.storageEnabled].every(Boolean) ? "available" : "blocked")
+        card("TypeScript-client logical adapter", `${currentState.clientEnabled ? "unblocked" : "blocked"}; not implemented in Task 2`),
+        card("HTTP/mock logical adapter", `${currentState.mockEnabled ? "unblocked" : "blocked"}; not implemented in Task 2`),
+        card("SQLite logical adapter", `${currentState.storageEnabled ? "unblocked" : "blocked"}; not implemented in Task 2`)
       );
       elements.freePlay.replaceChildren();
       [
@@ -205,6 +229,19 @@ s:ApproveKnownProject a m:Scenario .`,
         button.disabled = action.type === "materialize" && currentState.verification?.status !== "verified";
         button.addEventListener("click", () => dispatch(action));
         elements.freePlay.append(button);
+      });
+      elements.walkthroughs.replaceChildren();
+      ContractAcceptanceProbe.walkthroughs.forEach((walkthrough) => {
+        const item = card(walkthrough.title, walkthrough.steps.map(({ label }, index) => `${index + 1}. ${label}`).join("\n"));
+        const button = document.createElement("button");
+        button.type = "button";
+        button.textContent = "Run source verification check (verified)";
+        button.addEventListener("click", () => {
+          state = walkthrough.steps.reduce((next, { action }) => ContractAcceptanceProbe.reduce(next, action), ContractAcceptanceProbe.initialState());
+          render(state);
+        });
+        item.append(button);
+        elements.walkthroughs.append(item);
       });
     }
 
