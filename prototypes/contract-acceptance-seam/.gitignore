@@ -1,0 +1,3 @@
+# Disposable browser-prototype artifacts
+*.log
+results/
