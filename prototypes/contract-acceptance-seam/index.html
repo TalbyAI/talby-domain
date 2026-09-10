@@ -92,6 +92,12 @@ s:ApproveKnownProject a m:Scenario .`,
         status: "blocked",
         diagnostics: [{ code: "SOURCE_NOT_FOUND", paths: ["/sources"] }]
       };
+      const actors = {
+        editor: ["projects.read", "projects.write", "projects.approve"],
+        reader: ["projects.read"],
+        anonymous: []
+      };
+      const paginationBindings = new Map();
       const walkthroughs = [{
         title: "Source verification check",
         steps: [
@@ -124,6 +130,137 @@ s:ApproveKnownProject a m:Scenario .`,
         };
       }
 
+      function normalizeProject(input) {
+        const value = { ...input };
+        if (typeof value.nombre === "string") value.nombre = value.nombre.trim();
+        return { value, incidents: [] };
+      }
+
+      function validateProject(input, mode = "complete") {
+        const incidents = [];
+        const known = ["clienteId", "nombre", "periodo", "importe"];
+        for (const key of Object.keys(input)) {
+          if (!known.includes(key)) incidents.push({ code: "UNKNOWN_FIELD", paths: [`/${key}`] });
+        }
+        if (mode === "complete" && !input.nombre) incidents.push({ code: "REQUIRED", paths: ["/nombre"] });
+        if (input.clienteId && !/^[A-Za-z0-9_-]{1,128}$/.test(input.clienteId)) incidents.push({ code: "INVALID_IDENTIFIER", paths: ["/clienteId"] });
+        if (input.periodo && input.periodo.fin < input.periodo.inicio) incidents.push({
+          code: "PERIOD_END_BEFORE_START", paths: ["/periodo/inicio", "/periodo/fin"]
+        });
+        if ((mode === "complete" || Object.hasOwn(input, "importe")) && typeof input.importe !== "string") incidents.push({ code: "EXACT_DECIMAL_STRING_REQUIRED", paths: ["/importe"] });
+        return incidents;
+      }
+
+      function problem(status, code, detail, errors = []) {
+        return {
+          status,
+          headers: { "content-type": "application/problem+json" },
+          body: {
+            type: `https://talby.ai/problems/${code.toLowerCase()}`,
+            title: detail,
+            status,
+            detail,
+            instance: "urn:talby:prototype:request:1",
+            errors
+          }
+        };
+      }
+
+      function clientRequest(operation, input, state) {
+        const routes = {
+          create: ["POST", "/projects"],
+          get: ["GET", `/projects/${input.id}`],
+          list: ["GET", "/projects"],
+          patch: ["PATCH", `/projects/${input.id}`],
+          delete: ["DELETE", `/projects/${input.id}`],
+          approve: ["POST", "/projects/commands/AprobarProyecto"]
+        };
+        const [method, path] = routes[operation];
+        return {
+          method,
+          path,
+          headers: { "X-Test-Actor": state.actor },
+          query: input.query,
+          body: input.body
+        };
+      }
+
+      function logicalStorage(state) {
+        return {
+          adapter: "SQLite (logical adapter)",
+          projects: state.projects.map(project => ({ ...project }))
+        };
+      }
+
+      function response(status, body) {
+        return { status, headers: status === 204 ? {} : { "content-type": "application/json" }, body };
+      }
+
+      function operationFor(request) {
+        if (request.method === "POST" && request.path === "/projects") return "create";
+        if (request.method === "GET" && request.path === "/projects") return "list";
+        if (request.method === "POST" && request.path === "/projects/commands/AprobarProyecto") return "approve";
+        if (/^\/projects\/[^/]+$/.test(request.path)) return ({ GET: "get", PATCH: "patch", DELETE: "delete" })[request.method];
+        return null;
+      }
+
+      function executeHttp(state, request) {
+        const operation = operationFor(request);
+        const required = ({ create: ["projects.write"], get: ["projects.read"], list: ["projects.read"], patch: ["projects.write"], delete: ["projects.write"], approve: ["projects.approve"] })[operation] || [];
+        const granted = actors[request.headers?.["X-Test-Actor"]] || [];
+        const missing = required.filter(permission => !granted.includes(permission));
+        const transition = { operation: operation || "unknown", required, granted, missing };
+        if (!operation) return { state, response: problem(404, "ROUTE_NOT_FOUND", "Route not found"), transition };
+        if (missing.length) return { state, response: problem(403, "FORBIDDEN", "Permission denied"), transition };
+        const id = request.path.split("/")[2];
+        if (id && !/^[A-Za-z0-9_-]{1,128}$/.test(id)) {
+          return { state, response: problem(422, "INVALID_IDENTIFIER", "Identifier is invalid", [{ code: "INVALID_IDENTIFIER", paths: ["/id"] }]), transition };
+        }
+        if (operation === "create") {
+          const normalized = normalizeProject(request.body || {});
+          const incidents = normalized.incidents.concat(validateProject(normalized.value));
+          if (incidents.length) return { state, response: problem(422, "VALIDATION_FAILED", "Project validation failed", incidents), transition };
+          const project = { id: `project-${state.projects.length + 1}`, ...normalized.value };
+          return { state: { ...state, projects: [...state.projects, project] }, response: response(201, project), transition };
+        }
+        if (operation === "list") {
+          const query = request.query || {};
+          if (query.offset !== undefined && query.token !== undefined) return { state, response: problem(400, "PAGINATION_MIXED", "Offset and token cannot be combined"), transition };
+          const signature = JSON.stringify({ limit: query.limit || 20, filter: query.filter || null });
+          let index = Number(query.offset || 0);
+          if (query.token !== undefined) {
+            const binding = paginationBindings.get(query.token);
+            if (!binding) return { state, response: problem(400, "PAGINATION_TOKEN_UNKNOWN", "Continuation token is unknown"), transition };
+            if (binding.signature !== signature) return { state, response: problem(400, "PAGINATION_TOKEN_MISMATCH", "Continuation token does not match the query"), transition };
+            index = binding.index;
+          }
+          const limit = Number(query.limit || 20);
+          const items = state.projects.slice(index, index + limit).map(project => ({ ...project }));
+          const nextIndex = index + items.length;
+          const token = nextIndex < state.projects.length ? `opaque-${nextIndex}` : null;
+          if (token) paginationBindings.set(token, { signature, index: nextIndex });
+          return { state, response: response(200, { items, pagination: { limit, token } }), transition };
+        }
+        const projectId = operation === "approve" ? request.body?.id : id;
+        const index = state.projects.findIndex(project => project.id === projectId);
+        if (index < 0) return { state, response: problem(404, "PROJECT_NOT_FOUND", "Project not found"), transition };
+        if (operation === "get") return { state, response: response(200, { ...state.projects[index] }), transition };
+        if (operation === "delete") return { state: { ...state, projects: state.projects.filter(project => project.id !== projectId) }, response: response(204), transition };
+        if (operation === "patch") {
+          const normalized = normalizeProject(request.body || {});
+          const suppliedIncidents = normalized.incidents.concat(validateProject(normalized.value, "partial"));
+          const project = { ...state.projects[index], ...normalized.value };
+          const { id: ignoredId, ...projectInput } = project;
+          const incidents = suppliedIncidents.concat(validateProject(projectInput).filter(incident => incident.code !== "UNKNOWN_FIELD"));
+          if (incidents.length) return { state, response: problem(422, "VALIDATION_FAILED", "Project validation failed", incidents), transition };
+          const projects = state.projects.map((item, itemIndex) => itemIndex === index ? project : item);
+          return { state: { ...state, projects }, response: response(200, project), transition };
+        }
+        const project = { ...state.projects[index], estado: "approved" };
+        const projects = state.projects.map((item, itemIndex) => itemIndex === index ? project : item);
+        return { state: { ...state, projects }, response: response(200, project), transition };
+      }
+
       function initialState() {
         return {
           stage: "sources-not-loaded",
@@ -133,12 +270,17 @@ s:ApproveKnownProject a m:Scenario .`,
           clientEnabled: false,
           mockEnabled: false,
           storageEnabled: false,
-          actor: null
+          actor: null,
+          // ponytail: in-memory logical storage; real SQLite belongs to implementation acceptance
+          projects: []
         };
       }
 
       function reduce(state, action) {
-        if (action.type === "reset") return initialState();
+        if (action.type === "reset") {
+          paginationBindings.clear();
+          return initialState();
+        }
         if (action.type === "loadSources" || action.type === "loadInvalidSource") {
           const selectedSource = action.source || (action.type === "loadSources" ? "valid" : null);
           if (!fixtureFor(selectedSource)) {
@@ -173,16 +315,22 @@ s:ApproveKnownProject a m:Scenario .`,
         return state;
       }
 
-      return { fixtures, walkthroughs, initialState, reduce };
+      return { fixtures, walkthroughs, initialState, reduce, normalizeProject, validateProject, clientRequest, executeHttp, logicalStorage };
     })();
 
     const elements = {
       scope: document.querySelector("#scope"),
       state: document.querySelector("#state"),
       freePlay: document.querySelector("#free-play"),
-      walkthroughs: document.querySelector("#walkthroughs")
+      walkthroughs: document.querySelector("#walkthroughs"),
+      lastRequest: document.querySelector("#last-request"),
+      lastResponse: document.querySelector("#last-response"),
+      incidents: document.querySelector("#incidents")
     };
     let state = ContractAcceptanceProbe.initialState();
+    let lastRequest = null;
+    let lastResponse = null;
+    let lastTransition = null;
 
     function card(title, value) {
       const item = document.createElement("article");
@@ -209,12 +357,16 @@ s:ApproveKnownProject a m:Scenario .`,
           ? currentState.verification.diagnostics.map(({ code, paths }) => `${code} ${paths.join(", ")}`).join("\n") || currentState.verification.status
           : "not run; no RDF/SHACL verifier"),
         card("Effective model", currentState.effectiveModel ? JSON.stringify(currentState.effectiveModel, null, 2) : "not materialized"),
-        card("TypeScript-client logical adapter", `${currentState.clientEnabled ? "unblocked" : "blocked"}; not implemented in Task 2`),
-        card("HTTP/mock logical adapter", `${currentState.mockEnabled ? "unblocked" : "blocked"}; not implemented in Task 2`),
-        card("SQLite logical adapter", `${currentState.storageEnabled ? "unblocked" : "blocked"}; not implemented in Task 2`)
+        card("TypeScript-client logical adapter", `${currentState.clientEnabled ? "unblocked" : "blocked"}; HTTP request boundary`),
+        card("HTTP/JSON mock logical adapter", `${currentState.mockEnabled ? "unblocked" : "blocked"}; response and transition`),
+        card("SQLite logical adapter", currentState.storageEnabled ? JSON.stringify(ContractAcceptanceProbe.logicalStorage(currentState), null, 2) : "blocked"),
+        card("Transition", lastTransition ? JSON.stringify(lastTransition, null, 2) : "no request")
       );
+      elements.lastRequest.textContent = lastRequest ? JSON.stringify(lastRequest, null, 2) : "No request";
+      elements.lastResponse.textContent = lastResponse ? JSON.stringify(lastResponse, null, 2) : "No response";
+      elements.incidents.textContent = lastResponse?.body?.errors?.length ? JSON.stringify(lastResponse.body.errors, null, 2) : "No incidents";
       elements.freePlay.replaceChildren();
-      [
+      const actions = [
         ["Load valid sources", { type: "loadSources" }],
         ["Load missing reference", { type: "loadInvalidSource", source: "missingReference" }],
         ["Load unsupported function", { type: "loadInvalidSource", source: "unsupportedFunction" }],
@@ -222,7 +374,24 @@ s:ApproveKnownProject a m:Scenario .`,
         ["Verify sources", { type: "verify" }],
         ["Materialize effective model", { type: "materialize" }],
         ["Reset", { type: "reset" }]
-      ].forEach(([label, action]) => {
+      ];
+      if (currentState.clientEnabled) actions.push(
+        ["Act as editor", { type: "selectActor", actor: "editor" }],
+        ["Act as reader", { type: "selectActor", actor: "reader" }],
+        ["Act as anonymous", { type: "selectActor", actor: "anonymous" }],
+        ["Create valid project", { type: "request", operation: "create", input: { body: ContractAcceptanceProbe.fixtures.valid.samplePayload } }],
+        ["List projects", { type: "request", operation: "list", input: { query: { limit: 1 } } }],
+        ["Get project-1", { type: "request", operation: "get", input: { id: "project-1" } }],
+        ["Patch project-1", { type: "request", operation: "patch", input: { id: "project-1", body: { nombre: " Proyecto Atlas actualizado " } } }],
+        ["Delete project-1", { type: "request", operation: "delete", input: { id: "project-1" } }],
+        ["Invalid Periodo", { type: "request", operation: "create", input: { body: { ...ContractAcceptanceProbe.fixtures.valid.samplePayload, periodo: { inicio: "2026-12-31", fin: "2026-01-01" } } } }],
+        ["Unknown field", { type: "request", operation: "create", input: { body: { ...ContractAcceptanceProbe.fixtures.valid.samplePayload, extra: true } } }],
+        ["Invalid identifier", { type: "request", operation: "get", input: { id: "invalid!" } }],
+        ["Mixed pagination", { type: "request", operation: "list", input: { query: { offset: 0, token: "opaque-1" } } }],
+        ["Invalid token", { type: "request", operation: "list", input: { query: { token: "unknown" } } }],
+        ["Approve project-1", { type: "request", operation: "approve", input: { body: { id: "project-1" } } }]
+      );
+      actions.forEach(([label, action]) => {
         const button = document.createElement("button");
         button.type = "button";
         button.textContent = label;
@@ -246,7 +415,18 @@ s:ApproveKnownProject a m:Scenario .`,
     }
 
     function dispatch(action) {
+      if (action.type === "request") {
+        if (!state.clientEnabled || !state.mockEnabled || !state.storageEnabled) return;
+        lastRequest = ContractAcceptanceProbe.clientRequest(action.operation, action.input, state);
+        const result = ContractAcceptanceProbe.executeHttp(state, lastRequest);
+        state = result.state;
+        lastResponse = result.response;
+        lastTransition = result.transition;
+        render(state);
+        return;
+      }
       state = ContractAcceptanceProbe.reduce(state, action);
+      if (action.type === "reset") [lastRequest, lastResponse, lastTransition] = [null, null, null];
       render(state);
     }
 
