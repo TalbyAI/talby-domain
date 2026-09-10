@@ -90,15 +90,30 @@ s:ApproveKnownProject a m:Scenario .`,
           },
           verification: { status: "verified", diagnostics: [] }
         },
-        missingReference: { verification: { status: "blocked", diagnostics: [
-          { code: "REFERENCE_NOT_FOUND", paths: ["/Proyecto/clienteId"] }
-        ] } },
-        unsupportedFunction: { verification: { status: "blocked", diagnostics: [
-          { code: "FUNCTION_UNSUPPORTED", paths: ["/Proyecto/Periodo"] }
-        ] } },
-        contradictory: { verification: { status: "blocked", diagnostics: [
-          { code: "DECLARATION_CONTRADICTION", paths: ["/Proyecto/importe"] }
-        ] } }
+        missingReference: {
+          semanticSource: `@prefix c: <https://github.com/TalbyAI/talby-domain/vocab/contract#> .
+@prefix d: <urn:talby:prototype:declaration:> .
+d:Project a c:Entity ; c:clienteId d:MissingCliente .`,
+          verification: { status: "blocked", diagnostics: [
+            { code: "REFERENCE_NOT_FOUND", paths: ["/Proyecto/clienteId"] }
+          ] }
+        },
+        unsupportedFunction: {
+          semanticSource: `@prefix c: <https://github.com/TalbyAI/talby-domain/vocab/contract#> .
+@prefix d: <urn:talby:prototype:declaration:> .
+d:Project a c:Entity ; c:Periodo [ c:usesFunction c:UnsupportedFunction ] .`,
+          verification: { status: "blocked", diagnostics: [
+            { code: "FUNCTION_UNSUPPORTED", paths: ["/Proyecto/Periodo"] }
+          ] }
+        },
+        contradictory: {
+          semanticSource: `@prefix c: <https://github.com/TalbyAI/talby-domain/vocab/contract#> .
+@prefix d: <urn:talby:prototype:declaration:> .
+d:Project a c:Entity ; c:importe c:ExactDecimal, c:Integer .`,
+          verification: { status: "blocked", diagnostics: [
+            { code: "DECLARATION_CONTRADICTION", paths: ["/Proyecto/importe"] }
+          ] }
+        }
       };
       fixtures.validWithoutMocking = { ...fixtures.valid, mockingSource: null };
       const sourceNotFound = {
@@ -151,11 +166,17 @@ s:ApproveKnownProject a m:Scenario .`,
           { label: "Verify sources — verified", action: { type: "verify" } },
           { label: "Materialize effective model", action: { type: "materialize" } },
           { label: "Select editor", action: { type: "selectActor", actor: "editor" } },
+          { label: "Create baseline project — 201", action: { type: "request", operation: "create", input: { body: fixtures.valid.samplePayload } } },
           { label: "Invalid Periodo — 422", action: { type: "request", operation: "create", input: { body: { ...fixtures.valid.samplePayload, periodo: { inicio: "2026-12-31", fin: "2026-01-01" } } } } },
+          { label: "Get preserved project after invalid Periodo — 200", action: { type: "request", operation: "get", input: { id: "project-1" } } },
           { label: "Unknown field — 422", action: { type: "request", operation: "create", input: { body: { ...fixtures.valid.samplePayload, extra: true } } } },
+          { label: "Get preserved project after unknown field — 200", action: { type: "request", operation: "get", input: { id: "project-1" } } },
           { label: "Invalid identifier — 422", action: { type: "request", operation: "get", input: { id: "invalid!" } } },
+          { label: "Get preserved project after invalid identifier — 200", action: { type: "request", operation: "get", input: { id: "project-1" } } },
           { label: "Mixed pagination — 400", action: { type: "request", operation: "list", input: { query: { offset: 0, token: "opaque-1" } } } },
-          { label: "Unknown continuation token — 400", action: { type: "request", operation: "list", input: { query: { token: "unknown" } } } }
+          { label: "Get preserved project after mixed pagination — 200", action: { type: "request", operation: "get", input: { id: "project-1" } } },
+          { label: "Unknown continuation token — 400", action: { type: "request", operation: "list", input: { query: { token: "unknown" } } } },
+          { label: "Get preserved project after unknown token — 200", action: { type: "request", operation: "get", input: { id: "project-1" } } }
         ]
       }, {
         title: "Authorization/mocking",
@@ -213,8 +234,8 @@ s:ApproveKnownProject a m:Scenario .`,
         return { value, incidents: [] };
       }
 
-      function matchScenarios(operation, count) {
-        if (operation !== "AprobarProyecto" || count === 0) return { status: "not-simulated", response: null, error: null };
+      function matchScenarios(operation, count, fixture) {
+        if (!fixture?.mockingSource || operation !== "AprobarProyecto" || count === 0) return { status: "not-simulated", response: null, error: null };
         if (count === 1) return { status: "matched", response: { approved: true }, error: null };
         return { status: "ambiguous", response: null, error: { code: "SCENARIO_AMBIGUOUS" } };
       }
@@ -235,7 +256,10 @@ s:ApproveKnownProject a m:Scenario .`,
         }
         if (mode === "complete" && !input.nombre) incidents.push({ code: "REQUIRED", paths: ["/nombre"] });
         if (Object.hasOwn(input, "clienteId") && !isIdentifier(input.clienteId)) incidents.push({ code: "INVALID_IDENTIFIER", paths: ["/clienteId"] });
-        if (input.periodo && input.periodo.fin < input.periodo.inicio) incidents.push({
+        if (input.periodo && (!Object.hasOwn(input.periodo, "inicio") || !Object.hasOwn(input.periodo, "fin"))) incidents.push({
+          code: "REQUIRED", paths: ["/periodo/inicio", "/periodo/fin"].filter(path => !Object.hasOwn(input.periodo, path.split("/").pop()))
+        });
+        else if (input.periodo && input.periodo.fin < input.periodo.inicio) incidents.push({
           code: "PERIOD_END_BEFORE_START", paths: ["/periodo/inicio", "/periodo/fin"]
         });
         if ((mode === "complete" || Object.hasOwn(input, "importe")) && typeof input.importe !== "string") incidents.push({ code: "EXACT_DECIMAL_STRING_REQUIRED", paths: ["/importe"] });
@@ -252,7 +276,10 @@ s:ApproveKnownProject a m:Scenario .`,
         if (Object.hasOwn(input, "clienteId") && (typeof input.clienteId !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(input.clienteId))) {
           incidents.push({ code: "INVALID_IDENTIFIER", paths: ["/clienteId"] });
         }
-        if (input.periodo && input.periodo.fin < input.periodo.inicio) incidents.push({
+        if (input.periodo && (!Object.hasOwn(input.periodo, "inicio") || !Object.hasOwn(input.periodo, "fin"))) incidents.push({
+          code: "REQUIRED", paths: ["/periodo/inicio", "/periodo/fin"].filter(path => !Object.hasOwn(input.periodo, path.split("/").pop()))
+        });
+        else if (input.periodo && input.periodo.fin < input.periodo.inicio) incidents.push({
           code: "PERIOD_END_BEFORE_START", paths: ["/periodo/inicio", "/periodo/fin"]
         });
         if (typeof input.importe !== "string") incidents.push({ code: "EXACT_DECIMAL_STRING_REQUIRED", paths: ["/importe"] });
@@ -363,15 +390,15 @@ s:ApproveKnownProject a m:Scenario .`,
         if (missing.length) return { state, response: problem(403, "FORBIDDEN", "Permission denied"), transition };
         const id = request.path.split("/")[2];
         if (id && !isIdentifier(id)) {
-          return { state, response: problem(422, "INVALID_IDENTIFIER", "Identifier is invalid", [{ code: "INVALID_IDENTIFIER", paths: ["/id"] }]), transition };
+          return { state, response: problem(422, "INVALID_IDENTIFIER", "Identifier is invalid", [{ code: "INVALID_IDENTIFIER", paths: ["/path/id"] }]), transition };
         }
         if (operation === "create") {
           if (request.body === null) return { state, response: problem(422, "VALIDATION_FAILED", "Project validation failed", [{ code: "NULL_BODY", paths: ["/"] }]), transition };
           const normalized = normalizeProject(request.body === undefined ? {} : request.body);
           const incidents = normalized.incidents.concat(validateProject(normalized.value));
           if (incidents.length) return { state, response: problem(422, "VALIDATION_FAILED", "Project validation failed", incidents), transition };
-          const project = { id: `project-${state.projects.length + 1}`, ...normalized.value };
-          return { state: { ...state, projects: [...state.projects, project] }, response: response(201, project), transition };
+          const project = { id: `project-${state.nextProjectNumber}`, ...normalized.value };
+          return { state: { ...state, nextProjectNumber: state.nextProjectNumber + 1, projects: [...state.projects, project] }, response: response(201, project), transition };
         }
         if (operation === "list") {
           if (request.query === null) return { state, response: problem(400, "INVALID_QUERY", "Query is invalid", [{ code: "NULL_QUERY", paths: ["/query"] }]), transition };
@@ -426,6 +453,7 @@ s:ApproveKnownProject a m:Scenario .`,
           mockEnabled: false,
           storageEnabled: false,
           actor: null,
+          nextProjectNumber: 1,
           // ponytail: in-memory logical storage; real SQLite belongs to implementation acceptance
           projects: []
         };
@@ -745,9 +773,9 @@ s:ApproveKnownProject a m:Scenario .`,
 
     function dispatch(action) {
       state = ContractAcceptanceProbe.reduce(state, action);
-      if (action.type === "reset") [lastRequest, lastResponse, lastTransition, scenarioReport, conformanceReport, compatibilityReport] = [null, null, null, null, null, null];
+      if (["reset", "loadSources", "loadInvalidSource"].includes(action.type)) [lastRequest, lastResponse, lastTransition, scenarioReport, conformanceReport, compatibilityReport] = [null, null, null, null, null, null];
       if (action.type === "scenario") {
-        scenarioReport = ContractAcceptanceProbe.matchScenarios(action.operation, action.count);
+        scenarioReport = ContractAcceptanceProbe.matchScenarios(action.operation, action.count, ContractAcceptanceProbe.fixtures[state.selectedSource]);
         lastResponse = scenarioReport;
         lastTransition = { logicalAdapter: "Mocking Source", operation: action.operation, matchingScenarios: action.count };
       } else if (action.type === "conformance") {
