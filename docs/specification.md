@@ -79,7 +79,7 @@ An entity may explicitly declare that it has Default CRUD Operations; in that ca
 Status: conclusions confirmed by human review based on the prototype from [issue #5](https://github.com/TalbyAI/talby-domain/issues/5). The [historical, non-normative disposable inspector](../prototypes/effective-contract-inspector/) provides evidence for this form of materialization:
 
 - The visible flow is `source → verification → materialization → inspection`; a source with missing references or contradictory declarations does not produce a partial effective model.
-- Each element distinguishes its origin (`declared`, `default`, or `derived`) as internal metadata of the effective model, not as part of the public HTTP payload. An explicit value replaces a default and retains that origin on the route, permissions, and CRUD contracts.
+- Each element distinguishes its origin (`declarado`, `default`, or `derivado`) as internal metadata of the effective model, not as part of the public HTTP payload. An explicit value replaces a default and retains that origin on the route, permissions, and CRUD contracts.
 - Explicitly enabled CRUD materializes exactly create, get, list, partial update, and delete, each with an inspectable input and output contract. No entity is enabled automatically.
 - A Partial Update Message preserves absent fields, completely replaces a present grouping, and validates the complete state; recursive PATCH inside the grouping is not supported in this iteration.
 - Nested Inclusions preserve their fields and rules in context, including `Periodo.fin >= Periodo.inicio`; the decimal amount is treated as exact decimal.

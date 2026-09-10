@@ -134,7 +134,7 @@ Authenticated and recorded authorization from a user with the corresponding auth
 Current public route representing a contract operation.
 
 **Superseded Route**:
-Former route that continues to respond directly and communicates its successor through `Link: <URL-de-la-ruta-efectiva>; rel="successor-version"`.
+Former route that continues to respond directly and communicates its successor through `Link: <effective-route-URL>; rel="successor-version"`.
 
 **Redirected Route**:
 Former route that remains supported through `308 Permanent Redirect` to the effective route and includes `Location: URL-de-la-ruta-efectiva`, preserving the request method and body.
