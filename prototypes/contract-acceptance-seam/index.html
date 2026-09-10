@@ -17,6 +17,14 @@
     .card { padding: 15px; background: #f8faff; border: 1px solid #e2e8f4; border-radius: 9px; }
     button { cursor: pointer; font: inherit; border: 1px solid #b8c4d8; border-radius: 8px; padding: 8px 11px; background: #fff; color: inherit; }
     button:hover, button:focus-visible { border-color: #3457d5; outline: 2px solid #c9d3ff; }
+    button:disabled { cursor: not-allowed; opacity: .55; }
+    select { font: inherit; border: 1px solid #b8c4d8; border-radius: 8px; padding: 8px 11px; background: #fff; color: inherit; }
+    select:focus-visible { border-color: #3457d5; outline: 2px solid #c9d3ff; }
+    .controls, [role="tablist"] { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; }
+    .control { display: grid; gap: 5px; }
+    [role="tab"][aria-selected="true"] { background: #3457d5; border-color: #3457d5; color: #fff; }
+    .state-table { grid-column: 1 / -1; }
+    [role="tabpanel"] [aria-current="step"] { color: #173ba8; font-weight: 700; }
     table { width: 100%; border-collapse: collapse; }
     th, td { padding: 8px 6px; border-bottom: 1px solid #e2e8f4; text-align: left; vertical-align: top; }
     th { color: #526079; font-size: .9rem; }
@@ -48,7 +56,7 @@
     </section>
     <section aria-labelledby="reports-title">
       <h2 id="reports-title">Mocking and compatibility reports</h2>
-      <div id="reports" class="grid"></div>
+      <div id="reports" class="grid" aria-live="polite"></div>
     </section>
   </main>
   <script>
@@ -117,41 +125,48 @@ s:ApproveKnownProject a m:Scenario .`,
       ];
       const paginationBindings = new Map();
       const walkthroughs = [{
-        title: "Source verification check",
+        title: "Valid journey",
         steps: [
           { label: "Load valid sources", action: { type: "loadSources" } },
-          { label: "Verify sources", action: { type: "verify" } },
-          { label: "Materialize effective model", action: { type: "materialize" } }
-        ]
-      }, {
-        title: "HTTP acceptance check",
-        steps: [
-          { label: "Load and materialize valid sources", action: { type: "loadSources" } },
-          { label: "Verify sources", action: { type: "verify" } },
+          { label: "Verify sources — verified", action: { type: "verify" } },
           { label: "Materialize effective model", action: { type: "materialize" } },
-          { label: "Act as editor", action: { type: "selectActor", actor: "editor" } },
-          { label: "Create project", action: { type: "request", operation: "create", input: { body: {
-            clienteId: "cliente-1", nombre: " Proyecto Atlas ", periodo: { inicio: "2026-01-01", fin: "2026-12-31" }, importe: "100.00"
-          } } } },
-          { label: "List projects", action: { type: "request", operation: "list", input: {} } },
-          { label: "Get project", action: { type: "request", operation: "get", input: { id: "project-1" } } },
-          { label: "Patch project", action: { type: "request", operation: "patch", input: { id: "project-1", body: { nombre: " Proyecto Atlas actualizado " } } } },
-          { label: "Delete project", action: { type: "request", operation: "delete", input: { id: "project-1" } } },
-          { label: "Reject invalid Periodo without changing storage", action: { type: "request", operation: "create", input: { body: {
-            clienteId: "cliente-1", nombre: "Rejected", periodo: { inicio: "2026-12-31", fin: "2026-01-01" }, importe: "100.00"
-          } } } },
-          { label: "Reject unknown field without changing storage", action: { type: "request", operation: "create", input: { body: {
-            clienteId: "cliente-1", nombre: "Rejected", importe: "100.00", extra: true
-          } } } },
-          { label: "Reject invalid identifier without changing storage", action: { type: "request", operation: "get", input: { id: "invalid!" } } },
-          { label: "Reject mixed pagination without changing storage", action: { type: "request", operation: "list", input: { query: { offset: 0, token: "opaque-1" } } } },
-          { label: "Reject invalid token without changing storage", action: { type: "request", operation: "list", input: { query: { token: "unknown" } } } }
+          { label: "Select editor", action: { type: "selectActor", actor: "editor" } },
+          { label: "Create project — 201", action: { type: "request", operation: "create", input: { body: fixtures.valid.samplePayload } } },
+          { label: "Get project — 200", action: { type: "request", operation: "get", input: { id: "project-1" } } },
+          { label: "Patch project — 200", action: { type: "request", operation: "patch", input: { id: "project-1", body: { nombre: " Proyecto Atlas actualizado " } } } },
+          { label: "List projects — 200", action: { type: "request", operation: "list", input: { query: { limit: 1 } } } },
+          { label: "Delete project — 204", action: { type: "request", operation: "delete", input: { id: "project-1" } } }
         ]
       }, {
-        title: "Conformance and compatibility check",
+        title: "Rejection",
         steps: [
-          { label: "Run conformance vectors", action: { type: "conformance" } },
-          { label: "Compare compatibility declarations", action: { type: "compatibility" } }
+          { label: "Load valid sources", action: { type: "loadSources" } },
+          { label: "Verify sources — verified", action: { type: "verify" } },
+          { label: "Materialize effective model", action: { type: "materialize" } },
+          { label: "Select editor", action: { type: "selectActor", actor: "editor" } },
+          { label: "Invalid Periodo — 422", action: { type: "request", operation: "create", input: { body: { ...fixtures.valid.samplePayload, periodo: { inicio: "2026-12-31", fin: "2026-01-01" } } } } },
+          { label: "Unknown field — 422", action: { type: "request", operation: "create", input: { body: { ...fixtures.valid.samplePayload, extra: true } } } },
+          { label: "Invalid identifier — 422", action: { type: "request", operation: "get", input: { id: "invalid!" } } },
+          { label: "Mixed pagination — 400", action: { type: "request", operation: "list", input: { query: { offset: 0, token: "opaque-1" } } } },
+          { label: "Unknown continuation token — 400", action: { type: "request", operation: "list", input: { query: { token: "unknown" } } } }
+        ]
+      }, {
+        title: "Authorization/mocking",
+        steps: [
+          { label: "Load valid sources", action: { type: "loadSources" } },
+          { label: "Verify sources — verified", action: { type: "verify" } },
+          { label: "Materialize effective model", action: { type: "materialize" } },
+          { label: "Select reader", action: { type: "selectActor", actor: "reader" } },
+          { label: "Create as reader — 403", action: { type: "request", operation: "create", input: { body: fixtures.valid.samplePayload } } },
+          { label: "No matching scenarios — not simulated", action: { type: "scenario", operation: "AprobarProyecto", count: 0 } },
+          { label: "One matching scenario — matched", action: { type: "scenario", operation: "AprobarProyecto", count: 1 } },
+          { label: "Two matching scenarios — ambiguous", action: { type: "scenario", operation: "AprobarProyecto", count: 2 } }
+        ]
+      }, {
+        title: "Conformance/compatibility",
+        steps: [
+          { label: "Run conformance vectors — equal", action: { type: "conformance" } },
+          { label: "Compare declarations — compatible", action: { type: "compatibility" } }
         ]
       }];
 
@@ -444,6 +459,8 @@ s:ApproveKnownProject a m:Scenario .`,
     let scenarioReport = null;
     let conformanceReport = null;
     let compatibilityReport = null;
+    let activeWalkthrough = 0;
+    let walkthroughStep = 0;
 
     function card(title, value) {
       const item = document.createElement("article");
@@ -462,6 +479,7 @@ s:ApproveKnownProject a m:Scenario .`,
       const headRow = document.createElement("tr");
       headers.forEach((header) => {
         const cell = document.createElement("th");
+        cell.scope = "col";
         cell.textContent = header;
         headRow.append(cell);
       });
@@ -480,155 +498,221 @@ s:ApproveKnownProject a m:Scenario .`,
       return table;
     }
 
+    function completeState(currentState) {
+      const incidents = lastResponse?.body?.errors || [];
+      return {
+        stage: currentState.stage,
+        selectedSources: currentState.selectedSource ? [currentState.selectedSource] : [],
+        verification: currentState.verification,
+        effectiveModel: currentState.effectiveModel,
+        actor: currentState.actor,
+        storage: ContractAcceptanceProbe.logicalStorage(currentState),
+        lastRequest,
+        lastResponse,
+        incidents,
+        reports: { scenario: scenarioReport, conformance: conformanceReport, compatibility: compatibilityReport }
+      };
+    }
+
+    function storageTable(storage) {
+      const item = card("Projects — SQLite logical adapter", storage.adapter);
+      item.classList.add("state-table");
+      item.append(reportTable(["Identifier", "Client", "Name", "Period", "Amount", "Status"], storage.projects.map((project) => [
+        project.id, project.clienteId, project.nombre, project.periodo ? `${project.periodo.inicio} to ${project.periodo.fin}` : "", project.importe, project.estado || ""
+      ])));
+      return item;
+    }
+
     function renderReports() {
-      elements.reports.replaceChildren(
-        card("Mocking Source", scenarioReport ? JSON.stringify(scenarioReport, null, 2) : "Optional for CRUD; scenario matching not run."),
-        card("Conformance", conformanceReport ? "Client and engine projections" : "Not run."),
-        card("Compatibility", compatibilityReport ? "Declaration comparison" : "Not run.")
-      );
-      if (conformanceReport) elements.reports.children[1].append(reportTable(
+      const scenario = card("Mocking Source", scenarioReport ? JSON.stringify(scenarioReport, null, 2) : "Optional for CRUD; scenario matching not run.");
+      const conformance = card("Conformance", conformanceReport ? "Client and engine projections" : "Not run.");
+      const compatibility = card("Compatibility", compatibilityReport ? "Declaration comparison" : "Not run.");
+      if (conformanceReport) conformance.append(reportTable(
         ["Vector", "Input", "Client", "Engine", "Result"],
-        conformanceReport.map((row) => [row.name, JSON.stringify(row.input), JSON.stringify(row.client), JSON.stringify(row.engine), row.equal ? "PASS" : "FAILURE: client and engine differ"])
+        conformanceReport.map((row) => [row.name, JSON.stringify(row.input), JSON.stringify(row.client), JSON.stringify(row.engine), row.equal ? "equal" : "FAILURE: client and engine differ"])
       ));
-      if (compatibilityReport) elements.reports.children[2].append(reportTable(
+      if (compatibilityReport) compatibility.append(reportTable(
         ["Declaration Identifier", "Category", "Reason"],
         compatibilityReport.map((entry) => [entry.id, entry.category, entry.reason])
       ));
+      elements.reports.replaceChildren(scenario, conformance, compatibility);
+    }
+
+    function addButton(container, label, action, disabled = false) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = label;
+      button.disabled = disabled;
+      button.addEventListener("click", () => dispatch(action));
+      container.append(button);
+    }
+
+    function renderWalkthroughs() {
+      const tablist = document.createElement("div");
+      tablist.setAttribute("role", "tablist");
+      tablist.setAttribute("aria-label", "Guided walkthroughs");
+      ContractAcceptanceProbe.walkthroughs.forEach((walkthrough, index) => {
+        const tab = document.createElement("button");
+        tab.type = "button";
+        tab.id = `walkthrough-tab-${index}`;
+        tab.setAttribute("role", "tab");
+        tab.setAttribute("aria-selected", String(activeWalkthrough === index));
+        if (activeWalkthrough === index) tab.setAttribute("aria-controls", `walkthrough-panel-${index}`);
+        tab.textContent = walkthrough.title;
+        tab.addEventListener("click", () => {
+          state = ContractAcceptanceProbe.reduce(state, { type: "reset" });
+          [lastRequest, lastResponse, lastTransition, scenarioReport, conformanceReport, compatibilityReport] = [null, null, null, null, null, null];
+          activeWalkthrough = index;
+          walkthroughStep = 0;
+          render(state);
+        });
+        tablist.append(tab);
+      });
+      const walkthrough = ContractAcceptanceProbe.walkthroughs[activeWalkthrough];
+      const panel = document.createElement("article");
+      panel.className = "card";
+      panel.id = `walkthrough-panel-${activeWalkthrough}`;
+      panel.setAttribute("role", "tabpanel");
+      panel.setAttribute("aria-labelledby", `walkthrough-tab-${activeWalkthrough}`);
+      const heading = document.createElement("h3");
+      heading.textContent = walkthrough.title;
+      const steps = document.createElement("ol");
+      walkthrough.steps.forEach((step, index) => {
+        const item = document.createElement("li");
+        item.textContent = step.label;
+        if (index === walkthroughStep && walkthroughStep < walkthrough.steps.length) item.setAttribute("aria-current", "step");
+        steps.append(item);
+      });
+      const next = document.createElement("button");
+      next.type = "button";
+      next.textContent = walkthroughStep < walkthrough.steps.length ? `Run step ${walkthroughStep + 1}` : "Walkthrough complete";
+      next.disabled = walkthroughStep >= walkthrough.steps.length;
+      next.addEventListener("click", () => {
+        const step = walkthrough.steps[walkthroughStep++];
+        dispatch(step.action);
+      });
+      panel.append(heading, steps, next);
+      elements.walkthroughs.replaceChildren(tablist, panel);
     }
 
     function render(currentState) {
       const fixture = Object.hasOwn(ContractAcceptanceProbe.fixtures, currentState.selectedSource)
         ? ContractAcceptanceProbe.fixtures[currentState.selectedSource]
         : null;
+      const visibleState = completeState(currentState);
       elements.scope.textContent = "Logical contract-level probe; no parser, runtime, network, or persistence is run.";
       elements.state.replaceChildren(
-        card("Stage", currentState.stage),
-        card("Selected source", currentState.selectedSource || "none"),
+        card("Complete visible state", JSON.stringify(visibleState, null, 2)),
         card("Turtle logical adapter — Semantic Source", fixture?.semanticSource || "not selected; no Turtle parser"),
         card("Turtle logical adapter — Mocking Source", fixture?.mockingSource || "optional for CRUD; no Turtle parser"),
-        card("Verification logical adapter", currentState.verification
-          ? currentState.verification.diagnostics.map(({ code, paths }) => `${code} ${paths.join(", ")}`).join("\n") || currentState.verification.status
-          : "not run; no RDF/SHACL verifier"),
-        card("Effective model", currentState.effectiveModel ? JSON.stringify(currentState.effectiveModel, null, 2) : "not materialized"),
         card("TypeScript-client logical adapter", `${currentState.clientEnabled ? "unblocked" : "blocked"}; HTTP request boundary`),
         card("HTTP/JSON mock logical adapter", `${currentState.mockEnabled ? "unblocked" : "blocked"}; response and transition`),
-        card("SQLite logical adapter", currentState.storageEnabled ? JSON.stringify(ContractAcceptanceProbe.logicalStorage(currentState), null, 2) : "blocked"),
-        card("Transition", lastTransition ? JSON.stringify(lastTransition, null, 2) : "no request")
+        card("Transition", lastTransition ? JSON.stringify(lastTransition, null, 2) : "no request"),
+        storageTable(visibleState.storage)
       );
       elements.lastRequest.textContent = lastRequest ? JSON.stringify(lastRequest, null, 2) : "No request";
       elements.lastResponse.textContent = lastResponse ? JSON.stringify(lastResponse, null, 2) : "No response";
-      elements.incidents.textContent = lastResponse?.body?.errors?.length ? JSON.stringify(lastResponse.body.errors, null, 2) : "No incidents";
-      elements.freePlay.replaceChildren();
-      const actions = [
-        ["Load valid sources", { type: "loadSources" }],
-        ["Load valid sources without Mocking Source", { type: "loadSources", source: "validWithoutMocking" }],
-        ["Load missing reference", { type: "loadInvalidSource", source: "missingReference" }],
-        ["Load unsupported function", { type: "loadInvalidSource", source: "unsupportedFunction" }],
-        ["Load contradictory declaration", { type: "loadInvalidSource", source: "contradictory" }],
-        ["Verify sources", { type: "verify" }],
-        ["Materialize effective model", { type: "materialize" }],
-        ["Reset", { type: "reset" }]
-      ];
-      if (currentState.clientEnabled) actions.push(
-        ["Act as editor", { type: "selectActor", actor: "editor" }],
-        ["Act as reader", { type: "selectActor", actor: "reader" }],
-        ["Act as anonymous", { type: "selectActor", actor: "anonymous" }],
-        ["Create valid project", { type: "request", operation: "create", input: { body: ContractAcceptanceProbe.fixtures.valid.samplePayload } }],
-        ["List projects", { type: "request", operation: "list", input: { query: { limit: 1 } } }],
-        ["Get project-1", { type: "request", operation: "get", input: { id: "project-1" } }],
-        ["Patch project-1", { type: "request", operation: "patch", input: { id: "project-1", body: { nombre: " Proyecto Atlas actualizado " } } }],
-        ["Delete project-1", { type: "request", operation: "delete", input: { id: "project-1" } }],
-        ["Invalid Periodo", { type: "request", operation: "create", input: { body: { ...ContractAcceptanceProbe.fixtures.valid.samplePayload, periodo: { inicio: "2026-12-31", fin: "2026-01-01" } } } }],
-        ["Unknown field", { type: "request", operation: "create", input: { body: { ...ContractAcceptanceProbe.fixtures.valid.samplePayload, extra: true } } }],
-        ["Invalid identifier", { type: "request", operation: "get", input: { id: "invalid!" } }],
-        ["Mixed pagination", { type: "request", operation: "list", input: { query: { offset: 0, token: "opaque-1" } } }],
-        ["Invalid token", { type: "request", operation: "list", input: { query: { token: "unknown" } } }],
-        ["Approve project-1", { type: "request", operation: "approve", input: { body: { id: "project-1" } } }],
-        ["Approve with no matching scenarios", { type: "scenario", operation: "AprobarProyecto", count: 0 }],
-        ["Approve with one matching scenario", { type: "scenario", operation: "AprobarProyecto", count: 1 }],
-        ["Approve with two matching scenarios", { type: "scenario", operation: "AprobarProyecto", count: 2 }],
-        ["Run conformance report", { type: "conformance" }],
-        ["Show conformance mismatch", { type: "conformance", mismatch: true }],
-        ["Run compatibility report", { type: "compatibility" }]
-      );
-      actions.forEach(([label, action]) => {
-        const button = document.createElement("button");
-        button.type = "button";
-        button.textContent = label;
-        button.disabled = action.type === "materialize" && currentState.verification?.status !== "verified";
-        button.addEventListener("click", () => dispatch(action));
-        elements.freePlay.append(button);
+      elements.incidents.textContent = visibleState.incidents.length ? JSON.stringify(visibleState.incidents, null, 2) : "No incidents";
+      const controls = document.createElement("div");
+      controls.className = "controls";
+      const sourceControl = document.createElement("div");
+      sourceControl.className = "control";
+      const sourceLabel = document.createElement("label");
+      sourceLabel.htmlFor = "source-variant";
+      sourceLabel.textContent = "Source variant";
+      const source = document.createElement("select");
+      source.id = "source-variant";
+      ["valid", "validWithoutMocking", "missingReference", "unsupportedFunction", "contradictory"].forEach((value) => {
+        const option = document.createElement("option");
+        option.value = value;
+        option.textContent = value;
+        option.selected = value === currentState.selectedSource;
+        source.append(option);
       });
-      elements.walkthroughs.replaceChildren();
-      ContractAcceptanceProbe.walkthroughs.forEach((walkthrough) => {
-        const item = card(walkthrough.title, walkthrough.steps.map(({ label }, index) => `${index + 1}. ${label}`).join("\n"));
-        const button = document.createElement("button");
-        button.type = "button";
-        button.textContent = walkthrough.title === "Source verification check" ? "Run source verification check (verified)" : `Run ${walkthrough.title.toLowerCase()}`;
-        button.addEventListener("click", () => {
-          const results = [];
-          state = walkthrough.steps.reduce((next, { label, action }) => {
-            if (action.type === "conformance") {
-              conformanceReport = ContractAcceptanceProbe.runConformance();
-              results.push({ label, equal: conformanceReport.every((row) => row.equal) });
-              return next;
-            }
-            if (action.type === "compatibility") {
-              compatibilityReport = ContractAcceptanceProbe.compareSources(ContractAcceptanceProbe.compatibilityBefore, ContractAcceptanceProbe.compatibilityAfter);
-              results.push({ label, categories: compatibilityReport.map((entry) => entry.category) });
-              return next;
-            }
-            if (action.type !== "request") return ContractAcceptanceProbe.reduce(next, action);
-            const request = ContractAcceptanceProbe.clientRequest(action.operation, action.input, next);
-            const result = ContractAcceptanceProbe.executeHttp(next, request);
-            lastRequest = request;
-            lastResponse = result.response;
-            results.push({ label, status: result.response.status, projects: ContractAcceptanceProbe.logicalStorage(result.state).projects });
-            return result.state;
-          }, ContractAcceptanceProbe.initialState());
-          lastTransition = results.length ? { walkthrough: results } : null;
-          render(state);
-        });
-        item.append(button);
-        elements.walkthroughs.append(item);
+      const load = document.createElement("button");
+      load.type = "button";
+      load.textContent = "Load selected source";
+      load.addEventListener("click", () => dispatch({ type: source.value === "valid" || source.value === "validWithoutMocking" ? "loadSources" : "loadInvalidSource", source: source.value }));
+      sourceControl.append(sourceLabel, source, load);
+      const actorControl = document.createElement("div");
+      actorControl.className = "control";
+      const actorLabel = document.createElement("label");
+      actorLabel.htmlFor = "test-actor";
+      actorLabel.textContent = "Test actor";
+      const actor = document.createElement("select");
+      actor.id = "test-actor";
+      actor.disabled = !currentState.effectiveModel;
+      ["editor", "reader", "anonymous"].forEach((value) => {
+        const option = document.createElement("option");
+        option.value = value;
+        option.textContent = value;
+        option.selected = value === currentState.actor;
+        actor.append(option);
       });
+      const selectActor = document.createElement("button");
+      selectActor.type = "button";
+      selectActor.textContent = "Select actor";
+      selectActor.disabled = !currentState.effectiveModel;
+      selectActor.addEventListener("click", () => dispatch({ type: "selectActor", actor: actor.value }));
+      actorControl.append(actorLabel, actor, selectActor);
+      elements.freePlay.replaceChildren(sourceControl, actorControl, controls);
+      const requiresModel = !currentState.effectiveModel;
+      [
+        ["Load valid sources", { type: "loadSources" }, false],
+        ["Load valid sources without Mocking Source", { type: "loadSources", source: "validWithoutMocking" }, false],
+        ["Load missing reference", { type: "loadInvalidSource", source: "missingReference" }, false],
+        ["Load unsupported function", { type: "loadInvalidSource", source: "unsupportedFunction" }, false],
+        ["Load contradictory declaration", { type: "loadInvalidSource", source: "contradictory" }, false],
+        ["Verify sources", { type: "verify" }, false],
+        ["Materialize effective model", { type: "materialize" }, currentState.verification?.status !== "verified"],
+        ["Act as editor", { type: "selectActor", actor: "editor" }, requiresModel],
+        ["Act as reader", { type: "selectActor", actor: "reader" }, requiresModel],
+        ["Act as anonymous", { type: "selectActor", actor: "anonymous" }, requiresModel],
+        ["Create valid project", { type: "request", operation: "create", input: { body: ContractAcceptanceProbe.fixtures.valid.samplePayload } }, requiresModel],
+        ["List projects", { type: "request", operation: "list", input: { query: { limit: 1 } } }, requiresModel],
+        ["Get project-1", { type: "request", operation: "get", input: { id: "project-1" } }, requiresModel],
+        ["Patch project-1", { type: "request", operation: "patch", input: { id: "project-1", body: { nombre: " Proyecto Atlas actualizado " } } }, requiresModel],
+        ["Delete project-1", { type: "request", operation: "delete", input: { id: "project-1" } }, requiresModel],
+        ["Invalid Periodo", { type: "request", operation: "create", input: { body: { ...ContractAcceptanceProbe.fixtures.valid.samplePayload, periodo: { inicio: "2026-12-31", fin: "2026-01-01" } } } }, requiresModel],
+        ["Unknown field", { type: "request", operation: "create", input: { body: { ...ContractAcceptanceProbe.fixtures.valid.samplePayload, extra: true } } }, requiresModel],
+        ["Invalid identifier", { type: "request", operation: "get", input: { id: "invalid!" } }, requiresModel],
+        ["Mixed pagination", { type: "request", operation: "list", input: { query: { offset: 0, token: "opaque-1" } } }, requiresModel],
+        ["Invalid token", { type: "request", operation: "list", input: { query: { token: "unknown" } } }, requiresModel],
+        ["Approve project-1", { type: "request", operation: "approve", input: { body: { id: "project-1" } } }, requiresModel],
+        ["Approve with no matching scenarios", { type: "scenario", operation: "AprobarProyecto", count: 0 }, requiresModel],
+        ["Approve with one matching scenario", { type: "scenario", operation: "AprobarProyecto", count: 1 }, requiresModel],
+        ["Approve with two matching scenarios", { type: "scenario", operation: "AprobarProyecto", count: 2 }, requiresModel],
+        ["Run conformance report", { type: "conformance" }, false],
+        ["Show conformance mismatch", { type: "conformance", mismatch: true }, false],
+        ["Run compatibility report", { type: "compatibility" }, false],
+        ["Reset", { type: "reset" }, false]
+      ].forEach(([label, action, disabled]) => addButton(controls, label, action, disabled));
+      renderWalkthroughs();
       renderReports();
     }
 
     function dispatch(action) {
+      state = ContractAcceptanceProbe.reduce(state, action);
+      if (action.type === "reset") [lastRequest, lastResponse, lastTransition, scenarioReport, conformanceReport, compatibilityReport] = [null, null, null, null, null, null];
       if (action.type === "scenario") {
         scenarioReport = ContractAcceptanceProbe.matchScenarios(action.operation, action.count);
         lastResponse = scenarioReport;
         lastTransition = { logicalAdapter: "Mocking Source", operation: action.operation, matchingScenarios: action.count };
-        render(state);
-        return;
-      }
-      if (action.type === "conformance") {
+      } else if (action.type === "conformance") {
         conformanceReport = ContractAcceptanceProbe.runConformance();
         if (action.mismatch) {
           const row = conformanceReport[0];
           conformanceReport[0] = { ...row, engine: { ...row.engine, value: { ...row.engine.value, nombre: "Mismatch" } }, equal: false };
         }
-        render(state);
-        return;
-      }
-      if (action.type === "compatibility") {
+      } else if (action.type === "compatibility") {
         compatibilityReport = ContractAcceptanceProbe.compareSources(ContractAcceptanceProbe.compatibilityBefore, ContractAcceptanceProbe.compatibilityAfter);
-        render(state);
-        return;
-      }
-      if (action.type === "request") {
-        if (!state.clientEnabled || !state.mockEnabled || !state.storageEnabled) return;
+      } else if (action.type === "request" && state.clientEnabled && state.mockEnabled && state.storageEnabled) {
         lastRequest = ContractAcceptanceProbe.clientRequest(action.operation, action.input, state);
         const result = ContractAcceptanceProbe.executeHttp(state, lastRequest);
         state = result.state;
         lastResponse = result.response;
         lastTransition = result.transition;
-        render(state);
-        return;
       }
-      state = ContractAcceptanceProbe.reduce(state, action);
-      if (action.type === "reset") [lastRequest, lastResponse, lastTransition] = [null, null, null];
       render(state);
     }
 
