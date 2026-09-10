@@ -116,10 +116,18 @@ s:ApproveKnownProject a m:Scenario .`,
             clienteId: "cliente-1", nombre: " Proyecto Atlas ", periodo: { inicio: "2026-01-01", fin: "2026-12-31" }, importe: "100.00"
           } } } },
           { label: "List projects", action: { type: "request", operation: "list", input: {} } },
+          { label: "Get project", action: { type: "request", operation: "get", input: { id: "project-1" } } },
           { label: "Patch project", action: { type: "request", operation: "patch", input: { id: "project-1", body: { nombre: " Proyecto Atlas actualizado " } } } },
+          { label: "Delete project", action: { type: "request", operation: "delete", input: { id: "project-1" } } },
           { label: "Reject invalid Periodo without changing storage", action: { type: "request", operation: "create", input: { body: {
             clienteId: "cliente-1", nombre: "Rejected", periodo: { inicio: "2026-12-31", fin: "2026-01-01" }, importe: "100.00"
-          } } } }
+          } } } },
+          { label: "Reject unknown field without changing storage", action: { type: "request", operation: "create", input: { body: {
+            clienteId: "cliente-1", nombre: "Rejected", importe: "100.00", extra: true
+          } } } },
+          { label: "Reject invalid identifier without changing storage", action: { type: "request", operation: "get", input: { id: "invalid!" } } },
+          { label: "Reject mixed pagination without changing storage", action: { type: "request", operation: "list", input: { query: { offset: 0, token: "opaque-1" } } } },
+          { label: "Reject invalid token without changing storage", action: { type: "request", operation: "list", input: { query: { token: "unknown" } } } }
         ]
       }];
 
@@ -436,12 +444,17 @@ s:ApproveKnownProject a m:Scenario .`,
         button.type = "button";
         button.textContent = walkthrough.title === "Source verification check" ? "Run source verification check (verified)" : "Run HTTP acceptance check";
         button.addEventListener("click", () => {
-          [state, lastRequest, lastResponse, lastTransition] = walkthrough.steps.reduce(([next], { action }) => {
-            if (action.type !== "request") return [ContractAcceptanceProbe.reduce(next, action), lastRequest, lastResponse, lastTransition];
+          const results = [];
+          state = walkthrough.steps.reduce((next, { label, action }) => {
+            if (action.type !== "request") return ContractAcceptanceProbe.reduce(next, action);
             const request = ContractAcceptanceProbe.clientRequest(action.operation, action.input, next);
             const result = ContractAcceptanceProbe.executeHttp(next, request);
-            return [result.state, request, result.response, result.transition];
-          }, [ContractAcceptanceProbe.initialState(), null, null, null]);
+            lastRequest = request;
+            lastResponse = result.response;
+            results.push({ label, status: result.response.status, projects: ContractAcceptanceProbe.logicalStorage(result.state).projects });
+            return result.state;
+          }, ContractAcceptanceProbe.initialState());
+          lastTransition = results.length ? { walkthrough: results } : null;
           render(state);
         });
         item.append(button);
