@@ -10,7 +10,7 @@
 ### Issue tracker
 
 Issues are tracked in this repository's GitHub Issues. See `docs/agents/issue-tracker.md`.
-Before creating, reading, listing, updating, labeling, commenting on, closing, or triaging an issue or pull request, read `docs/agents/issue-tracker.md`.
+Before creating an issue, or reading, listing, updating, labeling, commenting on, closing, or triaging an issue or pull request, read `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 
@@ -29,7 +29,7 @@ This is a single-context repository. See `docs/agents/domain.md`.
 - The current inventory is `AGENTS.md`, `CONTEXT.md`, `docs/adr/*.md`, `docs/agents/*.md`, `docs/research/*.md`, `docs/specification.md`, `docs/superpowers/plans/*.md`, `docs/superpowers/specs/*.md`, and `samples/*.md`. New files matching the same categories join the inventory automatically.
 - All content under `prototypes/` is excluded, including READMEs, source files, fixtures, reports, generated evidence, dependencies, and launch instructions. Historical GitHub issues, comments, reviews, and other already-published repository communication are also excluded.
 - Do not rename or reinterpret protected contract surfaces: code-facing identifiers, RDF IRIs, JSON keys, public API names and routes, runtime payload fields, protocol literals, declaration identifiers, serialized data, command-line syntax, and exact example values whose spelling carries contract meaning.
-- Preserve existing paths, filenames, ADR numbering, links, headings, anchors, examples, and cross-references unless a separate decision authorizes a change. The migration is documentation-only except for explicitly in-scope production comments or docstrings.
+- Preserve existing paths, filenames, ADR numbering, links, heading structure, anchor names, examples, and cross-references unless a separate decision authorizes a change. The migration is documentation-only except for explicitly in-scope production comments or docstrings.
 
 #### Documentation review checklist
 

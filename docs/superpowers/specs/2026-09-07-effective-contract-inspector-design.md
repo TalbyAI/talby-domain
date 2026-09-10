@@ -27,11 +27,11 @@ The page will be a thin wrapper around a pure module inside its single `script`.
 The page state will always show:
 
 1. the loaded source;
-2. the reached stage (`loaded`, `verified`, or `materialized`);
+2. the reached stage (`cargada`, `verificada`, or `materializada`);
 3. verification diagnostics;
 4. the effective model, when verification allows it to be materialized.
 
-Each declaration, default, and derived element will include a visible origin: `declared`, `default`, or `derived`. Each derived operation will show its public route, permissions, input/output contract, and applicable rules.
+Each declaration, default, and derived element will include a visible origin: `declarado`, `default`, or `derivado`. Each derived operation will show its public route, permissions, input/output contract, and applicable rules.
 
 The example will be a `gestion` module, a `proyectos` feature, and a `Proyecto` entity, with an identifier, a nested `Periodo` grouping, and a decimal amount. The content will be small and representative; it will not attempt to cover the whole language.
 

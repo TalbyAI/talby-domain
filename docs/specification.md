@@ -159,7 +159,7 @@ Results are the JSON of the declared model, without an additional wrapper except
 
 The workflow and activities that interact with the service model are declared in the DSL. Declarative activities have an explicit transaction boundary: their changes commit together or none do. An operation crossing boundaries is expressed as multiple steps. The persistence mode must be checked against the declared boundary; how to define that boundary remains pending.
 
-Activities in code are reserved for interactions with external systems, such as payments or email. They receive clear, defined inputs, return results or errors, and declare external effects. They do not directly access the main service state, which retains authority over its data.
+External Activity steps are reserved for interactions with external systems, such as payments or email. They receive clear, defined inputs, return results or errors, and declare external effects. They do not directly access the main service state, which retains authority over its data.
 
 The engine interprets the declaration and interacts with simple services that execute those external activities. The workflow engine must be durable and resilient, using Temporal as a behavior reference without yet deciding on a dependency on that product. It will have automatic retries and declarative configuration for each step's behavior. Transport, concrete retry policies, handling of uncertain external results, and compensation remain pending.
 
