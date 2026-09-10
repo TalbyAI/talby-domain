@@ -131,15 +131,22 @@ s:ApproveKnownProject a m:Scenario .`,
           { label: "Verify sources — verified", action: { type: "verify" } },
           { label: "Materialize effective model", action: { type: "materialize" } },
           { label: "Select editor", action: { type: "selectActor", actor: "editor" } },
-          { label: "Create project — 201", action: { type: "request", operation: "create", input: { body: fixtures.valid.samplePayload } } },
+          { label: "Create project one — 201", action: { type: "request", operation: "create", input: { body: fixtures.valid.samplePayload } } },
+          { label: "Create project two — 201", action: { type: "request", operation: "create", input: { body: { ...fixtures.valid.samplePayload, nombre: " Proyecto Beta ", importe: "200.00" } } } },
           { label: "Get project — 200", action: { type: "request", operation: "get", input: { id: "project-1" } } },
-          { label: "Patch project — 200", action: { type: "request", operation: "patch", input: { id: "project-1", body: { nombre: " Proyecto Atlas actualizado " } } } },
-          { label: "List projects — 200", action: { type: "request", operation: "list", input: { query: { limit: 1 } } } },
-          { label: "Delete project — 204", action: { type: "request", operation: "delete", input: { id: "project-1" } } }
+          { label: "Replace complete Periodo — 200", action: { type: "request", operation: "patch", input: { id: "project-1", body: { periodo: { inicio: "2026-02-01", fin: "2026-11-30" } } } } },
+          { label: "List by offset — 200 with continuation token", action: { type: "request", operation: "list", input: { query: { offset: 0, limit: 1 } } } },
+          { label: "List by continuation token — 200", action: { type: "request", operation: "list", input: { query: { token: "opaque-1", limit: 1 } } } },
+          { label: "Delete project one — 204", action: { type: "request", operation: "delete", input: { id: "project-1" } } },
+          { label: "Delete project two — 204; clean state", action: { type: "request", operation: "delete", input: { id: "project-2" } } }
         ]
       }, {
         title: "Rejection",
         steps: [
+          { label: "Load missingReference source", action: { type: "loadInvalidSource", source: "missingReference" } },
+          { label: "Verify missingReference — blocked REFERENCE_NOT_FOUND", action: { type: "verify" } },
+          { label: "Load unsupportedFunction source", action: { type: "loadInvalidSource", source: "unsupportedFunction" } },
+          { label: "Verify unsupportedFunction — blocked FUNCTION_UNSUPPORTED", action: { type: "verify" } },
           { label: "Load valid sources", action: { type: "loadSources" } },
           { label: "Verify sources — verified", action: { type: "verify" } },
           { label: "Materialize effective model", action: { type: "materialize" } },
@@ -156,8 +163,14 @@ s:ApproveKnownProject a m:Scenario .`,
           { label: "Load valid sources", action: { type: "loadSources" } },
           { label: "Verify sources — verified", action: { type: "verify" } },
           { label: "Materialize effective model", action: { type: "materialize" } },
+          { label: "Select editor", action: { type: "selectActor", actor: "editor" } },
+          { label: "Create as editor — 201", action: { type: "request", operation: "create", input: { body: fixtures.valid.samplePayload } } },
+          { label: "AprobarProyecto as editor — authorized 200", action: { type: "request", operation: "approve", input: { body: { id: "project-1" } } } },
           { label: "Select reader", action: { type: "selectActor", actor: "reader" } },
-          { label: "Create as reader — 403", action: { type: "request", operation: "create", input: { body: fixtures.valid.samplePayload } } },
+          { label: "Create as reader — denied 403", action: { type: "request", operation: "create", input: { body: fixtures.valid.samplePayload } } },
+          { label: "AprobarProyecto as reader — denied 403", action: { type: "request", operation: "approve", input: { body: { id: "project-1" } } } },
+          { label: "Select anonymous", action: { type: "selectActor", actor: "anonymous" } },
+          { label: "Read as anonymous — default denied 403", action: { type: "request", operation: "get", input: { id: "project-1" } } },
           { label: "No matching scenarios — not simulated", action: { type: "scenario", operation: "AprobarProyecto", count: 0 } },
           { label: "One matching scenario — matched", action: { type: "scenario", operation: "AprobarProyecto", count: 1 } },
           { label: "Two matching scenarios — ambiguous", action: { type: "scenario", operation: "AprobarProyecto", count: 2 } }
@@ -229,10 +242,27 @@ s:ApproveKnownProject a m:Scenario .`,
         return incidents;
       }
 
+      function validateClientProject(input) {
+        const incidents = [];
+        const known = ["clienteId", "nombre", "periodo", "importe"];
+        for (const key of Object.keys(input)) {
+          if (!known.includes(key)) incidents.push({ code: "UNKNOWN_FIELD", paths: [`/${pointerSegment(key)}`] });
+        }
+        if (!input.nombre) incidents.push({ code: "REQUIRED", paths: ["/nombre"] });
+        if (Object.hasOwn(input, "clienteId") && (typeof input.clienteId !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(input.clienteId))) {
+          incidents.push({ code: "INVALID_IDENTIFIER", paths: ["/clienteId"] });
+        }
+        if (input.periodo && input.periodo.fin < input.periodo.inicio) incidents.push({
+          code: "PERIOD_END_BEFORE_START", paths: ["/periodo/inicio", "/periodo/fin"]
+        });
+        if (typeof input.importe !== "string") incidents.push({ code: "EXACT_DECIMAL_STRING_REQUIRED", paths: ["/importe"] });
+        return incidents;
+      }
+
       function runClientVector(vector) {
         const value = { ...vector.input };
         if (typeof value.nombre === "string") value.nombre = value.nombre.trim();
-        return { value, incidents: validateProject(value) };
+        return { value, incidents: validateClientProject(value) };
       }
 
       function runEngineVector(vector) {
@@ -626,6 +656,7 @@ s:ApproveKnownProject a m:Scenario .`,
         card("Complete visible state", JSON.stringify(visibleState, null, 2)),
         card("Turtle logical adapter — Semantic Source", fixture?.semanticSource || "not selected; no Turtle parser"),
         card("Turtle logical adapter — Mocking Source", fixture?.mockingSource || "optional for CRUD; no Turtle parser"),
+        card("Verification logical adapter", JSON.stringify(currentState.verification || { status: "not run", diagnostics: [] }, null, 2)),
         card("TypeScript-client logical adapter", `${currentState.clientEnabled ? "unblocked" : "blocked"}; HTTP request boundary`),
         card("HTTP/JSON mock logical adapter", `${currentState.mockEnabled ? "unblocked" : "blocked"}; response and transition`),
         card("Transition", lastTransition ? JSON.stringify(lastTransition, null, 2) : "no request"),
