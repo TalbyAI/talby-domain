@@ -1,0 +1,802 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Contract acceptance seam</title>
+  <style>
+    :root { color-scheme: light; font: 16px/1.5 system-ui, sans-serif; }
+    body { margin: 0; background: #f5f7fb; color: #172033; }
+    main { width: min(1180px, calc(100% - 32px)); margin: 0 auto; padding: 36px 0 64px; }
+    section { margin-top: 22px; padding: 22px; background: #fff; border: 1px solid #dce2ee; border-radius: 12px; }
+    h1, h2, h3 { line-height: 1.2; }
+    h1 { margin-bottom: 8px; }
+    h2 { margin-top: 0; }
+    .eyebrow { color: #3457d5; font-weight: 650; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 14px; }
+    .card { padding: 15px; background: #f8faff; border: 1px solid #e2e8f4; border-radius: 9px; }
+    button { cursor: pointer; font: inherit; border: 1px solid #b8c4d8; border-radius: 8px; padding: 8px 11px; background: #fff; color: inherit; }
+    button:hover, button:focus-visible { border-color: #3457d5; outline: 2px solid #c9d3ff; }
+    button:disabled { cursor: not-allowed; opacity: .55; }
+    select { font: inherit; border: 1px solid #b8c4d8; border-radius: 8px; padding: 8px 11px; background: #fff; color: inherit; }
+    select:focus-visible { border-color: #3457d5; outline: 2px solid #c9d3ff; }
+    .controls, [role="tablist"] { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; }
+    .control { display: grid; gap: 5px; }
+    [role="tab"][aria-selected="true"] { background: #3457d5; border-color: #3457d5; color: #fff; }
+    .state-table { grid-column: 1 / -1; }
+    [role="tabpanel"] [aria-current="step"] { color: #173ba8; font-weight: 700; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 8px 6px; border-bottom: 1px solid #e2e8f4; text-align: left; vertical-align: top; }
+    th { color: #526079; font-size: .9rem; }
+    pre { overflow: auto; margin: 8px 0 0; padding: 12px; background: #172033; color: #eef3ff; border-radius: 8px; font: 13px/1.45 ui-monospace, SFMono-Regular, Consolas, monospace; }
+    @media (max-width: 650px) { main { width: min(100% - 20px, 1180px); padding-top: 22px; } section { padding: 16px; } }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <p class="eyebrow">Disposable prototype · contract acceptance seam</p>
+      <h1>Contract acceptance seam</h1>
+      <p id="scope"></p>
+    </header>
+    <section aria-labelledby="state-title">
+      <h2 id="state-title">Current state</h2>
+      <div id="state" class="grid"></div>
+      <pre id="last-request" aria-label="Last request"></pre>
+      <pre id="last-response" aria-label="Last response" aria-live="polite"></pre>
+      <pre id="incidents" aria-label="Incidents" aria-live="polite"></pre>
+    </section>
+    <section aria-labelledby="free-play-title">
+      <h2 id="free-play-title">Free exploration</h2>
+      <div id="free-play" class="grid"></div>
+    </section>
+    <section aria-labelledby="walkthrough-title">
+      <h2 id="walkthrough-title">Guided walkthroughs</h2>
+      <div id="walkthroughs"></div>
+    </section>
+    <section aria-labelledby="reports-title">
+      <h2 id="reports-title">Mocking and compatibility reports</h2>
+      <div id="reports" class="grid" aria-live="polite"></div>
+    </section>
+  </main>
+  <script>
+    "use strict";
+    const ContractAcceptanceProbe = (() => {
+      const effectiveModel = {
+        route: { value: "/projects", origin: "derivado" },
+        operations: ["create", "get", "list", "patch", "delete"],
+        fields: {
+          importe: { type: "ExactDecimal", origin: "declarado" },
+          periodo: { rule: "fin >= inicio", origin: "declarado" }
+        },
+        profileDefaults: { listLimit: { value: 20, origin: "default" } },
+        command: { name: "AprobarProyecto", origin: "declarado" },
+        event: { name: "ProjectApproved", origin: "declarado" }
+      };
+      const fixtures = {
+        valid: {
+          semanticSource: `@prefix c: <https://github.com/TalbyAI/talby-domain/vocab/contract#> .
+@prefix d: <urn:talby:prototype:declaration:> .
+d:Project a c:Entity ; c:name "Proyecto" .`,
+          mockingSource: `@prefix m: <https://github.com/TalbyAI/talby-domain/vocab/mocking#> .
+@prefix s: <urn:talby:prototype:scenario:> .
+s:ApproveKnownProject a m:Scenario .`,
+          effectiveModel,
+          samplePayload: {
+            clienteId: "cliente-1",
+            nombre: "Proyecto Atlas",
+            periodo: { inicio: "2026-01-01", fin: "2026-12-31" },
+            importe: "100.00"
+          },
+          verification: { status: "verified", diagnostics: [] }
+        },
+        missingReference: {
+          semanticSource: `@prefix c: <https://github.com/TalbyAI/talby-domain/vocab/contract#> .
+@prefix d: <urn:talby:prototype:declaration:> .
+d:Project a c:Entity ; c:clienteId d:MissingCliente .`,
+          verification: { status: "blocked", diagnostics: [
+            { code: "REFERENCE_NOT_FOUND", paths: ["/Proyecto/clienteId"] }
+          ] }
+        },
+        unsupportedFunction: {
+          semanticSource: `@prefix c: <https://github.com/TalbyAI/talby-domain/vocab/contract#> .
+@prefix d: <urn:talby:prototype:declaration:> .
+d:Project a c:Entity ; c:Periodo [ c:usesFunction c:UnsupportedFunction ] .`,
+          verification: { status: "blocked", diagnostics: [
+            { code: "FUNCTION_UNSUPPORTED", paths: ["/Proyecto/Periodo"] }
+          ] }
+        },
+        contradictory: {
+          semanticSource: `@prefix c: <https://github.com/TalbyAI/talby-domain/vocab/contract#> .
+@prefix d: <urn:talby:prototype:declaration:> .
+d:Project a c:Entity ; c:importe c:ExactDecimal, c:Integer .`,
+          verification: { status: "blocked", diagnostics: [
+            { code: "DECLARATION_CONTRADICTION", paths: ["/Proyecto/importe"] }
+          ] }
+        }
+      };
+      fixtures.validWithoutMocking = { ...fixtures.valid, mockingSource: null };
+      const sourceNotFound = {
+        status: "blocked",
+        diagnostics: [{ code: "SOURCE_NOT_FOUND", paths: ["/sources"] }]
+      };
+      const actors = {
+        editor: ["projects.read", "projects.write", "projects.approve"],
+        reader: ["projects.read"],
+        anonymous: []
+      };
+      const conformanceVectors = [
+        { name: "trim", input: { clienteId: "cliente-1", nombre: " Proyecto Atlas ", periodo: { inicio: "2026-01-01", fin: "2026-12-31" }, importe: "100.00" } },
+        { name: "idempotent trim", input: { clienteId: "cliente-1", nombre: "Proyecto Atlas", periodo: { inicio: "2026-01-01", fin: "2026-12-31" }, importe: "100.00" } },
+        { name: "invalid Periodo", input: { clienteId: "cliente-1", nombre: "Proyecto Atlas", periodo: { inicio: "2026-12-31", fin: "2026-01-01" }, importe: "100.00" } },
+        { name: "exact decimal string preservation", input: { clienteId: "cliente-1", nombre: "Proyecto Atlas", periodo: { inicio: "2026-01-01", fin: "2026-12-31" }, importe: "100.00" } },
+        { name: "unknown field", input: { clienteId: "cliente-1", nombre: "Proyecto Atlas", periodo: { inicio: "2026-01-01", fin: "2026-12-31" }, importe: "100.00", extra: true } }
+      ];
+      const compatibilityBefore = [
+        { id: "decl:project", route: "/projects", input: ["nombre"], output: ["id", "nombre"] }
+      ];
+      const compatibilityAfter = [
+        { id: "decl:project", route: "/projects-v2", input: ["nombre", "clienteId"], output: ["id", "nombre", "estado"] }
+      ];
+      const paginationBindings = new Map();
+      const walkthroughs = [{
+        title: "Valid journey",
+        steps: [
+          { label: "Load valid sources", action: { type: "loadSources" } },
+          { label: "Verify sources — verified", action: { type: "verify" } },
+          { label: "Materialize effective model", action: { type: "materialize" } },
+          { label: "Select editor", action: { type: "selectActor", actor: "editor" } },
+          { label: "Create project one — 201", action: { type: "request", operation: "create", input: { body: fixtures.valid.samplePayload } } },
+          { label: "Create project two — 201", action: { type: "request", operation: "create", input: { body: { ...fixtures.valid.samplePayload, nombre: " Proyecto Beta ", importe: "200.00" } } } },
+          { label: "Get project — 200", action: { type: "request", operation: "get", input: { id: "project-1" } } },
+          { label: "Replace complete Periodo — 200", action: { type: "request", operation: "patch", input: { id: "project-1", body: { periodo: { inicio: "2026-02-01", fin: "2026-11-30" } } } } },
+          { label: "List by offset — 200 with continuation token", action: { type: "request", operation: "list", input: { query: { offset: 0, limit: 1 } } } },
+          { label: "List by continuation token — 200", action: { type: "request", operation: "list", input: { query: { token: "opaque-1", limit: 1 } } } },
+          { label: "Delete project one — 204", action: { type: "request", operation: "delete", input: { id: "project-1" } } },
+          { label: "Delete project two — 204; clean state", action: { type: "request", operation: "delete", input: { id: "project-2" } } }
+        ]
+      }, {
+        title: "Rejection",
+        steps: [
+          { label: "Load missingReference source", action: { type: "loadInvalidSource", source: "missingReference" } },
+          { label: "Verify missingReference — blocked REFERENCE_NOT_FOUND", action: { type: "verify" } },
+          { label: "Load unsupportedFunction source", action: { type: "loadInvalidSource", source: "unsupportedFunction" } },
+          { label: "Verify unsupportedFunction — blocked FUNCTION_UNSUPPORTED", action: { type: "verify" } },
+          { label: "Load valid sources", action: { type: "loadSources" } },
+          { label: "Verify sources — verified", action: { type: "verify" } },
+          { label: "Materialize effective model", action: { type: "materialize" } },
+          { label: "Select editor", action: { type: "selectActor", actor: "editor" } },
+          { label: "Create baseline project — 201", action: { type: "request", operation: "create", input: { body: fixtures.valid.samplePayload } } },
+          { label: "Invalid Periodo — 422", action: { type: "request", operation: "create", input: { body: { ...fixtures.valid.samplePayload, periodo: { inicio: "2026-12-31", fin: "2026-01-01" } } } } },
+          { label: "Get preserved project after invalid Periodo — 200", action: { type: "request", operation: "get", input: { id: "project-1" } } },
+          { label: "Unknown field — 422", action: { type: "request", operation: "create", input: { body: { ...fixtures.valid.samplePayload, extra: true } } } },
+          { label: "Get preserved project after unknown field — 200", action: { type: "request", operation: "get", input: { id: "project-1" } } },
+          { label: "Invalid identifier — 422", action: { type: "request", operation: "get", input: { id: "invalid!" } } },
+          { label: "Get preserved project after invalid identifier — 200", action: { type: "request", operation: "get", input: { id: "project-1" } } },
+          { label: "Mixed pagination — 400", action: { type: "request", operation: "list", input: { query: { offset: 0, token: "opaque-1" } } } },
+          { label: "Get preserved project after mixed pagination — 200", action: { type: "request", operation: "get", input: { id: "project-1" } } },
+          { label: "Unknown continuation token — 400", action: { type: "request", operation: "list", input: { query: { token: "unknown" } } } },
+          { label: "Get preserved project after unknown token — 200", action: { type: "request", operation: "get", input: { id: "project-1" } } }
+        ]
+      }, {
+        title: "Authorization/mocking",
+        steps: [
+          { label: "Load valid sources", action: { type: "loadSources" } },
+          { label: "Verify sources — verified", action: { type: "verify" } },
+          { label: "Materialize effective model", action: { type: "materialize" } },
+          { label: "Select editor", action: { type: "selectActor", actor: "editor" } },
+          { label: "Create as editor — 201", action: { type: "request", operation: "create", input: { body: fixtures.valid.samplePayload } } },
+          { label: "AprobarProyecto as editor — authorized 200", action: { type: "request", operation: "approve", input: { body: { id: "project-1" } } } },
+          { label: "Select reader", action: { type: "selectActor", actor: "reader" } },
+          { label: "Create as reader — denied 403", action: { type: "request", operation: "create", input: { body: fixtures.valid.samplePayload } } },
+          { label: "AprobarProyecto as reader — denied 403", action: { type: "request", operation: "approve", input: { body: { id: "project-1" } } } },
+          { label: "Select anonymous", action: { type: "selectActor", actor: "anonymous" } },
+          { label: "Read as anonymous — default denied 403", action: { type: "request", operation: "get", input: { id: "project-1" } } },
+          { label: "No matching scenarios — not simulated", action: { type: "scenario", operation: "AprobarProyecto", count: 0 } },
+          { label: "One matching scenario — matched", action: { type: "scenario", operation: "AprobarProyecto", count: 1 } },
+          { label: "Two matching scenarios — ambiguous", action: { type: "scenario", operation: "AprobarProyecto", count: 2 } }
+        ]
+      }, {
+        title: "Conformance/compatibility",
+        completion: "Compatibility categories: compatible, potentially-incompatible, incompatible",
+        steps: [
+          { label: "Run conformance vectors — equal", action: { type: "conformance" } },
+          { label: "Compare declarations — compatible, potentially-incompatible, incompatible", action: { type: "compatibility" } }
+        ]
+      }];
+
+      function fixtureFor(source) {
+        return Object.hasOwn(fixtures, source) ? fixtures[source] : null;
+      }
+
+      function verifySources(fixture) {
+        return fixture.verification;
+      }
+
+      function materializeEffectiveModel(fixture) {
+        if (fixture.verification.status !== "verified") return null;
+        return {
+          route: { value: "/projects", origin: "derivado" },
+          operations: ["create", "get", "list", "patch", "delete"],
+          fields: {
+            importe: { type: "ExactDecimal", origin: "declarado" },
+            periodo: { rule: "fin >= inicio", origin: "declarado" }
+          },
+          profileDefaults: { listLimit: { value: 20, origin: "default" } },
+          command: { name: "AprobarProyecto", origin: "declarado" },
+          event: { name: "ProjectApproved", origin: "declarado" }
+        };
+      }
+
+      function normalizeProject(input) {
+        const value = { ...input };
+        if (typeof value.nombre === "string") value.nombre = value.nombre.trim();
+        return { value, incidents: [] };
+      }
+
+      function matchScenarios(operation, count, fixture) {
+        if (!fixture?.mockingSource || operation !== "AprobarProyecto" || count === 0) return { status: "not-simulated", response: null, error: null };
+        if (count === 1) return { status: "matched", response: { approved: true }, error: null };
+        return { status: "ambiguous", response: null, error: { code: "SCENARIO_AMBIGUOUS" } };
+      }
+
+      function isIdentifier(value) {
+        return typeof value === "string" && /^[A-Za-z0-9_-]{1,128}$/.test(value);
+      }
+
+      function pointerSegment(value) {
+        return value.replace(/~/g, "~0").replace(/\//g, "~1");
+      }
+
+      function validateProject(input, mode = "complete") {
+        const incidents = [];
+        const known = ["clienteId", "nombre", "periodo", "importe"];
+        for (const key of Object.keys(input)) {
+          if (!known.includes(key)) incidents.push({ code: "UNKNOWN_FIELD", paths: [`/${pointerSegment(key)}`] });
+        }
+        if (mode === "complete" && !input.nombre) incidents.push({ code: "REQUIRED", paths: ["/nombre"] });
+        if (Object.hasOwn(input, "clienteId") && !isIdentifier(input.clienteId)) incidents.push({ code: "INVALID_IDENTIFIER", paths: ["/clienteId"] });
+        if (input.periodo && (!Object.hasOwn(input.periodo, "inicio") || !Object.hasOwn(input.periodo, "fin"))) incidents.push({
+          code: "REQUIRED", paths: ["/periodo/inicio", "/periodo/fin"].filter(path => !Object.hasOwn(input.periodo, path.split("/").pop()))
+        });
+        else if (input.periodo && input.periodo.fin < input.periodo.inicio) incidents.push({
+          code: "PERIOD_END_BEFORE_START", paths: ["/periodo/inicio", "/periodo/fin"]
+        });
+        if ((mode === "complete" || Object.hasOwn(input, "importe")) && typeof input.importe !== "string") incidents.push({ code: "EXACT_DECIMAL_STRING_REQUIRED", paths: ["/importe"] });
+        return incidents;
+      }
+
+      function validateClientProject(input) {
+        const incidents = [];
+        const known = ["clienteId", "nombre", "periodo", "importe"];
+        for (const key of Object.keys(input)) {
+          if (!known.includes(key)) incidents.push({ code: "UNKNOWN_FIELD", paths: [`/${pointerSegment(key)}`] });
+        }
+        if (!input.nombre) incidents.push({ code: "REQUIRED", paths: ["/nombre"] });
+        if (Object.hasOwn(input, "clienteId") && (typeof input.clienteId !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(input.clienteId))) {
+          incidents.push({ code: "INVALID_IDENTIFIER", paths: ["/clienteId"] });
+        }
+        if (input.periodo && (!Object.hasOwn(input.periodo, "inicio") || !Object.hasOwn(input.periodo, "fin"))) incidents.push({
+          code: "REQUIRED", paths: ["/periodo/inicio", "/periodo/fin"].filter(path => !Object.hasOwn(input.periodo, path.split("/").pop()))
+        });
+        else if (input.periodo && input.periodo.fin < input.periodo.inicio) incidents.push({
+          code: "PERIOD_END_BEFORE_START", paths: ["/periodo/inicio", "/periodo/fin"]
+        });
+        if (typeof input.importe !== "string") incidents.push({ code: "EXACT_DECIMAL_STRING_REQUIRED", paths: ["/importe"] });
+        return incidents;
+      }
+
+      function runClientVector(vector) {
+        const value = { ...vector.input };
+        if (typeof value.nombre === "string") value.nombre = value.nombre.trim();
+        return { value, incidents: validateClientProject(value) };
+      }
+
+      function runEngineVector(vector) {
+        const normalized = normalizeProject(vector.input);
+        return { value: normalized.value, incidents: normalized.incidents.concat(validateProject(normalized.value)) };
+      }
+
+      function conformanceRow(vector) {
+        const client = runClientVector(vector);
+        const engine = runEngineVector(vector);
+        return {
+          name: vector.name,
+          input: vector.input,
+          client,
+          engine,
+          equal: JSON.stringify(client) === JSON.stringify(engine)
+        };
+      }
+
+      function runConformance() {
+        return conformanceVectors.map(conformanceRow);
+      }
+
+      function compareSources(before, after) {
+        return before.flatMap((previous) => {
+          const next = after.find((declaration) => declaration.id === previous.id);
+          if (!next) return [{ id: previous.id, category: "incompatible", reason: "Declaration is missing." }];
+          const entries = [];
+          const addedOutput = next.output.filter((field) => !previous.output.includes(field));
+          if (addedOutput.length) entries.push({ id: previous.id, category: "compatible", reason: `Output adds ${addedOutput.join(", ")}.` });
+          if (next.route !== previous.route) entries.push({ id: previous.id, category: "potentially-incompatible", reason: `Effective route moves from ${previous.route} to ${next.route}.` });
+          const addedInput = next.input.filter((field) => !previous.input.includes(field));
+          if (addedInput.length) entries.push({ id: previous.id, category: "incompatible", reason: `Required input adds ${addedInput.join(", ")}.` });
+          return entries;
+        });
+      }
+
+      function problem(status, code, detail, errors = []) {
+        return {
+          status,
+          headers: { "content-type": "application/problem+json" },
+          body: {
+            type: `https://talby.ai/problems/${code.toLowerCase()}`,
+            title: detail,
+            status,
+            detail,
+            instance: "urn:talby:prototype:request:1",
+            errors
+          }
+        };
+      }
+
+      function clientRequest(operation, input, state) {
+        const routes = {
+          create: ["POST", "/projects"],
+          get: ["GET", `/projects/${input.id}`],
+          list: ["GET", "/projects"],
+          patch: ["PATCH", `/projects/${input.id}`],
+          delete: ["DELETE", `/projects/${input.id}`],
+          approve: ["POST", "/projects/commands/AprobarProyecto"]
+        };
+        const [method, path] = routes[operation];
+        return {
+          method,
+          path,
+          headers: { "X-Test-Actor": state.actor },
+          ...(Object.hasOwn(input, "query") ? { query: input.query } : {}),
+          ...(Object.hasOwn(input, "body") ? { body: input.body } : {})
+        };
+      }
+
+      function logicalStorage(state) {
+        return {
+          adapter: "SQLite (logical adapter)",
+          projects: state.projects.map(project => ({ ...project }))
+        };
+      }
+
+      function response(status, body) {
+        return { status, headers: status === 204 ? {} : { "content-type": "application/json" }, body };
+      }
+
+      function operationFor(request) {
+        if (request.method === "POST" && request.path === "/projects") return "create";
+        if (request.method === "GET" && request.path === "/projects") return "list";
+        if (request.method === "POST" && request.path === "/projects/commands/AprobarProyecto") return "approve";
+        if (/^\/projects\/[^/]+$/.test(request.path)) return ({ GET: "get", PATCH: "patch", DELETE: "delete" })[request.method];
+        return null;
+      }
+
+      function executeHttp(state, request) {
+        const operation = operationFor(request);
+        const required = ({ create: ["projects.write"], get: ["projects.read"], list: ["projects.read"], patch: ["projects.write"], delete: ["projects.write"], approve: ["projects.approve"] })[operation] || [];
+        const granted = actors[request.headers?.["X-Test-Actor"]] || [];
+        const missing = required.filter(permission => !granted.includes(permission));
+        const transition = { operation: operation || "unknown", required, granted, missing };
+        if (!operation) return { state, response: problem(404, "ROUTE_NOT_FOUND", "Route not found"), transition };
+        if (missing.length) return { state, response: problem(403, "FORBIDDEN", "Permission denied"), transition };
+        const id = request.path.split("/")[2];
+        if (id && !isIdentifier(id)) {
+          return { state, response: problem(422, "INVALID_IDENTIFIER", "Identifier is invalid", [{ code: "INVALID_IDENTIFIER", paths: ["/path/id"] }]), transition };
+        }
+        if (operation === "create") {
+          if (request.body === null) return { state, response: problem(422, "VALIDATION_FAILED", "Project validation failed", [{ code: "NULL_BODY", paths: ["/"] }]), transition };
+          const normalized = normalizeProject(request.body === undefined ? {} : request.body);
+          const incidents = normalized.incidents.concat(validateProject(normalized.value));
+          if (incidents.length) return { state, response: problem(422, "VALIDATION_FAILED", "Project validation failed", incidents), transition };
+          const project = { id: `project-${state.nextProjectNumber}`, ...normalized.value };
+          return { state: { ...state, nextProjectNumber: state.nextProjectNumber + 1, projects: [...state.projects, project] }, response: response(201, project), transition };
+        }
+        if (operation === "list") {
+          if (request.query === null) return { state, response: problem(400, "INVALID_QUERY", "Query is invalid", [{ code: "NULL_QUERY", paths: ["/query"] }]), transition };
+          const query = request.query === undefined ? {} : request.query;
+          if (query.offset !== undefined && query.token !== undefined) return { state, response: problem(400, "PAGINATION_MIXED", "Offset and token cannot be combined"), transition };
+          const signature = JSON.stringify({ limit: query.limit || 20, filter: query.filter || null });
+          let index = Number(query.offset || 0);
+          if (query.token !== undefined) {
+            const binding = paginationBindings.get(query.token);
+            if (!binding) return { state, response: problem(400, "PAGINATION_TOKEN_UNKNOWN", "Continuation token is unknown"), transition };
+            if (binding.signature !== signature) return { state, response: problem(400, "PAGINATION_TOKEN_MISMATCH", "Continuation token does not match the query"), transition };
+            index = binding.index;
+          }
+          const limit = Number(query.limit || 20);
+          const items = state.projects.slice(index, index + limit).map(project => ({ ...project }));
+          const nextIndex = index + items.length;
+          const token = nextIndex < state.projects.length ? `opaque-${nextIndex}` : null;
+          if (token) paginationBindings.set(token, { signature, index: nextIndex });
+          return { state, response: response(200, { items, pagination: { limit, token } }), transition };
+        }
+        const projectId = operation === "approve" ? request.body?.id : id;
+        if (operation === "approve" && !isIdentifier(projectId)) {
+          return { state, response: problem(422, "INVALID_IDENTIFIER", "Identifier is invalid", [{ code: "INVALID_IDENTIFIER", paths: ["/id"] }]), transition };
+        }
+        const index = state.projects.findIndex(project => project.id === projectId);
+        if (index < 0) return { state, response: problem(404, "PROJECT_NOT_FOUND", "Project not found"), transition };
+        if (operation === "get") return { state, response: response(200, { ...state.projects[index] }), transition };
+        if (operation === "delete") return { state: { ...state, projects: state.projects.filter(project => project.id !== projectId) }, response: response(204), transition };
+        if (operation === "patch") {
+          if (request.body === null) return { state, response: problem(422, "VALIDATION_FAILED", "Project validation failed", [{ code: "NULL_BODY", paths: ["/"] }]), transition };
+          const normalized = normalizeProject(request.body === undefined ? {} : request.body);
+          const suppliedIncidents = normalized.incidents.concat(validateProject(normalized.value, "partial"));
+          const project = { ...state.projects[index], ...normalized.value };
+          const { id: ignoredId, ...projectInput } = project;
+          const incidents = suppliedIncidents.concat(validateProject(projectInput).filter(incident => incident.code !== "UNKNOWN_FIELD"));
+          if (incidents.length) return { state, response: problem(422, "VALIDATION_FAILED", "Project validation failed", incidents), transition };
+          const projects = state.projects.map((item, itemIndex) => itemIndex === index ? project : item);
+          return { state: { ...state, projects }, response: response(200, project), transition };
+        }
+        const project = { ...state.projects[index], estado: "approved" };
+        const projects = state.projects.map((item, itemIndex) => itemIndex === index ? project : item);
+        return { state: { ...state, projects }, response: response(200, project), transition };
+      }
+
+      function initialState() {
+        return {
+          stage: "sources-not-loaded",
+          selectedSource: null,
+          verification: null,
+          effectiveModel: null,
+          clientEnabled: false,
+          mockEnabled: false,
+          storageEnabled: false,
+          actor: null,
+          nextProjectNumber: 1,
+          // ponytail: in-memory logical storage; real SQLite belongs to implementation acceptance
+          projects: []
+        };
+      }
+
+      function reduce(state, action) {
+        if (action.type === "reset") {
+          paginationBindings.clear();
+          return initialState();
+        }
+        if (action.type === "loadSources" || action.type === "loadInvalidSource") {
+          const selectedSource = action.source || (action.type === "loadSources" ? "valid" : null);
+          if (!fixtureFor(selectedSource)) {
+            return { ...initialState(), stage: "blocked", selectedSource, verification: sourceNotFound };
+          }
+          return { ...initialState(), stage: "sources-loaded", selectedSource };
+        }
+        if (action.type === "verify" && state.selectedSource) {
+          const fixture = fixtureFor(state.selectedSource);
+          const verification = fixture ? verifySources(fixture) : sourceNotFound;
+          return {
+            ...state,
+            stage: verification.status === "verified" ? "verified" : "blocked",
+            verification,
+            effectiveModel: null,
+            clientEnabled: false,
+            mockEnabled: false,
+            storageEnabled: false
+          };
+        }
+        if (action.type === "materialize" && state.verification?.status === "verified") {
+          return {
+            ...state,
+            stage: "materialized",
+            effectiveModel: materializeEffectiveModel(fixtures[state.selectedSource]),
+            clientEnabled: true,
+            mockEnabled: true,
+            storageEnabled: true
+          };
+        }
+        if (action.type === "selectActor") return { ...state, actor: action.actor };
+        return state;
+      }
+
+      return { fixtures, walkthroughs, initialState, reduce, normalizeProject, validateProject, matchScenarios, runClientVector, runEngineVector, runConformance, compareSources, compatibilityBefore, compatibilityAfter, clientRequest, executeHttp, logicalStorage };
+    })();
+
+    const elements = {
+      scope: document.querySelector("#scope"),
+      state: document.querySelector("#state"),
+      freePlay: document.querySelector("#free-play"),
+      walkthroughs: document.querySelector("#walkthroughs"),
+      reports: document.querySelector("#reports"),
+      lastRequest: document.querySelector("#last-request"),
+      lastResponse: document.querySelector("#last-response"),
+      incidents: document.querySelector("#incidents")
+    };
+    let state = ContractAcceptanceProbe.initialState();
+    let lastRequest = null;
+    let lastResponse = null;
+    let lastTransition = null;
+    let scenarioReport = null;
+    let conformanceReport = null;
+    let compatibilityReport = null;
+    let activeWalkthrough = 0;
+    let walkthroughStep = 0;
+    let restoreWalkthroughFocus = false;
+
+    function card(title, value) {
+      const item = document.createElement("article");
+      item.className = "card";
+      const heading = document.createElement("h3");
+      heading.textContent = title;
+      const content = document.createElement("pre");
+      content.textContent = value;
+      item.append(heading, content);
+      return item;
+    }
+
+    function reportTable(headers, rows) {
+      const table = document.createElement("table");
+      const head = document.createElement("thead");
+      const headRow = document.createElement("tr");
+      headers.forEach((header) => {
+        const cell = document.createElement("th");
+        cell.scope = "col";
+        cell.textContent = header;
+        headRow.append(cell);
+      });
+      head.append(headRow);
+      const body = document.createElement("tbody");
+      rows.forEach((row) => {
+        const rowElement = document.createElement("tr");
+        row.forEach((value) => {
+          const cell = document.createElement("td");
+          cell.textContent = value;
+          rowElement.append(cell);
+        });
+        body.append(rowElement);
+      });
+      table.append(head, body);
+      return table;
+    }
+
+    function completeState(currentState) {
+      const incidents = lastResponse?.body?.errors || [];
+      return {
+        stage: currentState.stage,
+        selectedSources: currentState.selectedSource ? [currentState.selectedSource] : [],
+        verification: currentState.verification,
+        effectiveModel: currentState.effectiveModel,
+        actor: currentState.actor,
+        storage: ContractAcceptanceProbe.logicalStorage(currentState),
+        lastRequest,
+        lastResponse,
+        incidents,
+        reports: { scenario: scenarioReport, conformance: conformanceReport, compatibility: compatibilityReport }
+      };
+    }
+
+    function storageTable(storage) {
+      const item = card("Projects — SQLite logical adapter", storage.adapter);
+      item.classList.add("state-table");
+      item.append(reportTable(["Identifier", "Client", "Name", "Period", "Amount", "Status"], storage.projects.map((project) => [
+        project.id, project.clienteId, project.nombre, project.periodo ? `${project.periodo.inicio} to ${project.periodo.fin}` : "", project.importe, project.estado || ""
+      ])));
+      return item;
+    }
+
+    function renderReports() {
+      const scenario = card("Mocking Source", scenarioReport ? JSON.stringify(scenarioReport, null, 2) : "Optional for CRUD; scenario matching not run.");
+      const conformance = card("Conformance", conformanceReport ? "Client and engine projections" : "Not run.");
+      const compatibility = card("Compatibility", compatibilityReport ? "Declaration comparison" : "Not run.");
+      if (conformanceReport) conformance.append(reportTable(
+        ["Vector", "Input", "Client", "Engine", "Result"],
+        conformanceReport.map((row) => [row.name, JSON.stringify(row.input), JSON.stringify(row.client), JSON.stringify(row.engine), row.equal ? "equal" : "FAILURE: client and engine differ"])
+      ));
+      if (compatibilityReport) compatibility.append(reportTable(
+        ["Declaration Identifier", "Category", "Reason"],
+        compatibilityReport.map((entry) => [entry.id, entry.category, entry.reason])
+      ));
+      elements.reports.replaceChildren(scenario, conformance, compatibility);
+    }
+
+    function addButton(container, label, action, disabled = false) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = label;
+      button.disabled = disabled;
+      button.addEventListener("click", () => dispatch(action));
+      container.append(button);
+    }
+
+    function renderWalkthroughs() {
+      const tablist = document.createElement("div");
+      tablist.setAttribute("role", "tablist");
+      tablist.setAttribute("aria-label", "Guided walkthroughs");
+      ContractAcceptanceProbe.walkthroughs.forEach((walkthrough, index) => {
+        const tab = document.createElement("button");
+        tab.type = "button";
+        tab.id = `walkthrough-tab-${index}`;
+        tab.setAttribute("role", "tab");
+        tab.setAttribute("aria-selected", String(activeWalkthrough === index));
+        tab.setAttribute("aria-controls", "walkthrough-panel");
+        tab.textContent = walkthrough.title;
+        tab.addEventListener("click", () => {
+          state = ContractAcceptanceProbe.reduce(state, { type: "reset" });
+          [lastRequest, lastResponse, lastTransition, scenarioReport, conformanceReport, compatibilityReport] = [null, null, null, null, null, null];
+          activeWalkthrough = index;
+          walkthroughStep = 0;
+          render(state);
+        });
+        tablist.append(tab);
+      });
+      const walkthrough = ContractAcceptanceProbe.walkthroughs[activeWalkthrough];
+      const panel = document.createElement("article");
+      panel.className = "card";
+      panel.id = "walkthrough-panel";
+      panel.setAttribute("role", "tabpanel");
+      panel.setAttribute("aria-labelledby", `walkthrough-tab-${activeWalkthrough}`);
+      const heading = document.createElement("h3");
+      heading.textContent = walkthrough.title;
+      const steps = document.createElement("ol");
+      walkthrough.steps.forEach((step, index) => {
+        const item = document.createElement("li");
+        item.textContent = step.label;
+        if (index === walkthroughStep && walkthroughStep < walkthrough.steps.length) item.setAttribute("aria-current", "step");
+        steps.append(item);
+      });
+      const next = document.createElement("button");
+      let completion = null;
+      next.type = "button";
+      if (walkthroughStep < walkthrough.steps.length) {
+        next.textContent = `Run step ${walkthroughStep + 1}`;
+        next.addEventListener("click", () => {
+          const step = walkthrough.steps[walkthroughStep++];
+          restoreWalkthroughFocus = true;
+          dispatch(step.action);
+        });
+      } else {
+        completion = document.createElement("p");
+        completion.textContent = walkthrough.completion || "Walkthrough complete";
+        next.textContent = `Restart ${walkthrough.title}`;
+        next.addEventListener("click", () => {
+          state = ContractAcceptanceProbe.reduce(state, { type: "reset" });
+          [lastRequest, lastResponse, lastTransition, scenarioReport, conformanceReport, compatibilityReport] = [null, null, null, null, null, null];
+          walkthroughStep = 0;
+          render(state);
+        });
+      }
+      panel.append(heading, steps);
+      if (completion) panel.append(completion);
+      panel.append(next);
+      elements.walkthroughs.replaceChildren(tablist, panel);
+      if (restoreWalkthroughFocus) {
+        next.focus();
+        restoreWalkthroughFocus = false;
+      }
+    }
+
+    function render(currentState) {
+      const fixture = Object.hasOwn(ContractAcceptanceProbe.fixtures, currentState.selectedSource)
+        ? ContractAcceptanceProbe.fixtures[currentState.selectedSource]
+        : null;
+      const visibleState = completeState(currentState);
+      elements.scope.textContent = "Logical contract-level probe; no parser, runtime, network, or persistence is run.";
+      elements.state.replaceChildren(
+        card("Complete visible state", JSON.stringify(visibleState, null, 2)),
+        card("Turtle logical adapter — Semantic Source", fixture?.semanticSource || "not selected; no Turtle parser"),
+        card("Turtle logical adapter — Mocking Source", fixture?.mockingSource || "optional for CRUD; no Turtle parser"),
+        card("Verification logical adapter", JSON.stringify(currentState.verification || { status: "not run", diagnostics: [] }, null, 2)),
+        card("TypeScript-client logical adapter", `${currentState.clientEnabled ? "unblocked" : "blocked"}; HTTP request boundary`),
+        card("HTTP/JSON mock logical adapter", `${currentState.mockEnabled ? "unblocked" : "blocked"}; response and transition`),
+        card("Transition", lastTransition ? JSON.stringify(lastTransition, null, 2) : "no request"),
+        storageTable(visibleState.storage)
+      );
+      elements.lastRequest.textContent = lastRequest ? JSON.stringify(lastRequest, null, 2) : "No request";
+      elements.lastResponse.textContent = lastResponse ? JSON.stringify(lastResponse, null, 2) : "No response";
+      elements.incidents.textContent = visibleState.incidents.length ? JSON.stringify(visibleState.incidents, null, 2) : "No incidents";
+      const controls = document.createElement("div");
+      controls.className = "controls";
+      const sourceControl = document.createElement("div");
+      sourceControl.className = "control";
+      const sourceLabel = document.createElement("label");
+      sourceLabel.htmlFor = "source-variant";
+      sourceLabel.textContent = "Source variant";
+      const source = document.createElement("select");
+      source.id = "source-variant";
+      ["valid", "validWithoutMocking", "missingReference", "unsupportedFunction", "contradictory"].forEach((value) => {
+        const option = document.createElement("option");
+        option.value = value;
+        option.textContent = value;
+        option.selected = value === currentState.selectedSource;
+        source.append(option);
+      });
+      const load = document.createElement("button");
+      load.type = "button";
+      load.textContent = "Load selected source";
+      load.addEventListener("click", () => dispatch({ type: source.value === "valid" || source.value === "validWithoutMocking" ? "loadSources" : "loadInvalidSource", source: source.value }));
+      sourceControl.append(sourceLabel, source, load);
+      const actorControl = document.createElement("div");
+      actorControl.className = "control";
+      const actorLabel = document.createElement("label");
+      actorLabel.htmlFor = "test-actor";
+      actorLabel.textContent = "Test actor";
+      const actor = document.createElement("select");
+      actor.id = "test-actor";
+      actor.disabled = !currentState.effectiveModel;
+      ["editor", "reader", "anonymous"].forEach((value) => {
+        const option = document.createElement("option");
+        option.value = value;
+        option.textContent = value;
+        option.selected = value === currentState.actor;
+        actor.append(option);
+      });
+      const selectActor = document.createElement("button");
+      selectActor.type = "button";
+      selectActor.textContent = "Select actor";
+      selectActor.disabled = !currentState.effectiveModel;
+      selectActor.addEventListener("click", () => dispatch({ type: "selectActor", actor: actor.value }));
+      actorControl.append(actorLabel, actor, selectActor);
+      elements.freePlay.replaceChildren(sourceControl, actorControl, controls);
+      const requiresModel = !currentState.effectiveModel;
+      [
+        ["Load valid sources", { type: "loadSources" }, false],
+        ["Load valid sources without Mocking Source", { type: "loadSources", source: "validWithoutMocking" }, false],
+        ["Load missing reference", { type: "loadInvalidSource", source: "missingReference" }, false],
+        ["Load unsupported function", { type: "loadInvalidSource", source: "unsupportedFunction" }, false],
+        ["Load contradictory declaration", { type: "loadInvalidSource", source: "contradictory" }, false],
+        ["Verify sources", { type: "verify" }, false],
+        ["Materialize effective model", { type: "materialize" }, currentState.verification?.status !== "verified"],
+        ["Act as editor", { type: "selectActor", actor: "editor" }, requiresModel],
+        ["Act as reader", { type: "selectActor", actor: "reader" }, requiresModel],
+        ["Act as anonymous", { type: "selectActor", actor: "anonymous" }, requiresModel],
+        ["Create valid project", { type: "request", operation: "create", input: { body: ContractAcceptanceProbe.fixtures.valid.samplePayload } }, requiresModel],
+        ["List projects", { type: "request", operation: "list", input: { query: { limit: 1 } } }, requiresModel],
+        ["Get project-1", { type: "request", operation: "get", input: { id: "project-1" } }, requiresModel],
+        ["Patch project-1", { type: "request", operation: "patch", input: { id: "project-1", body: { nombre: " Proyecto Atlas actualizado " } } }, requiresModel],
+        ["Delete project-1", { type: "request", operation: "delete", input: { id: "project-1" } }, requiresModel],
+        ["Invalid Periodo", { type: "request", operation: "create", input: { body: { ...ContractAcceptanceProbe.fixtures.valid.samplePayload, periodo: { inicio: "2026-12-31", fin: "2026-01-01" } } } }, requiresModel],
+        ["Unknown field", { type: "request", operation: "create", input: { body: { ...ContractAcceptanceProbe.fixtures.valid.samplePayload, extra: true } } }, requiresModel],
+        ["Invalid identifier", { type: "request", operation: "get", input: { id: "invalid!" } }, requiresModel],
+        ["Mixed pagination", { type: "request", operation: "list", input: { query: { offset: 0, token: "opaque-1" } } }, requiresModel],
+        ["Invalid token", { type: "request", operation: "list", input: { query: { token: "unknown" } } }, requiresModel],
+        ["Approve project-1", { type: "request", operation: "approve", input: { body: { id: "project-1" } } }, requiresModel],
+        ["Approve with no matching scenarios", { type: "scenario", operation: "AprobarProyecto", count: 0 }, requiresModel],
+        ["Approve with one matching scenario", { type: "scenario", operation: "AprobarProyecto", count: 1 }, requiresModel],
+        ["Approve with two matching scenarios", { type: "scenario", operation: "AprobarProyecto", count: 2 }, requiresModel],
+        ["Run conformance report", { type: "conformance" }, false],
+        ["Show conformance mismatch", { type: "conformance", mismatch: true }, false],
+        ["Run compatibility report", { type: "compatibility" }, false],
+        ["Reset", { type: "reset" }, false]
+      ].forEach(([label, action, disabled]) => addButton(controls, label, action, disabled));
+      renderWalkthroughs();
+      renderReports();
+    }
+
+    function dispatch(action) {
+      state = ContractAcceptanceProbe.reduce(state, action);
+      if (["reset", "loadSources", "loadInvalidSource"].includes(action.type)) [lastRequest, lastResponse, lastTransition, scenarioReport, conformanceReport, compatibilityReport] = [null, null, null, null, null, null];
+      if (action.type === "scenario") {
+        scenarioReport = ContractAcceptanceProbe.matchScenarios(action.operation, action.count, ContractAcceptanceProbe.fixtures[state.selectedSource]);
+        lastResponse = scenarioReport;
+        lastTransition = { logicalAdapter: "Mocking Source", operation: action.operation, matchingScenarios: action.count };
+      } else if (action.type === "conformance") {
+        conformanceReport = ContractAcceptanceProbe.runConformance();
+        if (action.mismatch) {
+          const row = conformanceReport[0];
+          conformanceReport[0] = { ...row, engine: { ...row.engine, value: { ...row.engine.value, nombre: "Mismatch" } }, equal: false };
+        }
+      } else if (action.type === "compatibility") {
+        compatibilityReport = ContractAcceptanceProbe.compareSources(ContractAcceptanceProbe.compatibilityBefore, ContractAcceptanceProbe.compatibilityAfter);
+      } else if (action.type === "request" && state.clientEnabled && state.mockEnabled && state.storageEnabled) {
+        lastRequest = ContractAcceptanceProbe.clientRequest(action.operation, action.input, state);
+        const result = ContractAcceptanceProbe.executeHttp(state, lastRequest);
+        state = result.state;
+        lastResponse = result.response;
+        lastTransition = result.transition;
+      }
+      render(state);
+    }
+
+    render(state);
+  </script>
+</body>
+</html>
