@@ -6,6 +6,8 @@ Decision approved by the user on September 12, 2026. Its incorporation is subjec
 
 The first-delivery Visual Source is a separate RDF source with its own ontology. It is scoped to one Module and annotates stable semantic declaration IRIs. The source is representation metadata only: it cannot change the Semantic Source, the effective model, contract compatibility, permissions, routes, payloads, mocking, or execution.
 
+The Module binding is selection context, not a second semantic identity: a Visual Source is selected for exactly one Module. Validation resolves each annotation target to its owning Module in the selected Semantic Source and requires it to match the selected Module. A target absent from the selected Module's semantic declarations, including a declaration that belongs to another loaded Module, is retained as an orphan with a visible non-blocking diagnostic and is never applied.
+
 The visual vocabulary uses the parallel namespace `https://github.com/TalbyAI/talby-domain/vocab/visual#`, abbreviated as `visual:`. The approved SHACL namespace remains `https://github.com/TalbyAI/talby-domain/vocab/shapes#`.
 
 The profile uses an annotation graph rather than a second semantic identity. A declaration IRI is the subject of its visual predicates; the profile does not introduce a `VisualElement` wrapper, visual-only nodes, or a second identifier. A declaration may have no visual annotation, and it has at most one core annotation in this profile.
@@ -27,7 +29,7 @@ The vocabulary does not duplicate semantic names, descriptions, routes, or ident
 
 The core shape is closed and checks known predicates, cardinalities, datatypes, coordinate pairing, non-negative dimensions, and the color lexical form. Unknown core predicates are structural errors; extension data belongs below `visual:extension` and is preserved as RDF graph content even when a tool cannot interpret it. Preservation does not promise byte-for-byte preservation of Turtle formatting.
 
-Structural errors are reported as errors. A syntactically valid annotation whose declaration IRI is absent from the selected Semantic Source is retained as an orphan with a visible non-blocking diagnostic. It is not applied to another declaration and cannot affect semantic execution. No IRI is dereferenced automatically, and extension content cannot execute code or fetch external assets.
+Structural errors are reported as errors. A syntactically valid annotation whose target is absent from the selected Module's semantic declarations, including a declaration that belongs to another loaded Module, is retained as an orphan with a visible non-blocking diagnostic. It is not applied to another declaration and cannot affect semantic execution. No IRI is dereferenced automatically, and extension content cannot execute code or fetch external assets.
 
 ## Compatibility and execution boundary
 
@@ -39,7 +41,7 @@ The eventual conformance evidence must demonstrate that:
 
 1. a valid annotation preserves its stable target through semantic rename or reorganization;
 2. invalid core data is rejected and unknown extension data survives round-tripping;
-3. an orphan target is retained with a diagnostic and has no execution effect;
+3. an orphan target, including a declaration from another loaded Module, is retained with a diagnostic and has no execution effect;
 4. changing only visual data leaves the effective semantic model and execution results unchanged; and
 5. visual sources do not trigger network loads or script execution.
 
