@@ -50,7 +50,13 @@ Input that describes changes to a model: an absent field keeps its previous valu
 RDF data that declares the meaning and contracts of the service according to its semantic ontologies.
 
 **Visual Source**:
-RDF data that describes location, colors, and other representation details of semantic elements according to a visual ontology, without changing their meaning.
+RDF data in a separate source and visual ontology that annotates semantic declarations with representation details such as position, size, and color, without changing their meaning, contract compatibility, or execution. In the first-delivery profile, it is scoped to one Module and uses the semantic declaration IRI as the annotation subject.
+
+**Visual Annotation**:
+Visual representation metadata attached to one Declaration Identifier in a Visual Source. The first-delivery profile permits one core annotation per declaration and does not introduce a second semantic identity for it.
+
+**Visual Extension**:
+Explicit RDF content in a Visual Source that a tool does not interpret but must preserve. A Visual Extension cannot add semantic behavior or trigger execution.
 
 **Mocking Source**:
 Optional RDF data that enriches operation simulation according to a mocking ontology. It is selected when the prototype runs.
