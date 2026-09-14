@@ -302,13 +302,15 @@ function diagnosticsFor(source) {
 
   for (const declaration of declarations) {
     const nameTerms = objects(source.graph, declaration.declarationIdentifier, `${CONTRACT}name`).filter((term) => term.termType === "Literal");
-    if (declaration.kind === "Module" && nameTerms.length !== 1) diagnostics.push({
+    const parentTerms = objects(source.graph, declaration.declarationIdentifier, CONTRACT_PARENT);
+    if ((declaration.kind === "Module" || organizationalKinds.has(declaration.kind)) && nameTerms.length !== 1) diagnostics.push({
       code: nameTerms.length === 0 ? "NAME_REQUIRED" : "NAME_CARDINALITY",
       target: declaration.declarationIdentifier
     });
-    else if (declaration.kind === "Module" && !declaration.name.trim()) diagnostics.push({ code: "NAME_REQUIRED", target: declaration.declarationIdentifier });
+    else if ((declaration.kind === "Module" || organizationalKinds.has(declaration.kind)) && !declaration.name.trim()) diagnostics.push({ code: "NAME_REQUIRED", target: declaration.declarationIdentifier });
     if (declaration.kind === "Module" && declaration.parentIdentifiers.length) diagnostics.push({ code: "MODULE_PARENT_FORBIDDEN", target: declaration.declarationIdentifier });
-    if (organizationalKinds.has(declaration.kind) && declaration.parentIdentifiers.length === 0) diagnostics.push({ code: "PARENT_REQUIRED", target: declaration.declarationIdentifier });
+    if (organizationalKinds.has(declaration.kind) && parentTerms.length === 0) diagnostics.push({ code: "PARENT_REQUIRED", target: declaration.declarationIdentifier });
+    if (organizationalKinds.has(declaration.kind) && parentTerms.some((term) => term.termType !== "NamedNode")) diagnostics.push({ code: "PARENT_IRI_REQUIRED", target: declaration.declarationIdentifier });
     for (const parent of declaration.parentIdentifiers) {
       const parentDeclaration = byId.get(parent);
       if (!parentDeclaration) diagnostics.push({ code: "PARENT_NOT_FOUND", target: declaration.declarationIdentifier, parent });
@@ -360,7 +362,7 @@ function ownershipFor(declarations) {
 export function loadSemanticSource(input) {
   const raw = typeof input === "string" ? input : input?.raw ?? null;
   const graph = typeof input === "string"
-    ? new TurtleParser(input).parse()
+    ? uniqueTriples(new TurtleParser(input).parse())
     : uniqueTriples((input?.graph ?? []).map(normaliseTriple));
   return { raw, graph, declarations: declarationRecords(graph) };
 }

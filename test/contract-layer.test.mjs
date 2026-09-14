@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { inspectSemanticSource } from "../src/contract-layer.mjs";
+import { inspectSemanticSource, loadSemanticSource } from "../src/contract-layer.mjs";
 
 test("materializes a declaration index with its owning Module", () => {
   const result = inspectSemanticSource(`
@@ -66,4 +66,45 @@ test("accepts an explicitly typed RDF string literal", () => {
 
   assert.equal(result.verification.status, "verified");
   assert.equal(result.effectiveModel.declarationIndex["urn:example:orders"].name, "Orders");
+});
+
+test("requires a name on every organizational declaration", () => {
+  const result = inspectSemanticSource(`
+    @prefix c: <https://github.com/TalbyAI/talby-domain/vocab/contract#> .
+    @prefix d: <urn:example:> .
+    d:orders a c:Module ; c:name "Orders" .
+    d:order a c:Entity ; c:parent d:orders .
+  `);
+
+  assert.equal(result.verification.status, "blocked");
+  assert.deepEqual(result.verification.diagnostics, [{
+    code: "NAME_REQUIRED",
+    target: "urn:example:order"
+  }]);
+});
+
+test("requires parent links to use Declaration Identifier IRIs", () => {
+  const result = inspectSemanticSource(`
+    @prefix c: <https://github.com/TalbyAI/talby-domain/vocab/contract#> .
+    @prefix d: <urn:example:> .
+    d:orders a c:Module ; c:name "Orders" .
+    d:order a c:Entity ; c:name "Order" ; c:parent "orders" .
+  `);
+
+  assert.equal(result.verification.status, "blocked");
+  assert.deepEqual(result.verification.diagnostics, [{
+    code: "PARENT_IRI_REQUIRED",
+    target: "urn:example:order"
+  }]);
+});
+
+test("treats repeated RDF triples as one graph statement", () => {
+  const source = loadSemanticSource(`
+    @prefix c: <https://github.com/TalbyAI/talby-domain/vocab/contract#> .
+    @prefix d: <urn:example:> .
+    d:orders a c:Module ; c:name "Orders" .
+    d:orders c:name "Orders" .
+  `);
+
+  assert.equal(source.graph.filter((triple) => triple.predicate.value.endsWith("name")).length, 1);
 });
