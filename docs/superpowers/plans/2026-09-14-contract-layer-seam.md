@@ -266,13 +266,13 @@ Expected: PASS with no Visual Source behavior or prototype dependency.
 **Interfaces:**
 - No new interface; this task verifies the implemented seam against the downstream binding contract.
 
-- [ ] **Step 1: Run the complete repository test command**
+- [x] **Step 1: Run the complete repository test command**
 
 Run: `node --test test/contract-layer.test.mjs test/contract-acceptance.test.mjs`
 
 Expected: PASS with zero failures.
 
-- [ ] **Step 2: Check the branch diff and repository safety**
+- [x] **Step 2: Check the branch diff and repository safety**
 
 Run:
 
@@ -282,12 +282,12 @@ git diff --check origin/main...HEAD
 git diff --name-only origin/main...HEAD
 ```
 
-Expected: only the documentation base commit, this plan, `src/contract-layer.mjs`, and `test/contract-layer.test.mjs` appear; no prototype, Visual Source, or root exploratory sample changes appear.
+Expected: only the documentation base commit, this plan, `src/contract-layer.mjs`, `src/contract-acceptance.mjs`, `test/contract-layer.test.mjs`, and `test/contract-acceptance.test.mjs` appear; no prototype, Visual Source, or root exploratory sample changes appear.
 
-- [ ] **Step 3: Review the final diff**
+- [x] **Step 3: Review the final diff**
 
 Confirm that the public result exposes Semantic Source, effective model, Declaration Identifier, and Module ownership; that visual binding is absent; and that no source graph is rewritten.
 
-- [ ] **Step 4: Commit any review correction and rerun the complete test**
+- [x] **Step 4: Commit review corrections and rerun the complete test**
 
 Use the smallest correction, then rerun `node --test test/contract-layer.test.mjs` and `git diff --check origin/main...HEAD` before reporting the branch ready.
