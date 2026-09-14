@@ -2,20 +2,24 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Implement the smallest production Contract Layer seam that loads and verifies a Semantic Source, materializes an effective model, and exposes stable Declaration Identifier and Module-ownership data for downstream consumers.
+**Goal:** Implement the first production Contract Layer acceptance path that loads and verifies a Semantic Source, materializes an effective model, and exposes stable Declaration Identifier and Module-ownership data through a project-management client, HTTP/JSON mock, SQLite persistence, conformance report, and compatibility report.
 
-**Architecture:** A pure ECMAScript module accepts either approved-subset Turtle or an already materialized RDF triple list, normalizes it into an immutable-in-result Semantic Source, verifies declaration structure, and returns an effective model. The public interface exposes one inspection function plus the source loader; ownership resolution stays inside this module and contains no Visual Source behavior.
+**Architecture:** `src/contract-layer.mjs` accepts either approved-subset Turtle or an already materialized RDF triple list, normalizes it into a separate Semantic Source snapshot, verifies declaration structure, and returns an effective model. A separate acceptance module consumes that seam for the fixed project-management contract, derives the public operations, runs normalization and validation, and exposes the HTTP/JSON, SQLite, Mocking Source, conformance, and compatibility boundaries. No module parses or materializes a Visual Source.
 
-**Tech Stack:** Node.js ECMAScript modules, the Node standard library, and `node:test`; no runtime dependencies, network access, generated files, or prototype references.
+**Tech Stack:** Node.js ECMAScript modules, the Node standard library (`node:crypto` and `node:sqlite`), and `node:test`; no runtime dependencies, network access, generated files, or prototype references.
 
 ## Global Constraints
 
 - Semantic, Visual, Mocking, and Governance Sources remain separate RDF sources with separate ontologies.
 - A Declaration Identifier is the stable IRI of a semantic declaration and is independent of its name and parent.
 - A Module is parentless and owns itself; other declarations inherit the root Module reached through their semantic `parent` chain.
+- A `BusinessError` uses its declared `module` relation for ownership; the relation must resolve to one Module.
 - Verification is blocking for malformed source, missing organizational parents, invalid declaration identifiers, and parent cycles; no partial effective model is returned.
 - Ownership data is deterministic and preserves multiple or zero resolved owners so a later Visual Source consumer can report ambiguity or orphaning without guessing.
 - The input source and graph are never rewritten; the returned result is a separate object.
+- Client and engine normalization are independent runners over the same public vectors; neither runner consumes the other's result.
+- SQLite is the persistence adapter, while its physical schema remains private to the acceptance module.
+- Continuation tokens are authenticated opaque JWE Compact values bound to the effective list request and validated on every request.
 - Production code, tests, and documentation are outside `prototypes/`; existing prototypes remain unchanged and isolated.
 - Human-readable repository content and comments are written in English.
 
@@ -32,7 +36,7 @@
 - `loadSemanticSource(turtleOrGraph)` returns a normalized Semantic Source.
 - `materializeEffectiveModel(verifiedSource)` returns a model only after successful verification.
 
-- [ ] **Step 1: Write the failing same-Module ownership test**
+- [x] **Step 1: Write the failing same-Module ownership test**
 
 ```js
 test("materializes a declaration index with its owning Module", () => {
@@ -49,13 +53,13 @@ test("materializes a declaration index with its owning Module", () => {
 });
 ```
 
-- [ ] **Step 2: Run the focused test and verify the expected missing-export failure**
+- [x] **Step 2: Run the focused test and verify the expected missing-export failure**
 
 Run: `node --test test/contract-layer.test.mjs`
 
 Expected: FAIL because `test/contract-layer.test.mjs` cannot import the missing module exports.
 
-- [ ] **Step 3: Add the minimal module export surface**
+- [x] **Step 3: Add the minimal module export surface**
 
 ```js
 export function inspectSemanticSource() {
@@ -71,17 +75,17 @@ export function materializeEffectiveModel() {
 }
 ```
 
-- [ ] **Step 4: Re-run the focused test and verify the expected implementation failure**
+- [x] **Step 4: Re-run the focused test and verify the expected implementation failure**
 
 Run: `node --test test/contract-layer.test.mjs`
 
 Expected: FAIL because the seam still has no source parsing or materialization behavior.
 
-- [ ] **Step 5: Commit the red seam**
+- [x] **Step 5: Commit the first green seam**
 
 ```powershell
 git add -- src/contract-layer.mjs test/contract-layer.test.mjs
-git commit -m "test: define Contract Layer semantic seam"
+git commit -m "feat: establish Contract Layer semantic seam"
 ```
 
 ### Task 2: Load the bounded RDF/Turtle source and verify declarations
@@ -94,7 +98,7 @@ git commit -m "test: define Contract Layer semantic seam"
 - `loadSemanticSource(input)` accepts Turtle text or `{ graph: Triple[] }` and returns `{ raw, graph, declarations }`.
 - `inspectSemanticSource(input)` returns a blocking verification result when the source has no stable declaration IRI or has an invalid hierarchy.
 
-- [ ] **Step 1: Add a failing parser and blocking-verification test**
+- [x] **Step 1: Add failing parser and blocking-verification tests**
 
 ```js
 test("keeps the Semantic Source graph separate and blocks a parent cycle", () => {
@@ -115,27 +119,27 @@ test("keeps the Semantic Source graph separate and blocks a parent cycle", () =>
 });
 ```
 
-- [ ] **Step 2: Run the test and verify it fails for the missing parser/verification behavior**
+- [x] **Step 2: Run the tests and verify they fail for missing parser/verification behavior**
 
 Run: `node --test test/contract-layer.test.mjs`
 
 Expected: FAIL because the loader does not yet produce RDF terms or hierarchy diagnostics.
 
-- [ ] **Step 3: Implement only the approved Turtle subset and source normalization**
+- [x] **Step 3: Implement only the approved Turtle subset and source normalization**
 
 Implement prefix declarations, named IRI/prefixed-name terms, literals, `a`, semicolon/comma predicate lists, and blank-node property lists. Keep the graph as triples and derive declarations only from contract declaration types.
 
-- [ ] **Step 4: Implement structural verification**
+- [x] **Step 4: Implement structural verification**
 
 Reject blank-node declaration identifiers, parentless organizational declarations, non-Module parents, missing parents, and parent cycles. Sort diagnostics by `code` and target IRI before returning them.
 
-- [ ] **Step 5: Run the focused test and the complete test file**
+- [x] **Step 5: Run the focused test and the complete test file**
 
 Run: `node --test test/contract-layer.test.mjs`
 
 Expected: PASS with zero failures.
 
-- [ ] **Step 6: Commit the loader and verification increment**
+- [x] **Step 6: Commit the loader and verification increment**
 
 ```powershell
 git add -- src/contract-layer.mjs test/contract-layer.test.mjs
@@ -152,7 +156,7 @@ git commit -m "feat: load and verify Semantic Source declarations"
 - `effectiveModel.declarationIndex[id]` exposes `declarationIdentifier`, `kind`, `name`, `parentIdentifiers`, `ownerModule`, and `ownerModules`.
 - `effectiveModel.moduleOwnership[id]` exposes the deterministic `{ ownerModule, ownerModules }` seam consumed by #36.
 
-- [ ] **Step 1: Add failing tests for rename/reorganization stability and ambiguous/unowned ownership**
+- [x] **Step 1: Add tests for rename/reorganization stability and ambiguous/unowned ownership**
 
 ```js
 test("keeps the Declaration Identifier stable when name and parent change", () => {
@@ -176,49 +180,81 @@ test("keeps the Declaration Identifier stable when name and parent change", () =
 });
 
 test("exposes all resolved owners without choosing an ambiguous context", () => {
-  const result = inspectSemanticSource({
-    graph: [
-      ["urn:example:one", "http://www.w3.org/1999/02/22-rdf-syntax-ns#type", "https://github.com/TalbyAI/talby-domain/vocab/contract#Module"],
-      ["urn:example:two", "http://www.w3.org/1999/02/22-rdf-syntax-ns#type", "https://github.com/TalbyAI/talby-domain/vocab/contract#Module"],
-      ["urn:example:shared", "http://www.w3.org/1999/02/22-rdf-syntax-ns#type", "https://github.com/TalbyAI/talby-domain/vocab/contract#Field"],
-      ["urn:example:shared", "https://github.com/TalbyAI/talby-domain/vocab/contract#parent", "urn:example:one"],
-      ["urn:example:shared", "https://github.com/TalbyAI/talby-domain/vocab/contract#parent", "urn:example:two"]
-    ]
-  });
+  const result = inspectSemanticSource(`
+    @prefix c: <https://github.com/TalbyAI/talby-domain/vocab/contract#> .
+    @prefix d: <urn:example:> .
+    d:one a c:Module ; c:name "One" .
+    d:two a c:Module ; c:name "Two" .
+    d:shared a c:Field ; c:parent d:one, d:two .
+  `);
 
   assert.deepEqual(result.effectiveModel.moduleOwnership["urn:example:shared"].ownerModules, ["urn:example:one", "urn:example:two"]);
   assert.equal(result.effectiveModel.moduleOwnership["urn:example:shared"].ownerModule, null);
 });
 ```
 
-- [ ] **Step 2: Run the tests and verify the new assertions fail**
+- [x] **Step 2: Run the tests and verify the new assertions fail**
 
 Run: `node --test test/contract-layer.test.mjs`
 
 Expected: FAIL because the effective model does not yet expose the index and ownership records.
 
-- [ ] **Step 3: Implement deterministic ownership resolution**
+- [x] **Step 3: Implement deterministic ownership resolution**
 
 Resolve a Module to itself, recursively union parent owners, sort owner IRIs, and return `ownerModule` only for exactly one owner. Preserve zero owners as `[]` and multiple owners as an explicit list.
 
-- [ ] **Step 4: Implement the effective-model result**
+- [x] **Step 4: Implement the effective-model result**
 
 Return a new object containing the normalized Semantic Source, declarations, `declarationIndex`, and `moduleOwnership`. Do not mutate or merge the original graph, and do not import or call any Visual Source code.
 
-- [ ] **Step 5: Run all tests and inspect the public result**
+- [x] **Step 5: Run all tests and inspect the public result**
 
 Run: `node --test test/contract-layer.test.mjs`
 
 Expected: PASS with zero failures; the test output must not contain warnings or network activity.
 
-- [ ] **Step 6: Commit the effective-model seam**
+- [x] **Step 6: Commit the effective-model seam**
 
 ```powershell
 git add -- src/contract-layer.mjs test/contract-layer.test.mjs
 git commit -m "feat: expose effective declaration ownership seam"
 ```
 
-### Task 4: Verify the branch and hand off to #36
+### Task 4: Add the project-management acceptance path
+
+**Files:**
+- Create: `src/contract-acceptance.mjs`
+- Create: `test/contract-acceptance.test.mjs`
+- Modify: `src/contract-layer.mjs` only when the generic source seam needs an approved contract predicate or diagnostic.
+
+**Interfaces:**
+- `createAcceptanceService(options)` explicitly selects a Semantic Source and optional Mocking Source, and returns verification, effective-model, client, HTTP/JSON, SQLite, and report seams.
+- `generateTypeScriptClient(effectiveModel)` returns the generated TypeScript client source for the selected public operations.
+- `compareSources(before, after)` compares effective declarations by Declaration Identifier without requiring versions.
+
+- [ ] **Step 1: Add failing public-source and effective-model tests**
+
+Cover the project fixture, declared/default/derived origins, stable Declaration Identifiers, Module ownership, derived CRUD routes, `Cliente`, `Proyecto`, `Periodo`, the exact decimal field, the declared Event, and `AprobarProyecto`.
+
+- [ ] **Step 2: Add the independent client and engine normalization/validation runners**
+
+Cover ordered `trim`, exact decimal strings, identifier lexical rules, required/nullability, undeclared input fields, `Periodo` cross-field paths, complete-state PATCH semantics, and idempotence.
+
+- [ ] **Step 3: Add the HTTP/JSON and SQLite public seam**
+
+Implement create, get, list, complete-state PATCH, delete, and the command route with Problem Details, fixed Test Actors, atomic rejected mutations, stable identifier ordering, offset pagination, and continuation-token pagination.
+
+- [ ] **Step 4: Add optional Mocking Source, conformance, and compatibility reports**
+
+Keep Mocking Source data separate from Semantic Source data, distinguish zero/one/multiple matching scenarios, compare independent client/engine vectors, and classify compatibility by Declaration Identifier as compatible, incompatible, or pending review.
+
+- [ ] **Step 5: Run the focused acceptance tests and commit the increment**
+
+Run: `node --test test/contract-layer.test.mjs test/contract-acceptance.test.mjs`
+
+Expected: PASS with no Visual Source behavior or prototype dependency.
+
+### Task 5: Verify the branch and hand off to #36
 
 **Files:**
 - Inspect: `AGENTS.md`
@@ -232,7 +268,7 @@ git commit -m "feat: expose effective declaration ownership seam"
 
 - [ ] **Step 1: Run the complete repository test command**
 
-Run: `node --test test/contract-layer.test.mjs`
+Run: `node --test test/contract-layer.test.mjs test/contract-acceptance.test.mjs`
 
 Expected: PASS with zero failures.
 

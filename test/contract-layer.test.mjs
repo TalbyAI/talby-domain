@@ -215,3 +215,60 @@ test("blocks a BusinessError without exactly one Module", () => {
     target: "urn:example:cannot-approve"
   }]);
 });
+
+test("rejects an unknown Semantic Source predicate", () => {
+  const result = inspectSemanticSource(`
+    @prefix c: <https://github.com/TalbyAI/talby-domain/vocab/contract#> .
+    @prefix d: <urn:example:> .
+    d:orders a c:Module ; c:name "Orders" ; c:unknown "not allowed" .
+  `);
+
+  assert.equal(result.verification.status, "blocked");
+  assert.deepEqual(result.verification.diagnostics, [{
+    code: "UNKNOWN_PROPERTY",
+    predicate: "https://github.com/TalbyAI/talby-domain/vocab/contract#unknown",
+    target: "urn:example:orders"
+  }]);
+});
+
+test("requires exactly one parent for an organizational declaration", () => {
+  const result = inspectSemanticSource(`
+    @prefix c: <https://github.com/TalbyAI/talby-domain/vocab/contract#> .
+    @prefix d: <urn:example:> .
+    d:one a c:Module ; c:name "One" .
+    d:two a c:Module ; c:name "Two" .
+    d:order a c:Entity ; c:name "Order" ; c:parent d:one, d:two .
+  `);
+
+  assert.equal(result.verification.status, "blocked");
+  assert.deepEqual(result.verification.diagnostics, [{
+    code: "PARENT_CARDINALITY",
+    target: "urn:example:order"
+  }]);
+});
+
+test("blocks a BusinessError whose Module reference is missing", () => {
+  const result = inspectSemanticSource(`
+    @prefix c: <https://github.com/TalbyAI/talby-domain/vocab/contract#> .
+    @prefix d: <urn:example:> .
+    d:cannot-approve a c:BusinessError ; c:module d:missing ; c:code "CANNOT_APPROVE" .
+  `);
+
+  assert.equal(result.verification.status, "blocked");
+  assert.deepEqual(result.verification.diagnostics, [{
+    code: "MODULE_NOT_FOUND",
+    parent: "urn:example:missing",
+    target: "urn:example:cannot-approve"
+  }]);
+});
+
+test("marks source declarations as declared in the effective model", () => {
+  const model = inspectSemanticSource(`
+    @prefix c: <https://github.com/TalbyAI/talby-domain/vocab/contract#> .
+    @prefix d: <urn:example:> .
+    d:orders a c:Module ; c:name "Orders" .
+  `).effectiveModel;
+
+  assert.equal(model.declarationIndex["urn:example:orders"].origin, "declared");
+  assert.equal(model.origins["urn:example:orders"], "declared");
+});

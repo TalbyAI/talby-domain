@@ -7,6 +7,21 @@ const RDF_FIRST = `${RDF}first`;
 const RDF_REST = `${RDF}rest`;
 const RDF_NIL = `${RDF}nil`;
 const CONTRACT_PARENT = `${CONTRACT}parent`;
+const RDFS = "http://www.w3.org/2000/01/rdf-schema#";
+
+const knownSemanticPredicates = new Set([
+  "name", "parent", "module", "code", "detailsType", "errors", "valueType", "baseType",
+  "allowedValue", "enabled", "defaultCrud", "required", "nullable", "itemNullable", "normalizers",
+  "normalizer", "constraint", "field", "uses", "identifierUse", "itemType", "targetEntity",
+  "limit", "lower", "upper", "lowerInclusive", "upperInclusive", "minLength", "maxLength",
+  "pattern", "text", "eventKind", "expression", "result", "requiresPermission", "allowAnonymous",
+  "route", "method", "input", "output", "assertion", "extension"
+].map((localName) => `${CONTRACT}${localName}`));
+knownSemanticPredicates.add(RDF_TYPE);
+knownSemanticPredicates.add(RDF_FIRST);
+knownSemanticPredicates.add(RDF_REST);
+knownSemanticPredicates.add(`${RDFS}label`);
+knownSemanticPredicates.add(`${RDFS}comment`);
 
 const declarationKinds = new Map([
   [`${CONTRACT}Module`, "Module"],
@@ -315,6 +330,14 @@ function diagnosticsFor(source) {
   const diagnostics = [];
 
   for (const triple of source.graph) {
+    if (!knownSemanticPredicates.has(triple.predicate.value)) diagnostics.push({
+      code: "UNKNOWN_PROPERTY",
+      predicate: triple.predicate.value,
+      target: triple.subject.termType === "NamedNode" ? triple.subject.value : `_:${triple.subject.value}`
+    });
+  }
+
+  for (const triple of source.graph) {
     if (triple.predicate.value === RDF_TYPE && triple.subject.termType !== "NamedNode" && declarationKinds.has(triple.object.value)) {
       diagnostics.push({ code: "DECLARATION_IDENTIFIER_REQUIRED", target: `_:${triple.subject.value}` });
     }
@@ -331,8 +354,16 @@ function diagnosticsFor(source) {
     else if ((declaration.kind === "Module" || organizationalKinds.has(declaration.kind)) && !declaration.name.trim()) diagnostics.push({ code: "NAME_REQUIRED", target: declaration.declarationIdentifier });
     if (declaration.kind === "Module" && declaration.parentIdentifiers.length) diagnostics.push({ code: "MODULE_PARENT_FORBIDDEN", target: declaration.declarationIdentifier });
     if (organizationalKinds.has(declaration.kind) && parentTerms.length === 0) diagnostics.push({ code: "PARENT_REQUIRED", target: declaration.declarationIdentifier });
+    if (organizationalKinds.has(declaration.kind) && parentTerms.length > 1) diagnostics.push({ code: "PARENT_CARDINALITY", target: declaration.declarationIdentifier });
     if (organizationalKinds.has(declaration.kind) && parentTerms.some((term) => term.termType !== "NamedNode")) diagnostics.push({ code: "PARENT_IRI_REQUIRED", target: declaration.declarationIdentifier });
     if (declaration.kind === "BusinessError" && moduleTerms.length !== 1) diagnostics.push({ code: "BUSINESS_ERROR_MODULE_REQUIRED", target: declaration.declarationIdentifier });
+    for (const module of moduleTerms) {
+      if (module.termType === "NamedNode" && (!byId.has(module.value) || byId.get(module.value).kind !== "Module")) diagnostics.push({
+        code: "MODULE_NOT_FOUND",
+        parent: module.value,
+        target: declaration.declarationIdentifier
+      });
+    }
     for (const parent of declaration.parentIdentifiers) {
       const parentDeclaration = byId.get(parent);
       if (!parentDeclaration) diagnostics.push({ code: "PARENT_NOT_FOUND", target: declaration.declarationIdentifier, parent });
@@ -412,13 +443,14 @@ export function materializeEffectiveModel(verifiedSource) {
   const moduleOwnership = ownershipFor(verifiedSource.declarations);
   const declarationIndex = Object.fromEntries(semanticSource.declarations.map((declaration) => [
     declaration.declarationIdentifier,
-    { ...declaration, ...moduleOwnership[declaration.declarationIdentifier] }
+    { ...declaration, ...moduleOwnership[declaration.declarationIdentifier], origin: "declared" }
   ]));
   return {
     semanticSource,
     declarations: semanticSource.declarations,
     declarationIndex,
-    moduleOwnership
+    moduleOwnership,
+    origins: Object.fromEntries(semanticSource.declarations.map((declaration) => [declaration.declarationIdentifier, "declared"]))
   };
 }
 
