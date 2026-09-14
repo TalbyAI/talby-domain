@@ -189,3 +189,29 @@ test("blocks a parent cycle without returning an effective model", () => {
   assert.equal(result.verification.diagnostics.some((diagnostic) => diagnostic.code === "PARENT_CYCLE"), true);
   assert.equal(result.effectiveModel, null);
 });
+
+test("resolves a BusinessError through its declared Module", () => {
+  const model = inspectSemanticSource(`
+    @prefix c: <https://github.com/TalbyAI/talby-domain/vocab/contract#> .
+    @prefix d: <urn:example:> .
+    d:orders a c:Module ; c:name "Orders" .
+    d:cannot-approve a c:BusinessError ; c:module d:orders ; c:code "CANNOT_APPROVE" .
+  `).effectiveModel;
+
+  assert.equal(model.moduleOwnership["urn:example:cannot-approve"].ownerModule, "urn:example:orders");
+});
+
+test("blocks a BusinessError without exactly one Module", () => {
+  const result = inspectSemanticSource(`
+    @prefix c: <https://github.com/TalbyAI/talby-domain/vocab/contract#> .
+    @prefix d: <urn:example:> .
+    d:orders a c:Module ; c:name "Orders" .
+    d:cannot-approve a c:BusinessError ; c:code "CANNOT_APPROVE" .
+  `);
+
+  assert.equal(result.verification.status, "blocked");
+  assert.deepEqual(result.verification.diagnostics, [{
+    code: "BUSINESS_ERROR_MODULE_REQUIRED",
+    target: "urn:example:cannot-approve"
+  }]);
+});

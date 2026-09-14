@@ -271,7 +271,8 @@ function cloneSource(source) {
     })),
     declarations: source.declarations.map((declaration) => ({
       ...declaration,
-      parentIdentifiers: [...declaration.parentIdentifiers]
+      parentIdentifiers: [...declaration.parentIdentifiers],
+      moduleIdentifiers: [...declaration.moduleIdentifiers]
     }))
   };
 }
@@ -289,7 +290,7 @@ function declarationRecords(graph) {
     const kind = declarationKinds.get(triple.object.value);
     if (!kind) continue;
     const id = triple.subject.value;
-    const record = byId.get(id) || { declarationIdentifier: id, kind, name: null, parentIdentifiers: [] };
+    const record = byId.get(id) || { declarationIdentifier: id, kind, name: null, parentIdentifiers: [], moduleIdentifiers: [] };
     if (kind === "Module" || record.kind === "Constraint") record.kind = kind;
     byId.set(id, record);
   }
@@ -297,6 +298,10 @@ function declarationRecords(graph) {
     const name = objects(graph, record.declarationIdentifier, `${CONTRACT}name`).find((term) => term.termType === "Literal");
     record.name = name?.value ?? null;
     record.parentIdentifiers = objects(graph, record.declarationIdentifier, CONTRACT_PARENT)
+      .filter((term) => term.termType === "NamedNode")
+      .map((term) => term.value)
+      .sort();
+    record.moduleIdentifiers = objects(graph, record.declarationIdentifier, `${CONTRACT}module`)
       .filter((term) => term.termType === "NamedNode")
       .map((term) => term.value)
       .sort();
@@ -318,6 +323,7 @@ function diagnosticsFor(source) {
   for (const declaration of declarations) {
     const nameTerms = objects(source.graph, declaration.declarationIdentifier, `${CONTRACT}name`).filter((term) => term.termType === "Literal");
     const parentTerms = objects(source.graph, declaration.declarationIdentifier, CONTRACT_PARENT);
+    const moduleTerms = objects(source.graph, declaration.declarationIdentifier, `${CONTRACT}module`);
     if ((declaration.kind === "Module" || organizationalKinds.has(declaration.kind)) && nameTerms.length !== 1) diagnostics.push({
       code: nameTerms.length === 0 ? "NAME_REQUIRED" : "NAME_CARDINALITY",
       target: declaration.declarationIdentifier
@@ -326,6 +332,7 @@ function diagnosticsFor(source) {
     if (declaration.kind === "Module" && declaration.parentIdentifiers.length) diagnostics.push({ code: "MODULE_PARENT_FORBIDDEN", target: declaration.declarationIdentifier });
     if (organizationalKinds.has(declaration.kind) && parentTerms.length === 0) diagnostics.push({ code: "PARENT_REQUIRED", target: declaration.declarationIdentifier });
     if (organizationalKinds.has(declaration.kind) && parentTerms.some((term) => term.termType !== "NamedNode")) diagnostics.push({ code: "PARENT_IRI_REQUIRED", target: declaration.declarationIdentifier });
+    if (declaration.kind === "BusinessError" && moduleTerms.length !== 1) diagnostics.push({ code: "BUSINESS_ERROR_MODULE_REQUIRED", target: declaration.declarationIdentifier });
     for (const parent of declaration.parentIdentifiers) {
       const parentDeclaration = byId.get(parent);
       if (!parentDeclaration) diagnostics.push({ code: "PARENT_NOT_FOUND", target: declaration.declarationIdentifier, parent });
@@ -361,7 +368,10 @@ function ownershipFor(declarations) {
     if (!declaration) return [];
     if (declaration.kind === "Module") return [id];
     const nextPath = new Set(path).add(id);
-    const owners = [...new Set(declaration.parentIdentifiers.flatMap((parent) => resolve(parent, nextPath)))].sort();
+    const owners = [...new Set([
+      ...declaration.parentIdentifiers.flatMap((parent) => resolve(parent, nextPath)),
+      ...declaration.moduleIdentifiers.flatMap((module) => resolve(module, nextPath))
+    ])].sort();
     memo.set(id, owners);
     return owners;
   };
@@ -374,6 +384,14 @@ function ownershipFor(declarations) {
   }));
 }
 
+/**
+ * The Contract Layer semantic seam used by downstream consumers.
+ *
+ * `source` is the verified Semantic Source snapshot. `effectiveModel` is
+ * null when verification blocks execution; otherwise it exposes stable
+ * Declaration Identifiers and deterministic Module ownership without any
+ * Visual Source interpretation.
+ */
 export function loadSemanticSource(input) {
   const raw = typeof input === "string" ? input : input?.raw ?? null;
   const graph = typeof input === "string"
