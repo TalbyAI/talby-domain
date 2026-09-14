@@ -231,6 +231,18 @@ test("rejects an unknown Semantic Source predicate", () => {
   }]);
 });
 
+test("preserves unknown RDF below an explicit Semantic Source extension", () => {
+  const result = inspectSemanticSource(`
+    @prefix c: <https://github.com/TalbyAI/talby-domain/vocab/contract#> .
+    @prefix d: <urn:example:> .
+    d:orders a c:Module ; c:name "Orders" ; c:extension [ <urn:custom:color> "blue" ] .
+  `);
+
+  assert.equal(result.verification.status, "verified");
+  assert.equal(result.effectiveModel.declarationIndex["urn:example:orders"].ownerModule, "urn:example:orders");
+  assert.ok(result.source.graph.some(({ predicate }) => predicate.value === "urn:custom:color"));
+});
+
 test("requires exactly one parent for an organizational declaration", () => {
   const result = inspectSemanticSource(`
     @prefix c: <https://github.com/TalbyAI/talby-domain/vocab/contract#> .

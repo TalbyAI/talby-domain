@@ -324,13 +324,32 @@ function declarationRecords(graph) {
   return [...byId.values()].sort((left, right) => left.declarationIdentifier.localeCompare(right.declarationIdentifier));
 }
 
+function extensionNodes(graph, extensionPredicate) {
+  const nodes = new Set();
+  const queue = graph
+    .filter((triple) => triple.predicate.value === extensionPredicate)
+    .map((triple) => triple.object)
+    .filter((term) => term.termType === "NamedNode" || term.termType === "BlankNode");
+  while (queue.length) {
+    const term = queue.shift();
+    const key = `${term.termType}:${term.value}`;
+    if (nodes.has(key)) continue;
+    nodes.add(key);
+    for (const triple of graph) {
+      if (triple.subject.termType === term.termType && triple.subject.value === term.value && (triple.object.termType === "NamedNode" || triple.object.termType === "BlankNode")) queue.push(triple.object);
+    }
+  }
+  return nodes;
+}
+
 function diagnosticsFor(source) {
   const declarations = source.declarations;
   const byId = new Map(declarations.map((declaration) => [declaration.declarationIdentifier, declaration]));
   const diagnostics = [];
+  const extensionNodesSet = extensionNodes(source.graph, `${CONTRACT}extension`);
 
   for (const triple of source.graph) {
-    if (!knownSemanticPredicates.has(triple.predicate.value)) diagnostics.push({
+    if (!knownSemanticPredicates.has(triple.predicate.value) && !extensionNodesSet.has(`${triple.subject.termType}:${triple.subject.value}`)) diagnostics.push({
       code: "UNKNOWN_PROPERTY",
       predicate: triple.predicate.value,
       target: triple.subject.termType === "NamedNode" ? triple.subject.value : `_:${triple.subject.value}`

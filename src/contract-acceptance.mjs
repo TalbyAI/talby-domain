@@ -114,6 +114,24 @@ function listValues(graph, head) {
   return values;
 }
 
+function extensionNodesFor(graph, extensionPredicate) {
+  const nodes = new Set();
+  const queue = graph
+    .filter((triple) => triple.predicate.value === extensionPredicate)
+    .map((triple) => triple.object)
+    .filter((term) => term.termType === "NamedNode" || term.termType === "BlankNode");
+  while (queue.length) {
+    const term = queue.shift();
+    const key = `${term.termType}:${term.value}`;
+    if (nodes.has(key)) continue;
+    nodes.add(key);
+    for (const triple of graph) {
+      if (triple.subject.termType === term.termType && triple.subject.value === term.value && (triple.object.termType === "NamedNode" || triple.object.termType === "BlankNode")) queue.push(triple.object);
+    }
+  }
+  return nodes;
+}
+
 function declarationsByKind(model, kind) {
   return Object.values(model.declarationIndex).filter((declaration) => declaration.kind === kind);
 }
@@ -208,7 +226,8 @@ function validateProject(value, mode = "complete") {
     else if (typeof value.nombre !== "string" || value.nombre.length < 1) issues.push(issue("MIN_LENGTH", ["/nombre"]));
   }
   if (mode === "complete" || Object.hasOwn(value, "periodo")) {
-    if (value.periodo === null) issues.push(issue("NULL_NOT_ALLOWED", ["/periodo"]));
+    if (value.periodo === undefined) issues.push(issue("REQUIRED", ["/periodo"]));
+    else if (value.periodo === null) issues.push(issue("NULL_NOT_ALLOWED", ["/periodo"]));
     else issues.push(...validatePeriod(value.periodo));
   }
   if (mode === "complete" || Object.hasOwn(value, "importe")) {
@@ -417,7 +436,8 @@ function parseMockingSource(input) {
     return { status: "blocked", diagnostics: [issue("MOCKING_SOURCE_SYNTAX_INVALID", [], error.message)], scenarios: [] };
   }
   const diagnostics = [];
-  for (const triple of source.graph) if (!MOCKING_PREDICATES.has(triple.predicate.value)) diagnostics.push(issue("UNKNOWN_MOCKING_PROPERTY", [`/${triple.subject.value}`]));
+  const extensionNodes = extensionNodesFor(source.graph, `${MOCKING}extension`);
+  for (const triple of source.graph) if (!MOCKING_PREDICATES.has(triple.predicate.value) && !extensionNodes.has(`${triple.subject.termType}:${triple.subject.value}`)) diagnostics.push(issue("UNKNOWN_MOCKING_PROPERTY", [`/${triple.subject.value}`]));
   const subjects = [...new Set(source.graph.filter((triple) => triple.predicate.value === `${MOCKING}operation`).map((triple) => triple.subject.value))];
   const scenarios = subjects.map((subject) => {
     const operation = termValue(firstObject(source.graph, subject, `${MOCKING}operation`));
@@ -444,7 +464,7 @@ function scenarioMatches(scenario, input) {
 }
 
 function generatedClientSource(model) {
-  return `export interface Periodo { inicio: string; fin: string; }\n` 
+  return `export interface Periodo { inicio: string; fin: string; }\n`
     + `export interface Proyecto { id: string; clienteId: string; nombre: string; periodo: Periodo; importe: string; }\n`
     + `export interface ProjectClient {\n`
     + `  createProject(input: Omit<Proyecto, "id">): Promise<Proyecto>;\n`
@@ -454,13 +474,25 @@ function generatedClientSource(model) {
     + `  deleteProject(id: string): Promise<void>;\n`
     + `  approveProject(id: string): Promise<{ approved: boolean }>;\n`
     + `}\n\n`
+    + `export function validateProjectInput(input: Partial<Omit<Proyecto, "id">>, complete = true): string[] {\n`
+    + `  const issues: string[] = [];\n`
+    + `  const known = ["clienteId", "nombre", "periodo", "importe"];\n`
+    + `  for (const key of Object.keys(input)) if (!known.includes(key)) issues.push("UNKNOWN_FIELD:" + key);\n`
+    + `  if (complete && !input.clienteId) issues.push("REQUIRED:/clienteId");\n`
+    + `  if (complete && !input.nombre) issues.push("REQUIRED:/nombre");\n`
+    + `  if (typeof input.nombre === "string" && input.nombre.trim().length < 1) issues.push("MIN_LENGTH:/nombre");\n`
+    + `  if (complete && !input.periodo) issues.push("REQUIRED:/periodo");\n`
+    + `  if (input.periodo && input.periodo.fin < input.periodo.inicio) issues.push("PERIOD_END_BEFORE_START:/periodo");\n`
+    + `  if (complete && (typeof input.importe !== "string" || !/^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?$/.test(input.importe))) issues.push("EXACT_DECIMAL_STRING_REQUIRED:/importe");\n`
+    + `  return issues;\n}\n\n`
     + `export function createProjectClient(send: (request: { method: string; path: string; query?: unknown; body?: unknown }) => Promise<unknown>): ProjectClient {\n`
     + `  const normalize = <T extends Partial<Omit<Proyecto, "id">>>(input: T) => ({ ...input, ...(typeof input.nombre === "string" ? { nombre: input.nombre.trim() } : {}) });\n`
+    + `  const checked = <T>(input: Partial<Omit<Proyecto, "id">>, request: { method: string; path: string; query?: unknown; body?: unknown }, complete: boolean) => { const issues = validateProjectInput(input, complete); return issues.length ? Promise.reject(issues) : send(request) as Promise<T>; };\n`
     + `  return {\n`
-    + `    createProject: input => send({ method: "POST", path: "${model.routes.project.value}", body: normalize(input) }) as Promise<Proyecto>,\n`
+    + `    createProject: input => checked<Proyecto>(normalize(input), { method: "POST", path: "${model.routes.project.value}", body: normalize(input) }, true),\n`
     + `    getProject: id => send({ method: "GET", path: \"/projects/\" + id }) as Promise<Proyecto>,\n`
     + `    listProjects: query => send({ method: "GET", path: "${model.routes.project.value}", query }) as Promise<{ items: Proyecto[] }>,\n`
-    + `    patchProject: (id, input) => send({ method: "PATCH", path: \"/projects/\" + id, body: normalize(input) }) as Promise<Proyecto>,\n`
+    + `    patchProject: (id, input) => checked<Proyecto>(normalize(input), { method: "PATCH", path: \"/projects/\" + id, body: normalize(input) }, false),\n`
     + `    deleteProject: id => send({ method: "DELETE", path: \"/projects/\" + id }) as Promise<void>,\n`
     + `    approveProject: id => send({ method: "POST", path: "/projects/commands/AprobarProyecto", body: { id } }) as Promise<{ approved: boolean }>\n`
     + `  };\n}\n\n`
@@ -502,7 +534,9 @@ function engineValidateProject(value, mode = "complete") {
     else if (typeof value.nombre !== "string" || value.nombre.length < 1) issues.push(issue("MIN_LENGTH", ["/nombre"]));
   }
   if (mode === "complete" || value.periodo !== undefined) {
-    if (!isPlainObject(value.periodo)) issues.push(issue(value.periodo === null ? "NULL_NOT_ALLOWED" : "GROUP_REQUIRED", ["/periodo"]));
+    if (value.periodo === undefined) issues.push(issue("REQUIRED", ["/periodo"]));
+    else if (value.periodo === null) issues.push(issue("NULL_NOT_ALLOWED", ["/periodo"]));
+    else if (!isPlainObject(value.periodo)) issues.push(issue("GROUP_REQUIRED", ["/periodo"]));
     else {
       if (!isDate(value.periodo.inicio)) issues.push(issue("DATE_INVALID", ["/periodo/inicio"]));
       if (!isDate(value.periodo.fin)) issues.push(issue("DATE_INVALID", ["/periodo/fin"]));

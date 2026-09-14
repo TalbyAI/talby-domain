@@ -56,6 +56,8 @@ test("generates a TypeScript client from the effective public operations", () =>
   assert.match(generated, /PATCH \/projects\/{id}/);
   assert.match(generated, /export function createProjectClient/);
   assert.match(generated, /trim\(\)/);
+  assert.match(generated, /export function validateProjectInput/);
+  assert.match(generated, /EXACT_DECIMAL_STRING_REQUIRED/);
   service.close();
 });
 
@@ -117,6 +119,17 @@ test("rejects invalid input atomically with structured JSON Pointer incidents", 
   assert.ok(result.body.issues.some((issue) => issue.code === "PERIOD_END_BEFORE_START"));
   assert.ok(result.body.issues.some((issue) => issue.code === "EXACT_DECIMAL_STRING_REQUIRED"));
   assert.deepEqual(service.storage(), before);
+  service.close();
+});
+
+test("preserves absence and null as distinct presence incidents", () => {
+  const service = editorService();
+  const missing = service.client.createProject(validProject({ periodo: undefined }));
+  const nullable = service.client.createProject(validProject({ periodo: null }));
+
+  assert.ok(missing.body.issues.some(({ code, paths }) => code === "REQUIRED" && paths.includes("/periodo")));
+  assert.ok(!missing.body.issues.some(({ code, paths }) => code === "NULL_NOT_ALLOWED" && paths.includes("/periodo")));
+  assert.ok(nullable.body.issues.some(({ code, paths }) => code === "NULL_NOT_ALLOWED" && paths.includes("/periodo")));
   service.close();
 });
 
@@ -202,6 +215,19 @@ test("keeps rejected malformed JSON and invalid pagination requests atomic", () 
   service.close();
 });
 
+test("maps an unexpected token-boundary failure to a technical Problem Details response", () => {
+  const service = editorService({ randomBytes: () => Buffer.alloc(1) });
+  service.client.createProject(validProject());
+  service.client.createProject(validProject({ nombre: "Project Beta" }));
+
+  const result = service.client.listProjects({ offset: 0, limit: 1 });
+
+  assert.equal(result.status, 500);
+  assert.equal(result.body.code, "TECHNICAL_FAILURE");
+  assert.equal(result.body.detail, "The request could not be completed");
+  service.close();
+});
+
 test("keeps Mocking Source separate from CRUD and distinguishes zero, one, and multiple matches", () => {
   const service = editorService();
   service.client.createProject(validProject());
@@ -242,6 +268,14 @@ test("blocks a missing semantic reference and an unsupported Mocking Source", ()
   assert.equal(unsupportedMock.verification.status, "blocked");
   assert.equal(unsupportedMock.effectiveModel, null);
   assert.ok(unsupportedMock.verification.diagnostics.some(({ code }) => code === "FUNCTION_UNSUPPORTED"));
+
+  const extendedMock = editorService({ mockingSource: `
+    @prefix m: <https://github.com/TalbyAI/talby-domain/vocab/mocking#> .
+    @prefix d: <urn:scenario:> .
+    d:scenario a m:Scenario ; m:operation "AprobarProyecto" ; m:response "{}" ; m:extension [ <urn:custom:note> "inert" ] .
+  ` });
+  assert.equal(extendedMock.verification.status, "verified");
+  extendedMock.close();
 });
 
 test("runs independent client and engine conformance vectors", () => {
