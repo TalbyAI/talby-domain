@@ -261,6 +261,21 @@ function uniqueTriples(graph) {
   });
 }
 
+function cloneSource(source) {
+  return {
+    raw: source.raw,
+    graph: source.graph.map((triple) => ({
+      subject: cloneTerm(triple.subject),
+      predicate: cloneTerm(triple.predicate),
+      object: cloneTerm(triple.object)
+    })),
+    declarations: source.declarations.map((declaration) => ({
+      ...declaration,
+      parentIdentifiers: [...declaration.parentIdentifiers]
+    }))
+  };
+}
+
 function objects(graph, subject, predicate) {
   return graph
     .filter((triple) => triple.subject.termType !== "Literal" && triple.subject.value === subject && triple.predicate.value === predicate)
@@ -375,14 +390,15 @@ export function verifySemanticSource(source) {
 export function materializeEffectiveModel(verifiedSource) {
   const verification = verifySemanticSource(verifiedSource);
   if (verification.status !== "verified") return null;
+  const semanticSource = cloneSource(verifiedSource);
   const moduleOwnership = ownershipFor(verifiedSource.declarations);
-  const declarationIndex = Object.fromEntries(verifiedSource.declarations.map((declaration) => [
+  const declarationIndex = Object.fromEntries(semanticSource.declarations.map((declaration) => [
     declaration.declarationIdentifier,
     { ...declaration, ...moduleOwnership[declaration.declarationIdentifier] }
   ]));
   return {
-    semanticSource: verifiedSource,
-    declarations: verifiedSource.declarations.map((declaration) => ({ ...declaration })),
+    semanticSource,
+    declarations: semanticSource.declarations,
     declarationIndex,
     moduleOwnership
   };
