@@ -180,10 +180,14 @@ class TurtleParser {
     if (token.type === "literal") {
       let datatype = `${XSD}string`;
       let language = null;
-      if (this.peek()?.type === "atom" && this.peek().value.startsWith("@")) language = this.take().value.slice(1);
+      const suffix = this.tokens[this.position];
+      if (suffix?.type === "atom" && suffix.value.startsWith("@")) language = this.take().value.slice(1);
       if (this.peek("^^")) {
         this.take();
         datatype = this.expandResource(this.take()).value;
+      } else if (this.tokens[this.position]?.type === "atom" && this.tokens[this.position].value.startsWith("^^")) {
+        const datatypeToken = this.take().value.slice(2);
+        datatype = this.expandResource({ type: "atom", value: datatypeToken }).value;
       }
       return literal(token.value, datatype, language);
     }
@@ -290,7 +294,19 @@ function diagnosticsFor(source) {
   const byId = new Map(declarations.map((declaration) => [declaration.declarationIdentifier, declaration]));
   const diagnostics = [];
 
+  for (const triple of source.graph) {
+    if (triple.predicate.value === RDF_TYPE && triple.subject.termType !== "NamedNode" && declarationKinds.has(triple.object.value)) {
+      diagnostics.push({ code: "DECLARATION_IDENTIFIER_REQUIRED", target: `_:${triple.subject.value}` });
+    }
+  }
+
   for (const declaration of declarations) {
+    const nameTerms = objects(source.graph, declaration.declarationIdentifier, `${CONTRACT}name`).filter((term) => term.termType === "Literal");
+    if (declaration.kind === "Module" && nameTerms.length !== 1) diagnostics.push({
+      code: nameTerms.length === 0 ? "NAME_REQUIRED" : "NAME_CARDINALITY",
+      target: declaration.declarationIdentifier
+    });
+    else if (declaration.kind === "Module" && !declaration.name.trim()) diagnostics.push({ code: "NAME_REQUIRED", target: declaration.declarationIdentifier });
     if (declaration.kind === "Module" && declaration.parentIdentifiers.length) diagnostics.push({ code: "MODULE_PARENT_FORBIDDEN", target: declaration.declarationIdentifier });
     if (organizationalKinds.has(declaration.kind) && declaration.parentIdentifiers.length === 0) diagnostics.push({ code: "PARENT_REQUIRED", target: declaration.declarationIdentifier });
     for (const parent of declaration.parentIdentifiers) {
