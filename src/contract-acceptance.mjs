@@ -66,15 +66,6 @@ const ACTORS = {
   anonymous: []
 };
 
-const OPERATION_PERMISSIONS = {
-  create: ["projects.write"],
-  get: ["projects.read"],
-  list: ["projects.read"],
-  patch: ["projects.write"],
-  delete: ["projects.write"],
-  approve: ["projects.approve"]
-};
-
 const operationDefinitions = [
   { name: "create", method: "POST", path: "/projects", permission: "projects.write" },
   { name: "get", method: "GET", path: "/projects/{id}", permission: "projects.read" },
@@ -82,6 +73,11 @@ const operationDefinitions = [
   { name: "patch", method: "PATCH", path: "/projects/{id}", permission: "projects.write" },
   { name: "delete", method: "DELETE", path: "/projects/{id}", permission: "projects.write" }
 ];
+
+const OPERATION_PERMISSIONS = Object.fromEntries([
+  ...operationDefinitions.map(({ name, permission }) => [name, [permission]]),
+  ["approve", ["projects.approve"]]
+]);
 
 function clone(value) {
   return value === undefined ? undefined : structuredClone(value);
@@ -464,6 +460,17 @@ function scenarioMatches(scenario, input) {
 }
 
 function generatedClientSource(model) {
+  const route = (name) => model.operations.find((operation) => operation.name === name)?.path ?? `/${name}`;
+  const routeExpression = (path) => {
+    const [prefix, suffix] = path.split("{id}");
+    return suffix === undefined ? JSON.stringify(path) : `${JSON.stringify(prefix)} + id + ${JSON.stringify(suffix)}`;
+  };
+  const projectRoute = route("create");
+  const getRoute = route("get");
+  const listRoute = route("list");
+  const patchRoute = route("patch");
+  const deleteRoute = route("delete");
+  const commandRoute = model.command.route;
   return `export interface Periodo { inicio: string; fin: string; }\n`
     + `export interface Proyecto { id: string; clienteId: string; nombre: string; periodo: Periodo; importe: string; }\n`
     + `export interface ProjectClient {\n`
@@ -489,14 +496,14 @@ function generatedClientSource(model) {
     + `  const normalize = <T extends Partial<Omit<Proyecto, "id">>>(input: T) => ({ ...input, ...(typeof input.nombre === "string" ? { nombre: input.nombre.trim() } : {}) });\n`
     + `  const checked = <T>(input: Partial<Omit<Proyecto, "id">>, request: { method: string; path: string; query?: unknown; body?: unknown }, complete: boolean) => { const issues = validateProjectInput(input, complete); return issues.length ? Promise.reject(issues) : send(request) as Promise<T>; };\n`
     + `  return {\n`
-    + `    createProject: input => checked<Proyecto>(normalize(input), { method: "POST", path: "${model.routes.project.value}", body: normalize(input) }, true),\n`
-    + `    getProject: id => send({ method: "GET", path: \"/projects/\" + id }) as Promise<Proyecto>,\n`
-    + `    listProjects: query => send({ method: "GET", path: "${model.routes.project.value}", query }) as Promise<{ items: Proyecto[] }>,\n`
-    + `    patchProject: (id, input) => checked<Proyecto>(normalize(input), { method: "PATCH", path: \"/projects/\" + id, body: normalize(input) }, false),\n`
-    + `    deleteProject: id => send({ method: "DELETE", path: \"/projects/\" + id }) as Promise<void>,\n`
-    + `    approveProject: id => send({ method: "POST", path: "/projects/commands/AprobarProyecto", body: { id } }) as Promise<{ approved: boolean }>\n`
+    + `    createProject: input => checked<Proyecto>(normalize(input), { method: "POST", path: ${JSON.stringify(projectRoute)}, body: normalize(input) }, true),\n`
+    + `    getProject: id => send({ method: "GET", path: ${routeExpression(getRoute)} }) as Promise<Proyecto>,\n`
+    + `    listProjects: query => send({ method: "GET", path: ${JSON.stringify(listRoute)}, query }) as Promise<{ items: Proyecto[] }>,\n`
+    + `    patchProject: (id, input) => checked<Proyecto>(normalize(input), { method: "PATCH", path: ${routeExpression(patchRoute)}, body: normalize(input) }, false),\n`
+    + `    deleteProject: id => send({ method: "DELETE", path: ${routeExpression(deleteRoute)} }) as Promise<void>,\n`
+    + `    approveProject: id => send({ method: "POST", path: ${JSON.stringify(commandRoute)}, body: { id } }) as Promise<{ approved: boolean }>\n`
     + `  };\n}\n\n`
-    + `// Derived routes: ${model.routes.project.value}, POST /projects/commands/AprobarProyecto\n`
+    + `// Derived routes: ${projectRoute}, POST ${commandRoute}\n`
     + `// PATCH /projects/{id} preserves complete-state semantics.\n`;
 }
 
