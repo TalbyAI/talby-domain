@@ -232,23 +232,23 @@ git commit -m "feat: expose effective declaration ownership seam"
 - `generateTypeScriptClient(effectiveModel)` returns the generated TypeScript client source for the selected public operations.
 - `compareSources(before, after)` compares effective declarations by Declaration Identifier without requiring versions.
 
-- [ ] **Step 1: Add failing public-source and effective-model tests**
+- [x] **Step 1: Add failing public-source and effective-model tests**
 
 Cover the project fixture, declared/default/derived origins, stable Declaration Identifiers, Module ownership, derived CRUD routes, `Cliente`, `Proyecto`, `Periodo`, the exact decimal field, the declared Event, and `AprobarProyecto`.
 
-- [ ] **Step 2: Add the independent client and engine normalization/validation runners**
+- [x] **Step 2: Add the independent client and engine normalization/validation runners**
 
 Cover ordered `trim`, exact decimal strings, identifier lexical rules, required/nullability, undeclared input fields, `Periodo` cross-field paths, complete-state PATCH semantics, and idempotence.
 
-- [ ] **Step 3: Add the HTTP/JSON and SQLite public seam**
+- [x] **Step 3: Add the HTTP/JSON and SQLite public seam**
 
 Implement create, get, list, complete-state PATCH, delete, and the command route with Problem Details, fixed Test Actors, atomic rejected mutations, stable identifier ordering, offset pagination, and continuation-token pagination.
 
-- [ ] **Step 4: Add optional Mocking Source, conformance, and compatibility reports**
+- [x] **Step 4: Add optional Mocking Source, conformance, and compatibility reports**
 
 Keep Mocking Source data separate from Semantic Source data, distinguish zero/one/multiple matching scenarios, compare independent client/engine vectors, and classify compatibility by Declaration Identifier as compatible, incompatible, or pending review.
 
-- [ ] **Step 5: Run the focused acceptance tests and commit the increment**
+- [x] **Step 5: Run the focused acceptance tests and commit the increment**
 
 Run: `node --test test/contract-layer.test.mjs test/contract-acceptance.test.mjs`
 

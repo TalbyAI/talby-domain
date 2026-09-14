@@ -12,7 +12,6 @@ const RDF_REST = "http://www.w3.org/1999/02/22-rdf-syntax-ns#rest";
 const RDF_NIL = "http://www.w3.org/1999/02/22-rdf-syntax-ns#nil";
 
 const PROJECT = "urn:talby:contract:";
-const PROJECT_CONTRACT = `${PROJECT}contract`;
 
 export const PROJECT_SEMANTIC_SOURCE = `@prefix c: <${CONTRACT}> .
 @prefix d: <${PROJECT}> .
@@ -278,11 +277,11 @@ function decodeToken(token, key, now, expected) {
   }
 }
 
-function projectRequestFingerprint() {
+function projectRequestFingerprint(filters = {}) {
   return fingerprint({
     operation: "list",
     resource: "projects",
-    filters: {},
+    filters,
     ordering: ["id:asc"],
     scope: "default"
   });
@@ -454,7 +453,18 @@ function generatedClientSource(model) {
     + `  patchProject(id: string, input: Partial<Omit<Proyecto, "id">>): Promise<Proyecto>;\n`
     + `  deleteProject(id: string): Promise<void>;\n`
     + `  approveProject(id: string): Promise<{ approved: boolean }>;\n`
-    + `}\n\n// Derived routes: ${model.routes.project.value}, POST /projects/commands/AprobarProyecto\n`
+    + `}\n\n`
+    + `export function createProjectClient(send: (request: { method: string; path: string; query?: unknown; body?: unknown }) => Promise<unknown>): ProjectClient {\n`
+    + `  const normalize = <T extends Partial<Omit<Proyecto, "id">>>(input: T) => ({ ...input, ...(typeof input.nombre === "string" ? { nombre: input.nombre.trim() } : {}) });\n`
+    + `  return {\n`
+    + `    createProject: input => send({ method: "POST", path: "${model.routes.project.value}", body: normalize(input) }) as Promise<Proyecto>,\n`
+    + `    getProject: id => send({ method: "GET", path: \"/projects/\" + id }) as Promise<Proyecto>,\n`
+    + `    listProjects: query => send({ method: "GET", path: "${model.routes.project.value}", query }) as Promise<{ items: Proyecto[] }>,\n`
+    + `    patchProject: (id, input) => send({ method: "PATCH", path: \"/projects/\" + id, body: normalize(input) }) as Promise<Proyecto>,\n`
+    + `    deleteProject: id => send({ method: "DELETE", path: \"/projects/\" + id }) as Promise<void>,\n`
+    + `    approveProject: id => send({ method: "POST", path: "/projects/commands/AprobarProyecto", body: { id } }) as Promise<{ approved: boolean }>\n`
+    + `  };\n}\n\n`
+    + `// Derived routes: ${model.routes.project.value}, POST /projects/commands/AprobarProyecto\n`
     + `// PATCH /projects/{id} preserves complete-state semantics.\n`;
 }
 
@@ -483,14 +493,20 @@ function engineValidateProject(value, mode = "complete") {
   const known = ["id", "clienteId", "nombre", "periodo", "importe"];
   for (const key of Object.keys(value)) if (!known.includes(key)) issues.push(issue("UNKNOWN_FIELD", [`/${key}`]));
   if (value.id !== undefined && !isIdentifier(value.id)) issues.push(issue("IDENTIFIER_INVALID", ["/id"]));
-  if ((mode === "complete" || value.clienteId !== undefined) && !isIdentifier(value.clienteId)) issues.push(issue("IDENTIFIER_INVALID", ["/clienteId"]));
-  if ((mode === "complete" || value.nombre !== undefined) && (typeof value.nombre !== "string" || value.nombre.length < 1)) issues.push(issue("MIN_LENGTH", ["/nombre"]));
+  if (mode === "complete" || value.clienteId !== undefined) {
+    if (value.clienteId === null || value.clienteId === undefined) issues.push(issue("REQUIRED", ["/clienteId"]));
+    else if (!isIdentifier(value.clienteId)) issues.push(issue("IDENTIFIER_INVALID", ["/clienteId"]));
+  }
+  if (mode === "complete" || value.nombre !== undefined) {
+    if (value.nombre === null || value.nombre === undefined) issues.push(issue("REQUIRED", ["/nombre"]));
+    else if (typeof value.nombre !== "string" || value.nombre.length < 1) issues.push(issue("MIN_LENGTH", ["/nombre"]));
+  }
   if (mode === "complete" || value.periodo !== undefined) {
     if (!isPlainObject(value.periodo)) issues.push(issue(value.periodo === null ? "NULL_NOT_ALLOWED" : "GROUP_REQUIRED", ["/periodo"]));
     else {
       if (!isDate(value.periodo.inicio)) issues.push(issue("DATE_INVALID", ["/periodo/inicio"]));
       if (!isDate(value.periodo.fin)) issues.push(issue("DATE_INVALID", ["/periodo/fin"]));
-      if (isDate(value.periodo.inicio) && isDate(value.periodo.fin) && value.periodo.fin < value.periodo.inicio) issues.push(issue("PERIOD_END_BEFORE_START", ["/periodo/inicio", "/periodo/fin"]));
+      if (isDate(value.periodo.inicio) && isDate(value.periodo.fin) && value.periodo.fin < value.periodo.inicio) issues.push(issue("PERIOD_END_BEFORE_START", ["/periodo/inicio", "/periodo/fin"], "fin must be greater than or equal to inicio"));
     }
   }
   if ((mode === "complete" || value.importe !== undefined) && !isDecimal(value.importe)) issues.push(issue("EXACT_DECIMAL_STRING_REQUIRED", ["/importe"]));
@@ -589,13 +605,16 @@ export function compareSources(before, after) {
 function parseListQuery(query) {
   const value = query ?? {};
   if (!isPlainObject(value)) return { error: problem(400, "INVALID_PARAMETERS", "List query must be an object") };
+  const unknown = Object.keys(value).filter((key) => !["offset", "continuationToken", "limit", "clienteId"].includes(key));
+  if (unknown.length) return { error: problem(400, "INVALID_PARAMETERS", `Unknown list parameter: ${unknown[0]}`) };
   const hasOffset = Object.hasOwn(value, "offset");
   const hasToken = Object.hasOwn(value, "continuationToken");
   if (hasOffset && hasToken) return { error: problem(400, "PAGINATION_MODE_CONFLICT", "offset and continuationToken cannot be combined") };
   const limit = value.limit === undefined ? 20 : value.limit;
   if (!Number.isInteger(limit) || limit < 1 || limit > 100) return { error: problem(400, "LIMIT_INVALID", "limit must be between 1 and 100") };
   if (hasOffset && (!Number.isInteger(value.offset) || value.offset < 0)) return { error: problem(400, "OFFSET_INVALID", "offset must be a non-negative integer") };
-  return { value: { mode: hasToken ? "token" : "offset", offset: value.offset ?? 0, token: value.continuationToken ?? null, limit } };
+  if (value.clienteId !== undefined && !isIdentifier(value.clienteId)) return { error: problem(400, "IDENTIFIER_INVALID", "clienteId must be a valid Entity Identifier") };
+  return { value: { mode: hasToken ? "token" : "offset", offset: value.offset ?? 0, token: value.continuationToken ?? null, limit, filters: value.clienteId === undefined ? {} : { clienteId: value.clienteId } } };
 }
 
 function pathOperation(request) {
@@ -744,16 +763,16 @@ export function createAcceptanceService(options = {}) {
   function handleList(request) {
     const parsed = parseListQuery(request.query);
     if (parsed.error) return parsed.error;
-    const { mode, offset, token, limit } = parsed.value;
+    const { mode, offset, token, limit, filters } = parsed.value;
     const now = Number(clock());
-    const expectedFingerprint = projectRequestFingerprint();
+    const expectedFingerprint = projectRequestFingerprint(filters);
     let position = offset;
     if (mode === "token") {
       const payload = decodeToken(token, tokenSecret, now, { operation: "list", fingerprint: expectedFingerprint });
       if (!payload) return problem(400, "INVALID_CONTINUATION_TOKEN", "Continuation token is invalid or expired");
       position = payload.position;
     }
-    const projects = storage().projects;
+    const projects = storage().projects.filter((project) => !filters.clienteId || project.clienteId === filters.clienteId);
     const items = projects.slice(position, position + limit).map(projectResponse);
     const pagination = { mode, limit };
     if (mode === "offset") pagination.offset = position;
