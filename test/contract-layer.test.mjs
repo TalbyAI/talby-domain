@@ -532,3 +532,23 @@ test("returns a data-only diagnostic when SHACL diagnostics exceed the ceiling",
     diagnostics: [{ code: "SHACL_DIAGNOSTIC_LIMIT", rule: "", target: "", paths: [], detail: "" }]
   });
 });
+
+test("validates an explicit rdfs:subClassOf property path without inference", async () => {
+  const data = loadSemanticSource(`
+    @prefix c: <https://github.com/TalbyAI/talby-domain/vocab/contract#> .
+    @prefix d: <urn:example:> .
+    @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+    d:orders a c:Module ; rdfs:subClassOf d:base .
+  `);
+  const shapes = `
+    @prefix c: <https://github.com/TalbyAI/talby-domain/vocab/contract#> .
+    @prefix d: <urn:example:> .
+    @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+    @prefix sh: <http://www.w3.org/ns/shacl#> .
+    d:moduleShape a sh:NodeShape ;
+      sh:targetClass c:Module ;
+      sh:property [ sh:path rdfs:subClassOf ; sh:minCount 1 ] .
+  `;
+
+  assert.deepEqual(await validateSemanticSource(data, shapes), { conforms: true, diagnostics: [] });
+});

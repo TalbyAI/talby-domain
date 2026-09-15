@@ -5,7 +5,33 @@ import environment from "rdf-validate-shacl/src/defaultEnv.js";
 const SH = "http://www.w3.org/ns/shacl#";
 const RDFS_SUBCLASS_OF = "http://www.w3.org/2000/01/rdf-schema#subClassOf";
 const MAX_DIAGNOSTICS = 1_000;
-const factory = { ...environment, ...DataFactory, dataset: (quads = []) => new Store(quads) };
+
+function withoutSubclassInference(dataset) {
+  return {
+    get size() {
+      return dataset.size;
+    },
+    add(quad) {
+      dataset.add(quad);
+      return this;
+    },
+    delete(quad) {
+      return dataset.delete(quad);
+    },
+    has(quad) {
+      return dataset.has(quad);
+    },
+    match(subject = null, predicate = null, object = null, graph = null) {
+      if (subject === null && predicate?.termType === "NamedNode" && predicate.value === RDFS_SUBCLASS_OF && object !== null) return new Store();
+      return dataset.match(subject, predicate, object, graph);
+    },
+    [Symbol.iterator]() {
+      return dataset[Symbol.iterator]();
+    }
+  };
+}
+
+const factory = { ...environment, ...DataFactory, dataset: (quads = []) => withoutSubclassInference(new Store(quads)) };
 
 function diagnosticCode(term) {
   const value = term?.value ?? SH + "ConstraintComponent";
@@ -40,13 +66,9 @@ function stableRule(term, blankNodes) {
   return term.termType === "BlankNode" ? blankNodes.get(term.value) ?? "_:shape" : term.value;
 }
 
-function withoutSubclassTriples(dataset) {
-  return new Store([...dataset].filter(({ predicate }) => predicate.value !== RDFS_SUBCLASS_OF));
-}
-
 export async function validateShaclDataset(dataDataset, shapesDataset) {
-  const dataView = withoutSubclassTriples(dataDataset);
-  const shapesView = withoutSubclassTriples(shapesDataset);
+  const dataView = withoutSubclassInference(dataDataset);
+  const shapesView = withoutSubclassInference(shapesDataset);
   let report;
   try {
     const validator = new SHACLValidator(shapesView, {
