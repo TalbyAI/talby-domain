@@ -70,6 +70,15 @@ test("rejects SPARQL directives and RDF-star syntax as non-Turtle", () => {
   }
 });
 
+test("preserves Turtle prefixed names containing directive words", () => {
+  const source = loadSemanticSource(`
+    @prefix d: <urn:example:> .
+    d:foo.BASE d:p d:o .
+  `);
+
+  assert.equal(source.graph[0].subject.value, "urn:example:foo.BASE");
+});
+
 test("parses bare decimal literals while preserving statement punctuation", () => {
   const source = loadSemanticSource(`
     @prefix c: <https://github.com/TalbyAI/talby-domain/vocab/contract#> .
