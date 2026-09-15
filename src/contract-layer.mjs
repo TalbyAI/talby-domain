@@ -103,6 +103,10 @@ function tokenise(input) {
     }
     const start = index;
     while (index < input.length && !/\s/.test(input[index]) && !";,.[]()<>\"".includes(input[index])) index += 1;
+    while (input[index] === "." && /\d/.test(input[index + 1] ?? "") && /^-?\d+(?:\.\d+)*$/.test(input.slice(start, index))) {
+      index += 1;
+      while (index < input.length && /\d/.test(input[index])) index += 1;
+    }
     if (start === index) throw new SyntaxError(`Unexpected character ${input[index]}`);
     const value = input.slice(start, index);
     if (value.startsWith("_:") && value.length === 2) tokens.push({ type: "blank", value: `b${blankNodeNumber++}` });
@@ -405,7 +409,11 @@ function diagnosticsFor(source) {
   };
   for (const declaration of declarations) visit(declaration.declarationIdentifier);
 
-  return diagnostics.sort((left, right) => `${left.code}:${left.target}`.localeCompare(`${right.code}:${right.target}`));
+  return diagnostics.sort((left, right) => {
+    const leftKey = `${left.code}:${left.target}`;
+    const rightKey = `${right.code}:${right.target}`;
+    return leftKey < rightKey ? -1 : leftKey > rightKey ? 1 : 0;
+  });
 }
 
 function ownershipFor(declarations) {

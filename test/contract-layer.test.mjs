@@ -3,6 +3,32 @@ import test from "node:test";
 
 import { inspectSemanticSource, loadSemanticSource } from "../src/contract-layer.mjs";
 
+test("parses bare decimal literals while preserving statement punctuation", () => {
+  const source = loadSemanticSource(`
+    @prefix c: <https://github.com/TalbyAI/talby-domain/vocab/contract#> .
+    @prefix d: <urn:example:> .
+    d:project c:limit 1.5 .
+  `);
+
+  assert.deepEqual(source.graph.find(({ predicate }) => predicate.value.endsWith("#limit")).object, {
+    termType: "Literal",
+    value: "1.5",
+    datatype: "http://www.w3.org/2001/XMLSchema#decimal",
+    language: null
+  });
+});
+
+test("sorts diagnostics by code and target without locale rules", () => {
+  const result = inspectSemanticSource(`
+    @prefix c: <https://github.com/TalbyAI/talby-domain/vocab/contract#> .
+    @prefix d: <urn:example:> .
+    d:A c:unknown "uppercase" .
+    d:a c:unknown "lowercase" .
+  `);
+
+  assert.deepEqual(result.verification.diagnostics.map(({ target }) => target), ["urn:example:A", "urn:example:a"]);
+});
+
 test("materializes a declaration index with its owning Module", () => {
   const result = inspectSemanticSource(`
     @prefix c: <https://github.com/TalbyAI/talby-domain/vocab/contract#> .

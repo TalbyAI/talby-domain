@@ -531,16 +531,16 @@ function engineValidateProject(value, mode = "complete") {
   if (!isPlainObject(value)) return [issue("OBJECT_REQUIRED", [""])];
   const known = ["id", "clienteId", "nombre", "periodo", "importe"];
   for (const key of Object.keys(value)) if (!known.includes(key)) issues.push(issue("UNKNOWN_FIELD", [`/${key}`]));
-  if (value.id !== undefined && !isIdentifier(value.id)) issues.push(issue("IDENTIFIER_INVALID", ["/id"]));
-  if (mode === "complete" || value.clienteId !== undefined) {
+  if (Object.hasOwn(value, "id") && !isIdentifier(value.id)) issues.push(issue("IDENTIFIER_INVALID", ["/id"]));
+  if (mode === "complete" || Object.hasOwn(value, "clienteId")) {
     if (value.clienteId === null || value.clienteId === undefined) issues.push(issue("REQUIRED", ["/clienteId"]));
     else if (!isIdentifier(value.clienteId)) issues.push(issue("IDENTIFIER_INVALID", ["/clienteId"]));
   }
-  if (mode === "complete" || value.nombre !== undefined) {
+  if (mode === "complete" || Object.hasOwn(value, "nombre")) {
     if (value.nombre === null || value.nombre === undefined) issues.push(issue("REQUIRED", ["/nombre"]));
     else if (typeof value.nombre !== "string" || value.nombre.length < 1) issues.push(issue("MIN_LENGTH", ["/nombre"]));
   }
-  if (mode === "complete" || value.periodo !== undefined) {
+  if (mode === "complete" || Object.hasOwn(value, "periodo")) {
     if (value.periodo === undefined) issues.push(issue("REQUIRED", ["/periodo"]));
     else if (value.periodo === null) issues.push(issue("NULL_NOT_ALLOWED", ["/periodo"]));
     else if (!isPlainObject(value.periodo)) issues.push(issue("GROUP_REQUIRED", ["/periodo"]));
@@ -550,18 +550,18 @@ function engineValidateProject(value, mode = "complete") {
       if (isDate(value.periodo.inicio) && isDate(value.periodo.fin) && value.periodo.fin < value.periodo.inicio) issues.push(issue("PERIOD_END_BEFORE_START", ["/periodo/inicio", "/periodo/fin"], "fin must be greater than or equal to inicio"));
     }
   }
-  if ((mode === "complete" || value.importe !== undefined) && !isDecimal(value.importe)) issues.push(issue("EXACT_DECIMAL_STRING_REQUIRED", ["/importe"]));
+  if ((mode === "complete" || Object.hasOwn(value, "importe")) && !isDecimal(value.importe)) issues.push(issue("EXACT_DECIMAL_STRING_REQUIRED", ["/importe"]));
   return issues;
 }
 
-function clientVector(value) {
+function clientVector(value, mode = "complete") {
   const normalized = normalizeProjectForClient(value);
-  return { value: clone(normalized), incidents: validateProjectForClient(normalized) };
+  return { value: clone(normalized), incidents: validateProjectForClient(normalized, mode) };
 }
 
-function engineVector(value) {
+function engineVector(value, mode = "complete") {
   const normalized = engineNormalizeProject(value);
-  return { value: clone(normalized), incidents: engineValidateProject(normalized) };
+  return { value: clone(normalized), incidents: engineValidateProject(normalized, mode) };
 }
 
 const conformanceVectors = [
@@ -584,13 +584,18 @@ const conformanceVectors = [
   {
     name: "unknown field",
     input: { clienteId: "cliente-1", nombre: "Proyecto Atlas", periodo: { inicio: "2026-01-01", fin: "2026-12-31" }, importe: "100.00", extra: true }
+  },
+  {
+    name: "partial own undefined id",
+    mode: "partial",
+    input: { id: undefined, nombre: "x" }
   }
 ];
 
 export function runConformance() {
   return conformanceVectors.map((vector) => {
-    const client = clientVector(vector.input);
-    const engine = engineVector(vector.input);
+    const client = clientVector(vector.input, vector.mode);
+    const engine = engineVector(vector.input, vector.mode);
     return {
       name: vector.name,
       input: clone(vector.input),
@@ -739,7 +744,7 @@ export function createAcceptanceService(options = {}) {
     ...(mocking.status === "blocked" ? mocking.diagnostics : [])
   ];
   const verification = diagnostics.length
-    ? { status: "blocked", diagnostics: diagnostics.sort((left, right) => `${left.code}:${left.paths[0] ?? ""}`.localeCompare(`${right.code}:${right.paths[0] ?? ""}`)) }
+    ? { status: "blocked", diagnostics: diagnostics.sort((left, right) => `${left.code}:${left.paths?.[0] ?? left.target ?? ""}`.localeCompare(`${right.code}:${right.paths?.[0] ?? right.target ?? ""}`)) }
     : { status: "verified", diagnostics: [] };
   const effectiveModel = verification.status === "verified" ? projectModelFrom(inspected) : null;
   let database = null;

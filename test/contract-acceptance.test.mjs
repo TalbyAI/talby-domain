@@ -135,13 +135,16 @@ test("preserves absence and null as distinct presence incidents", () => {
 
 test("blocks an invalid Semantic Source before opening the acceptance service", () => {
   const result = createAcceptanceService({
-    semanticSource: `${PROJECT_SEMANTIC_SOURCE}\n<urn:talby:contract:project> <https://github.com/TalbyAI/talby-domain/vocab/contract#unknown> "x" .`
+    semanticSource: `${PROJECT_SEMANTIC_SOURCE}
+      <urn:talby:contract:project> <https://github.com/TalbyAI/talby-domain/vocab/contract#unknown> "x" .
+      <urn:talby:contract:module> <https://github.com/TalbyAI/talby-domain/vocab/contract#unknown> "y" .`
   });
 
   assert.equal(result.verification.status, "blocked");
   assert.equal(result.effectiveModel, null);
   assert.equal(result.client, null);
   assert.ok(result.verification.diagnostics.some(({ code }) => code === "UNKNOWN_PROPERTY"));
+  assert.deepEqual(result.verification.diagnostics.map(({ target }) => target), ["urn:talby:contract:module", "urn:talby:contract:project"]);
 });
 
 test("denies missing and insufficient Test Actors while exposing the transition only outside the payload", () => {
@@ -282,11 +285,14 @@ test("runs independent client and engine conformance vectors", () => {
   const service = editorService();
   const rows = service.conformance();
 
-  assert.ok(rows.length >= 5);
+  assert.ok(rows.length >= 6);
   assert.ok(rows.every((row) => row.equal));
   const decimal = rows.find((row) => row.name === "exact decimal string preservation");
   assert.equal(decimal.client.value.importe, "100.00");
   assert.deepEqual(rows.find((row) => row.name === "invalid Periodo").client.incidents[0].paths, ["/periodo/inicio", "/periodo/fin"]);
+  const partialUndefinedId = rows.find((row) => row.name === "partial own undefined id");
+  assert.deepEqual(partialUndefinedId.client.incidents, [{ code: "IDENTIFIER_INVALID", rule: "IDENTIFIER_INVALID", paths: ["/id"], detail: "IDENTIFIER_INVALID" }]);
+  assert.deepEqual(partialUndefinedId.engine.incidents, partialUndefinedId.client.incidents);
   service.close();
 });
 
