@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { Parser, Store } from "n3";
+
+import { validateShaclDataset } from "../src/shacl-adapter.mjs";
 
 import {
   inspectSemanticSource,
@@ -546,6 +549,28 @@ test("returns a data-only diagnostic when SHACL diagnostics exceed the ceiling",
   `;
 
   assert.deepEqual(await validateSemanticSource(data, shapes), {
+    conforms: false,
+    diagnostics: [{ code: "SHACL_DIAGNOSTIC_LIMIT", rule: "", target: "", paths: [], detail: "" }]
+  });
+});
+
+test("caps direct SHACL validation when maxDiagnostics is Infinity", async () => {
+  const parse = (source) => new Store(new Parser({ format: "text/turtle" }).parse(source));
+  const data = parse(`
+    @prefix d: <urn:example:> .
+    ${Array.from({ length: 1_001 }, (_, index) => `d:module${index} d:value "invalid" .`).join("\n    ")}
+  `);
+  const shapes = parse(`
+    @prefix d: <urn:example:> .
+    @prefix sh: <http://www.w3.org/ns/shacl#> .
+    d:moduleShape a sh:NodeShape ;
+      sh:targetSubjectsOf d:value ;
+      sh:property [ sh:path d:value ; sh:in ( "allowed" ) ] .
+  `);
+
+  const result = await validateShaclDataset(data, shapes, { maxDiagnostics: Infinity });
+
+  assert.deepEqual(result, {
     conforms: false,
     diagnostics: [{ code: "SHACL_DIAGNOSTIC_LIMIT", rule: "", target: "", paths: [], detail: "" }]
   });
