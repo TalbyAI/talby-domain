@@ -485,12 +485,12 @@ function generatedClientSource(model) {
     + `  const issues: string[] = [];\n`
     + `  const known = ["clienteId", "nombre", "periodo", "importe"];\n`
     + `  for (const key of Object.keys(input)) if (!known.includes(key)) issues.push("UNKNOWN_FIELD:" + key);\n`
-    + `  if (complete && !input.clienteId) issues.push("REQUIRED:/clienteId");\n`
-    + `  if (complete && !input.nombre) issues.push("REQUIRED:/nombre");\n`
+    + `  if ((complete || Object.hasOwn(input, "clienteId")) && !input.clienteId) issues.push("REQUIRED:/clienteId");\n`
+    + `  if ((complete || Object.hasOwn(input, "nombre")) && !input.nombre) issues.push("REQUIRED:/nombre");\n`
     + `  if (typeof input.nombre === "string" && input.nombre.trim().length < 1) issues.push("MIN_LENGTH:/nombre");\n`
-    + `  if (complete && !input.periodo) issues.push("REQUIRED:/periodo");\n`
+    + `  if ((complete || Object.hasOwn(input, "periodo")) && !input.periodo) issues.push("REQUIRED:/periodo");\n`
     + `  if (input.periodo && input.periodo.fin < input.periodo.inicio) issues.push("PERIOD_END_BEFORE_START:/periodo");\n`
-    + `  if (complete && (typeof input.importe !== "string" || !/^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?$/.test(input.importe))) issues.push("EXACT_DECIMAL_STRING_REQUIRED:/importe");\n`
+    + `  if ((complete || Object.hasOwn(input, "importe")) && (typeof input.importe !== "string" || !/^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?$/.test(input.importe))) issues.push("EXACT_DECIMAL_STRING_REQUIRED:/importe");\n`
     + `  return issues;\n}\n\n`
     + `export function createProjectClient(send: (request: { method: string; path: string; query?: unknown; body?: unknown }) => Promise<unknown>): ProjectClient {\n`
     + `  const normalize = <T extends Partial<Omit<Proyecto, "id">>>(input: T) => ({ ...input, ...(typeof input.nombre === "string" ? { nombre: input.nombre.trim() } : {}) });\n`

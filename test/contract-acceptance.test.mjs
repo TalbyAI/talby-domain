@@ -58,6 +58,9 @@ test("generates a TypeScript client from the effective public operations", () =>
   assert.match(generated, /trim\(\)/);
   assert.match(generated, /export function validateProjectInput/);
   assert.match(generated, /EXACT_DECIMAL_STRING_REQUIRED/);
+  for (const field of ["clienteId", "nombre", "periodo", "importe"]) {
+    assert.match(generated, new RegExp(`complete \\|\\| Object\\.hasOwn\\(input, "${field}"\\)`));
+  }
   service.close();
 });
 
