@@ -1,4 +1,5 @@
 import { DataFactory, Parser, Store, Writer } from "n3";
+import { validateShaclDataset } from "./shacl-adapter.mjs";
 
 const { blankNode, defaultGraph, literal, namedNode, quad } = DataFactory;
 const datasets = new WeakMap();
@@ -335,6 +336,13 @@ export function matchSemanticSource(source, { subject = null, predicate = null, 
   if (!dataset) throw new TypeError("Semantic Source was not loaded by loadSemanticSource");
   const asTerm = (value) => value === null ? null : typeof value === "string" ? namedNode(value) : rdfTerm(value);
   return [...dataset.match(asTerm(subject), asTerm(predicate), asTerm(object))].map(publicTriple);
+}
+
+export async function validateSemanticSource(source, shapesInput) {
+  const dataDataset = datasets.get(source);
+  if (!dataDataset) throw new TypeError("Semantic Source was not loaded by loadSemanticSource");
+  const shapesSource = loadSemanticSource(shapesInput);
+  return validateShaclDataset(dataDataset, datasets.get(shapesSource));
 }
 
 export function serializeSemanticSource(source) {

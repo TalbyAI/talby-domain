@@ -5,7 +5,8 @@ import {
   inspectSemanticSource,
   loadSemanticSource,
   matchSemanticSource,
-  serializeSemanticSource
+  serializeSemanticSource,
+  validateSemanticSource
 } from "../src/contract-layer.mjs";
 
 test("round-trips Turtle through RDF/JS without exposing package objects", async () => {
@@ -393,4 +394,72 @@ test("marks source declarations as declared in the effective model", () => {
 
   assert.equal(model.declarationIndex["urn:example:orders"].origin, "declared");
   assert.equal(model.origins["urn:example:orders"], "declared");
+});
+
+test("normalizes deterministic SHACL diagnostics without exposing the report", async () => {
+  const data = loadSemanticSource(`
+    @prefix c: <https://github.com/TalbyAI/talby-domain/vocab/contract#> .
+    @prefix d: <urn:example:> .
+    d:orders a c:Module .
+  `);
+  const shapes = `
+    @prefix c: <https://github.com/TalbyAI/talby-domain/vocab/contract#> .
+    @prefix d: <urn:example:> .
+    @prefix sh: <http://www.w3.org/ns/shacl#> .
+    d:moduleShape a sh:NodeShape ;
+      sh:targetClass c:Module ;
+      sh:property [ sh:path c:name ; sh:minCount 1 ] .
+  `;
+
+  const first = await validateSemanticSource(data, shapes);
+  const second = await validateSemanticSource(data, shapes);
+
+  assert.equal(first.conforms, false);
+  assert.equal(first.diagnostics.length, 1);
+  assert.equal(first.diagnostics[0].code, "SHACL_MIN_COUNT");
+  assert.equal(first.diagnostics[0].target, "urn:example:orders");
+  assert.deepEqual(second, first);
+  assert.equal(first.dataset, undefined);
+  assert.equal(first.results, undefined);
+});
+
+test("accepts a conforming synthetic SHACL dataset", async () => {
+  const data = loadSemanticSource(`
+    @prefix c: <https://github.com/TalbyAI/talby-domain/vocab/contract#> .
+    @prefix d: <urn:example:> .
+    d:orders a c:Module ; c:name "Orders" .
+  `);
+  const shapes = `
+    @prefix c: <https://github.com/TalbyAI/talby-domain/vocab/contract#> .
+    @prefix d: <urn:example:> .
+    @prefix sh: <http://www.w3.org/ns/shacl#> .
+    d:moduleShape a sh:NodeShape ;
+      sh:targetClass c:Module ;
+      sh:property [ sh:path c:name ; sh:minCount 1 ] .
+  `;
+
+  assert.deepEqual(await validateSemanticSource(data, shapes), { conforms: true, diagnostics: [] });
+});
+
+test("reports unsupported SHACL paths without guessing a pointer", async () => {
+  const data = loadSemanticSource(`
+    @prefix c: <https://github.com/TalbyAI/talby-domain/vocab/contract#> .
+    @prefix d: <urn:example:> .
+    d:orders a c:Module .
+  `);
+  const shapes = `
+    @prefix c: <https://github.com/TalbyAI/talby-domain/vocab/contract#> .
+    @prefix d: <urn:example:> .
+    @prefix sh: <http://www.w3.org/ns/shacl#> .
+    d:moduleShape a sh:NodeShape ;
+      sh:targetClass c:Module ;
+      sh:property [ sh:path [ sh:alternativePath ( c:name c:label ) ] ; sh:minCount 1 ] .
+  `;
+
+  const result = await validateSemanticSource(data, shapes);
+
+  assert.equal(result.conforms, false);
+  assert.equal(result.diagnostics.length, 1);
+  assert.equal(result.diagnostics[0].code, "SHACL_PATH_UNSUPPORTED");
+  assert.deepEqual(result.diagnostics[0].paths, []);
 });
