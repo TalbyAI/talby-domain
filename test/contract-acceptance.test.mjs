@@ -1,3 +1,4 @@
+import { createCipheriv, createHash } from "node:crypto";
 import assert from "node:assert/strict";
 import test from "node:test";
 
@@ -26,6 +27,36 @@ function validProject(overrides = {}) {
     importe: "100.00",
     ...overrides
   };
+}
+
+function canonicalJson(value) {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+  if (value !== null && typeof value === "object") return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`).join(",")}}`;
+  return JSON.stringify(value);
+}
+
+function projectListFingerprint(filters = []) {
+  return createHash("sha256")
+    .update(canonicalJson({
+      filters,
+      operation: "urn:talby:contract:proyecto/operation/list",
+      ordering: [{ direction: "asc", field: "urn:talby:contract:projectId", nulls: "last", tieBreaker: true }],
+      scope: { resource: "urn:talby:contract:proyecto", tenant: null }
+    }), "utf8")
+    .digest("base64url");
+}
+
+function canonicalContinuationToken({ key, now, fingerprint, position = 1, exp = now + 1000, payload: payloadOverride = null }) {
+  const encodedHeader = Buffer.from(JSON.stringify({ typ: "continuation+jwe", alg: "dir", enc: "A256GCM", kid: "local" })).toString("base64url");
+  const iv = Buffer.alloc(12, 9);
+  const cipher = createCipheriv("aes-256-gcm", key, iv);
+  cipher.setAAD(Buffer.from(encodedHeader));
+  const payload = payloadOverride ?? { version: 1, operation: "list", iat: now, exp, fingerprint, position };
+  const ciphertext = Buffer.concat([
+    cipher.update(JSON.stringify(payload), "utf8"),
+    cipher.final()
+  ]);
+  return [encodedHeader, "", iv.toString("base64url"), ciphertext.toString("base64url"), cipher.getAuthTag().toString("base64url")].join(".");
 }
 
 test("materializes the project effective model with origins and Module ownership", () => {
@@ -61,6 +92,9 @@ test("generates a TypeScript client from the effective public operations", () =>
   for (const field of ["clienteId", "nombre", "periodo", "importe"]) {
     assert.match(generated, new RegExp(`complete \\|\\| Object\\.hasOwn\\(input, "${field}"\\)`));
   }
+  assert.match(generated, /IDENTIFIER_INVALID/);
+  assert.match(generated, /GROUP_REQUIRED/);
+  assert.match(generated, /DATE_INVALID/);
   service.close();
 });
 
@@ -197,6 +231,46 @@ test("uses authenticated continuation tokens and rejects mixed, manipulated, and
   assert.deepEqual(second.body.items.map(({ id }) => id), ["project-2"]);
   now += 1001;
   assert.equal(service.client.listProjects({ continuationToken: token }).body.code, "INVALID_CONTINUATION_TOKEN");
+  service.close();
+});
+
+test("accepts continuation tokens using the canonical request schema", () => {
+  const now = 1_800_000_000_000;
+  const tokenSecret = Buffer.alloc(32, 7);
+  const service = editorService({ clock: () => now, tokenSecret });
+  service.client.createProject(validProject());
+  service.client.createProject(validProject({ nombre: "Project Beta" }));
+
+  const result = service.client.listProjects({ continuationToken: canonicalContinuationToken({
+    key: tokenSecret,
+    now,
+    fingerprint: projectListFingerprint()
+  }) });
+
+  assert.equal(result.status, 200);
+  assert.deepEqual(result.body.items.map(({ id }) => id), ["project-2"]);
+  service.close();
+});
+
+test("rejects continuation tokens with incomplete or inconsistent payloads", () => {
+  const now = 1_800_000_000_000;
+  const tokenSecret = Buffer.alloc(32, 7);
+  const service = editorService({ clock: () => now, tokenSecret });
+  service.client.createProject(validProject());
+  service.client.createProject(validProject({ nombre: "Project Beta" }));
+  const fingerprint = projectListFingerprint();
+  const basePayload = { version: 1, operation: "list", iat: now, exp: now + 1000, fingerprint, position: 1 };
+  const payloads = [
+    { ...basePayload, exp: undefined },
+    { ...basePayload, iat: undefined },
+    { ...basePayload, extra: true },
+    { ...basePayload, iat: now + 1001 }
+  ];
+
+  for (const payload of payloads) {
+    const result = service.client.listProjects({ continuationToken: canonicalContinuationToken({ key: tokenSecret, now, fingerprint, payload }) });
+    assert.equal(result.body.code, "INVALID_CONTINUATION_TOKEN");
+  }
   service.close();
 });
 

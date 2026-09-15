@@ -285,7 +285,17 @@ function decodeToken(token, key, now, expected) {
     decipher.setAuthTag(tag);
     const payload = JSON.parse(Buffer.concat([decipher.update(ciphertext), decipher.final()]).toString("utf8"));
     if (payload.version !== 1 || payload.operation !== expected.operation || payload.fingerprint !== expected.fingerprint) throw new Error("binding");
-    if (!Number.isInteger(payload.position) || payload.position < 0 || payload.exp <= now || payload.iat > now + 60_000) throw new Error("payload");
+    const payloadKeys = ["version", "operation", "iat", "exp", "fingerprint", "position"];
+    if (!isPlainObject(payload)
+      || payloadKeys.some((key) => !Object.hasOwn(payload, key))
+      || Object.keys(payload).some((key) => !payloadKeys.includes(key))
+      || !Number.isInteger(payload.position)
+      || payload.position < 0
+      || !Number.isInteger(payload.exp)
+      || !Number.isInteger(payload.iat)
+      || payload.exp <= now
+      || payload.iat > payload.exp
+      || payload.iat > now + 60_000) throw new Error("payload");
     return payload;
   } catch {
     return null;
@@ -293,12 +303,16 @@ function decodeToken(token, key, now, expected) {
 }
 
 function projectRequestFingerprint(filters = {}) {
+  const canonicalFilters = filters.clienteId === undefined ? [] : [{
+    field: `${PROJECT}projectClientId`,
+    operands: [filters.clienteId],
+    operator: "eq"
+  }];
   return fingerprint({
-    operation: "list",
-    resource: "projects",
-    filters,
-    ordering: ["id:asc"],
-    scope: "default"
+    filters: canonicalFilters,
+    operation: `${PROJECT}proyecto/operation/list`,
+    ordering: [{ direction: "asc", field: `${PROJECT}projectId`, nulls: "last", tieBreaker: true }],
+    scope: { resource: `${PROJECT}proyecto`, tenant: null }
   });
 }
 
@@ -485,12 +499,11 @@ function generatedClientSource(model) {
     + `  const issues: string[] = [];\n`
     + `  const known = ["clienteId", "nombre", "periodo", "importe"];\n`
     + `  for (const key of Object.keys(input)) if (!known.includes(key)) issues.push("UNKNOWN_FIELD:" + key);\n`
-    + `  if ((complete || Object.hasOwn(input, "clienteId")) && !input.clienteId) issues.push("REQUIRED:/clienteId");\n`
-    + `  if ((complete || Object.hasOwn(input, "nombre")) && !input.nombre) issues.push("REQUIRED:/nombre");\n`
-    + `  if (typeof input.nombre === "string" && input.nombre.trim().length < 1) issues.push("MIN_LENGTH:/nombre");\n`
-    + `  if ((complete || Object.hasOwn(input, "periodo")) && !input.periodo) issues.push("REQUIRED:/periodo");\n`
-    + `  if (input.periodo && input.periodo.fin < input.periodo.inicio) issues.push("PERIOD_END_BEFORE_START:/periodo");\n`
-    + `  if ((complete || Object.hasOwn(input, "importe")) && (typeof input.importe !== "string" || !/^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?$/.test(input.importe))) issues.push("EXACT_DECIMAL_STRING_REQUIRED:/importe");\n`
+    + `  const isDate = (value: unknown) => { if (typeof value !== "string" || !/^\\d{4}-\\d{2}-\\d{2}$/.test(value)) return false; const [year, month, day] = value.split("-").map(Number); if (year < 1 || year > 9999 || month < 1 || month > 12) return false; return day >= 1 && day <= new Date(Date.UTC(year, month, 0)).getUTCDate(); };\n`
+    + `  if (complete || Object.hasOwn(input, "clienteId")) { if (input.clienteId === null || input.clienteId === undefined) issues.push("REQUIRED:/clienteId"); else if (typeof input.clienteId !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(input.clienteId)) issues.push("IDENTIFIER_INVALID:/clienteId"); }\n`
+    + `  if (complete || Object.hasOwn(input, "nombre")) { if (input.nombre === null || input.nombre === undefined) issues.push("REQUIRED:/nombre"); else if (typeof input.nombre !== "string" || input.nombre.trim().length < 1) issues.push("MIN_LENGTH:/nombre"); }\n`
+    + `  if (complete || Object.hasOwn(input, "periodo")) { if (input.periodo === undefined) issues.push("REQUIRED:/periodo"); else if (input.periodo === null) issues.push("NULL_NOT_ALLOWED:/periodo"); else if (typeof input.periodo !== "object" || Array.isArray(input.periodo)) issues.push("GROUP_REQUIRED:/periodo"); else { if (!isDate(input.periodo.inicio)) issues.push("DATE_INVALID:/periodo/inicio"); if (!isDate(input.periodo.fin)) issues.push("DATE_INVALID:/periodo/fin"); if (isDate(input.periodo.inicio) && isDate(input.periodo.fin) && input.periodo.fin < input.periodo.inicio) issues.push("PERIOD_END_BEFORE_START:/periodo"); } }\n`
+    + `  if (complete || Object.hasOwn(input, "importe")) { if (typeof input.importe !== "string" || input.importe.length > 4096 || !/^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?$/.test(input.importe)) issues.push("EXACT_DECIMAL_STRING_REQUIRED:/importe"); }\n`
     + `  return issues;\n}\n\n`
     + `export function createProjectClient(send: (request: { method: string; path: string; query?: unknown; body?: unknown }) => Promise<unknown>): ProjectClient {\n`
     + `  const normalize = <T extends Partial<Omit<Proyecto, "id">>>(input: T) => ({ ...input, ...(typeof input.nombre === "string" ? { nombre: input.nombre.trim() } : {}) });\n`
