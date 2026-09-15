@@ -79,6 +79,14 @@ test("preserves Turtle prefixed names containing directive words", () => {
   assert.equal(source.graph[0].subject.value, "urn:example:foo.BASE");
 });
 
+test("preserves escaped punctuation in Turtle local names", () => {
+  for (const escaped of ["!", "~", "(", ")", "*", "+", ",", ";", "=", "/", "?"]) {
+    const source = loadSemanticSource(`@prefix d: <urn:> . d:foo\\${escaped}BASE <urn:p> <urn:o> .`);
+
+    assert.equal(source.graph[0].subject.value, `urn:foo${escaped}BASE`);
+  }
+});
+
 test("parses bare decimal literals while preserving statement punctuation", () => {
   const source = loadSemanticSource(`
     @prefix c: <https://github.com/TalbyAI/talby-domain/vocab/contract#> .

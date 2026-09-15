@@ -131,7 +131,8 @@ function rejectNonTurtleExtensions(input) {
       if (input.slice(index, index + directive.length).toUpperCase() !== directive) continue;
       const previous = input[index - 1];
       const next = input[index + directive.length];
-      const boundary = index === 0 || !/[A-Za-z0-9_:%@.-]/.test(previous) || (previous === "." && /[\s;,[\](){}]/.test(input[index - 2] ?? ""));
+      const escapedPrevious = input[index - 2] === "\\";
+      const boundary = !escapedPrevious && (index === 0 || !/[A-Za-z0-9_:%@.-]/.test(previous) || (previous === "." && /[\s;,[\](){}]/.test(input[index - 2] ?? "")));
       if (boundary && /[\s#<]/.test(next ?? "")) throw new SyntaxError("SPARQL directives are not supported in Turtle");
     }
   }
