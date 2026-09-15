@@ -71,6 +71,24 @@ test("rejects SPARQL directives and RDF-star syntax as non-Turtle", () => {
   }
 });
 
+test("blocks Turtle input over the source byte ceiling", () => {
+  const oversized = "@prefix d: <urn:example:> . d:x <urn:p> \"" + "x".repeat(1_048_576) + "\" .";
+  const result = inspectSemanticSource(oversized);
+  assert.equal(result.verification.status, "blocked");
+  assert.equal(result.verification.diagnostics[0].code, "SOURCE_BYTES_LIMIT");
+  assert.equal(result.effectiveModel, null);
+});
+
+test("blocks a graph over the quad ceiling before verification", () => {
+  const graph = Array.from({ length: 10_001 }, (_, index) => ({
+    subject: { termType: "NamedNode", value: "urn:s:" + index },
+    predicate: { termType: "NamedNode", value: "urn:p" },
+    object: { termType: "Literal", value: "x", datatype: "http://www.w3.org/2001/XMLSchema#string", language: null }
+  }));
+  const result = inspectSemanticSource({ graph });
+  assert.equal(result.verification.diagnostics[0].code, "QUAD_COUNT_LIMIT");
+});
+
 test("preserves Turtle prefixed names containing directive words", () => {
   const source = loadSemanticSource(`
     @prefix d: <urn:example:> .

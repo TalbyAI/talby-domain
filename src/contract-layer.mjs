@@ -342,7 +342,7 @@ export async function validateSemanticSource(source, shapesInput) {
   const dataDataset = datasets.get(source);
   if (!dataDataset) throw new TypeError("Semantic Source was not loaded by loadSemanticSource");
   const shapesSource = loadSemanticSource(shapesInput);
-  return validateShaclDataset(dataDataset, datasets.get(shapesSource));
+  return validateShaclDataset(dataDataset, datasets.get(shapesSource), { maxDiagnostics: SOURCE_LIMITS.maxDiagnostics });
 }
 
 export function serializeSemanticSource(source) {
@@ -383,9 +383,12 @@ export function inspectSemanticSource(input) {
   try {
     source = loadSemanticSource(input);
   } catch (error) {
+    const diagnostic = error instanceof SourceLimitError
+      ? { code: error.code }
+      : { code: "SOURCE_SYNTAX_INVALID", detail: error.message };
     return {
       source: { raw: typeof input === "string" ? input : input?.raw ?? null, graph: [], declarations: [] },
-      verification: { status: "blocked", diagnostics: [{ code: "SOURCE_SYNTAX_INVALID", detail: error.message }] },
+      verification: { status: "blocked", diagnostics: [diagnostic] },
       effectiveModel: null
     };
   }
