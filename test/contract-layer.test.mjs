@@ -54,6 +54,22 @@ test("preserves RDF/JS language literals at the data-only boundary", () => {
   });
 });
 
+test("rejects SPARQL directives and RDF-star syntax as non-Turtle", () => {
+  const inputs = [
+    "PREFIX ex: <urn:example:> ex:s ex:p ex:o .",
+    "BASE <urn:example:> <s> <p> <o> .",
+    "@prefix ex: <urn:example:> . ex:s ex:p << ex:s ex:q ex:o >> ."
+  ];
+
+  for (const input of inputs) {
+    const result = inspectSemanticSource(input);
+
+    assert.equal(result.verification.status, "blocked");
+    assert.equal(result.verification.diagnostics[0].code, "SOURCE_SYNTAX_INVALID");
+    assert.deepEqual(result.source.graph, []);
+  }
+});
+
 test("parses bare decimal literals while preserving statement punctuation", () => {
   const source = loadSemanticSource(`
     @prefix c: <https://github.com/TalbyAI/talby-domain/vocab/contract#> .

@@ -87,6 +87,59 @@ function inputQuad(value) {
   return quad(rdfTerm(value.subject), rdfTerm(value.predicate), rdfTerm(value.object), value.graph ? rdfTerm(value.graph) : defaultGraph());
 }
 
+function rejectNonTurtleExtensions(input) {
+  let comment = false;
+  let iri = false;
+  let quote = null;
+  for (let index = 0; index < input.length; index += 1) {
+    const character = input[index];
+    if (comment) {
+      if (character === "\n" || character === "\r") comment = false;
+      continue;
+    }
+    if (quote) {
+      if (character === "\\") {
+        index += 1;
+        continue;
+      }
+      if (input.startsWith(quote, index)) {
+        index += quote.length - 1;
+        quote = null;
+      }
+      continue;
+    }
+    if (iri) {
+      if (character === ">") iri = false;
+      continue;
+    }
+    if (character === "#") {
+      comment = true;
+      continue;
+    }
+    if (character === '"' || character === "'") {
+      quote = input.startsWith(character.repeat(3), index) ? character.repeat(3) : character;
+      index += quote.length - 1;
+      continue;
+    }
+    if (character === "<") {
+      if (input[index + 1] === "<") throw new SyntaxError("RDF-star syntax is not supported in Turtle");
+      iri = true;
+      continue;
+    }
+    if (character === ">" && input[index + 1] === ">") throw new SyntaxError("RDF-star syntax is not supported in Turtle");
+    for (const directive of ["PREFIX", "BASE"]) {
+      if (input.slice(index, index + directive.length).toUpperCase() !== directive) continue;
+      const previous = input[index - 1];
+      const next = input[index + directive.length];
+      if ((index === 0 || !/[A-Za-z0-9_:%@-]/.test(previous)) && /[\s#<]/.test(next ?? "")) throw new SyntaxError("SPARQL directives are not supported in Turtle");
+    }
+  }
+}
+
+function containsQuadTerm(value) {
+  return [value.subject, value.predicate, value.object, value.graph].some((term) => term?.termType === "Quad");
+}
+
 function cloneTerm(term) {
   return { ...term };
 }
@@ -263,9 +316,11 @@ function ownershipFor(declarations) {
 export function loadSemanticSource(input) {
   const raw = typeof input === "string" ? input : input?.raw ?? null;
   if (typeof raw === "string" && Buffer.byteLength(raw, "utf8") > SOURCE_LIMITS.maxBytes) throw sourceLimit("SOURCE_BYTES_LIMIT");
+  if (typeof input === "string") rejectNonTurtleExtensions(input);
   const parsed = typeof input === "string"
     ? new Parser({ format: "text/turtle" }).parse(input)
     : (input?.graph ?? []).map(inputQuad);
+  if (parsed.some(containsQuadTerm)) throw new SyntaxError("RDF-star syntax is not supported in Turtle");
   if (parsed.length > SOURCE_LIMITS.maxQuads) throw sourceLimit("QUAD_COUNT_LIMIT");
   const dataset = new Store(parsed);
   const source = { raw, graph: [...dataset].map(publicTriple), declarations: declarationRecords(dataset) };
