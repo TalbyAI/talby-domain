@@ -1,7 +1,58 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { inspectSemanticSource, loadSemanticSource } from "../src/contract-layer.mjs";
+import {
+  inspectSemanticSource,
+  loadSemanticSource,
+  matchSemanticSource,
+  serializeSemanticSource
+} from "../src/contract-layer.mjs";
+
+test("round-trips Turtle through RDF/JS without exposing package objects", async () => {
+  const turtle = `
+    @prefix c: <https://github.com/TalbyAI/talby-domain/vocab/contract#> .
+    @prefix d: <urn:example:> .
+    @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+    d:orders a c:Module ; c:name "Orders" ; c:extension [ <urn:custom:color> "blue" ] .
+    d:orders c:limit 1.50 ; c:normalizers ( c:trim ) .
+    d:amount c:value "1.50"^^xsd:decimal .
+  `;
+
+  const source = loadSemanticSource(turtle);
+  const serialized = await serializeSemanticSource(source);
+  const roundTrip = loadSemanticSource(serialized);
+  const result = inspectSemanticSource(turtle);
+  const matches = matchSemanticSource(roundTrip, { subject: "urn:example:orders", predicate: "https://github.com/TalbyAI/talby-domain/vocab/contract#name" });
+
+  assert.equal(roundTrip.graph.length, source.graph.length);
+  assert.equal(matches[0].object.value, "Orders");
+  assert.equal(result.source.graph[0].subject.equals, undefined);
+  assert.equal(result.source.graph[0].predicate.equals, undefined);
+  assert.doesNotThrow(() => structuredClone(result));
+});
+
+test("preserves RDF/JS language literals at the data-only boundary", () => {
+  const source = loadSemanticSource({
+    raw: null,
+    graph: [{
+      subject: { termType: "NamedNode", value: "urn:example:subject" },
+      predicate: { termType: "NamedNode", value: "urn:example:label" },
+      object: {
+        termType: "Literal",
+        value: "Pedidos",
+        datatype: "http://www.w3.org/1999/02/22-rdf-syntax-ns#langString",
+        language: "es"
+      }
+    }]
+  });
+
+  assert.deepEqual(source.graph[0].object, {
+    termType: "Literal",
+    value: "Pedidos",
+    datatype: "http://www.w3.org/1999/02/22-rdf-syntax-ns#langString",
+    language: "es"
+  });
+});
 
 test("parses bare decimal literals while preserving statement punctuation", () => {
   const source = loadSemanticSource(`
