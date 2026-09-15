@@ -58,6 +58,12 @@ Visual representation metadata attached to one Declaration Identifier in a Visua
 **Visual Extension**:
 Explicit RDF content in a Visual Source that a tool does not interpret but must preserve. A Visual Extension cannot add semantic behavior or trigger execution.
 
+**Visual Source Binding**:
+Association that selects exactly one Module for a Visual Source and determines which annotation targets may be applied without changing the Semantic Source or execution.
+
+**Orphan Visual Annotation**:
+Visual Annotation whose target is missing, owned by another Module, or has no unique Module owner. It remains in the Visual Source and produces a visible non-blocking diagnostic, but is not applied.
+
 **Mocking Source**:
 Optional RDF data that enriches operation simulation according to a mocking ontology. It is selected when the prototype runs.
 
