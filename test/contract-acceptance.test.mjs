@@ -63,6 +63,10 @@ test("materializes the project effective model with origins and Module ownership
   const service = editorService();
 
   assert.equal(service.verification.status, "verified");
+  assert.deepEqual(Object.keys(service).sort(), [
+    "client", "close", "compareCompatibility", "conformance", "effectiveModel", "execute",
+    "generatedClientSource", "matchScenarios", "mockingSource", "source", "storage", "verification"
+  ]);
   assert.equal(service.effectiveModel.declarationIndex["urn:talby:contract:proyecto"].ownerModule, "urn:talby:contract:module");
   assert.equal(service.effectiveModel.declarationIndex["urn:talby:contract:proyecto"].origin, "declared");
   assert.deepEqual(service.effectiveModel.profileDefaults.listLimit, { value: 20, origin: "default" });
