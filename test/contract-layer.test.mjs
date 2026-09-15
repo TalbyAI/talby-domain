@@ -463,3 +463,72 @@ test("reports unsupported SHACL paths without guessing a pointer", async () => {
   assert.equal(result.diagnostics[0].code, "SHACL_PATH_UNSUPPORTED");
   assert.deepEqual(result.diagnostics[0].paths, []);
 });
+
+test("does not infer SHACL targets through rdfs:subClassOf", async () => {
+  const data = loadSemanticSource(`
+    @prefix c: <https://github.com/TalbyAI/talby-domain/vocab/contract#> .
+    @prefix d: <urn:example:> .
+    @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+    d:direct a c:Module .
+    d:special a c:SpecialModule .
+    c:SpecialModule rdfs:subClassOf c:Module .
+  `);
+  const shapes = `
+    @prefix c: <https://github.com/TalbyAI/talby-domain/vocab/contract#> .
+    @prefix d: <urn:example:> .
+    @prefix sh: <http://www.w3.org/ns/shacl#> .
+    d:moduleShape a sh:NodeShape ;
+      sh:targetClass c:Module ;
+      sh:property [ sh:path c:name ; sh:minCount 1 ] .
+  `;
+
+  const result = await validateSemanticSource(data, shapes);
+
+  assert.equal(result.conforms, false);
+  assert.equal(result.diagnostics[0].code, "SHACL_MIN_COUNT");
+  assert.deepEqual(result.diagnostics.map(({ target }) => target), ["urn:example:direct"]);
+  assert.equal(matchSemanticSource(data, { predicate: "http://www.w3.org/2000/01/rdf-schema#subClassOf" }).length, 1);
+});
+
+test("returns a data-only diagnostic when SHACL imports are forbidden", async () => {
+  const data = loadSemanticSource(`
+    @prefix c: <https://github.com/TalbyAI/talby-domain/vocab/contract#> .
+    @prefix d: <urn:example:> .
+    d:orders a c:Module .
+  `);
+  const shapes = `
+    @prefix c: <https://github.com/TalbyAI/talby-domain/vocab/contract#> .
+    @prefix d: <urn:example:> .
+    @prefix owl: <http://www.w3.org/2002/07/owl#> .
+    @prefix sh: <http://www.w3.org/ns/shacl#> .
+    d:moduleShape a sh:NodeShape ;
+      sh:targetClass c:Module ;
+      owl:imports <urn:remote:shapes> .
+  `;
+
+  assert.deepEqual(await validateSemanticSource(data, shapes), {
+    conforms: false,
+    diagnostics: [{ code: "SHACL_IMPORT_FORBIDDEN", rule: "", target: "", paths: [], detail: "" }]
+  });
+});
+
+test("returns a data-only diagnostic when SHACL diagnostics exceed the ceiling", async () => {
+  const data = loadSemanticSource(`
+    @prefix c: <https://github.com/TalbyAI/talby-domain/vocab/contract#> .
+    @prefix d: <urn:example:> .
+    ${Array.from({ length: 1_001 }, (_, index) => `d:module${index} a c:Module .`).join("\n    ")}
+  `);
+  const shapes = `
+    @prefix c: <https://github.com/TalbyAI/talby-domain/vocab/contract#> .
+    @prefix d: <urn:example:> .
+    @prefix sh: <http://www.w3.org/ns/shacl#> .
+    d:moduleShape a sh:NodeShape ;
+      sh:targetClass c:Module ;
+      sh:property [ sh:path c:name ; sh:minCount 1 ] .
+  `;
+
+  assert.deepEqual(await validateSemanticSource(data, shapes), {
+    conforms: false,
+    diagnostics: [{ code: "SHACL_DIAGNOSTIC_LIMIT", rule: "", target: "", paths: [], detail: "" }]
+  });
+});

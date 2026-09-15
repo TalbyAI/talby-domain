@@ -3,6 +3,7 @@ import SHACLValidator from "rdf-validate-shacl";
 import environment from "rdf-validate-shacl/src/defaultEnv.js";
 
 const SH = "http://www.w3.org/ns/shacl#";
+const RDFS_SUBCLASS_OF = "http://www.w3.org/2000/01/rdf-schema#subClassOf";
 const MAX_DIAGNOSTICS = 1_000;
 const factory = { ...environment, ...DataFactory, dataset: (quads = []) => new Store(quads) };
 
@@ -39,23 +40,29 @@ function stableRule(term, blankNodes) {
   return term.termType === "BlankNode" ? blankNodes.get(term.value) ?? "_:shape" : term.value;
 }
 
+function withoutSubclassTriples(dataset) {
+  return new Store([...dataset].filter(({ predicate }) => predicate.value !== RDFS_SUBCLASS_OF));
+}
+
 export async function validateShaclDataset(dataDataset, shapesDataset) {
+  const dataView = withoutSubclassTriples(dataDataset);
+  const shapesView = withoutSubclassTriples(shapesDataset);
   let report;
   try {
-    const validator = new SHACLValidator(shapesDataset, {
+    const validator = new SHACLValidator(shapesView, {
       factory,
       maxErrors: MAX_DIAGNOSTICS + 1,
       importGraph: async () => {
         throw new Error("SHACL_IMPORT_FORBIDDEN");
       }
     });
-    report = await validator.validate(dataDataset);
+    report = await validator.validate(dataView);
   } catch (error) {
     if (error?.message === "SHACL_IMPORT_FORBIDDEN") return { conforms: false, diagnostics: [boundaryDiagnostic("SHACL_IMPORT_FORBIDDEN")] };
     throw error;
   }
   if (report.results.length > MAX_DIAGNOSTICS) return { conforms: false, diagnostics: [boundaryDiagnostic("SHACL_DIAGNOSTIC_LIMIT")] };
-  const blankNodes = stableBlankNodes(shapesDataset);
+  const blankNodes = stableBlankNodes(shapesView);
   const diagnostics = report.results.map((result) => ({
     code: result.path && result.path.termType !== "NamedNode"
       ? "SHACL_PATH_UNSUPPORTED"
