@@ -576,6 +576,73 @@ test("caps direct SHACL validation when maxDiagnostics is Infinity", async () =>
   });
 });
 
+test("enforces the configured SHACL diagnostic count limit", async () => {
+  const parse = (source) => new Store(new Parser({ format: "text/turtle" }).parse(source));
+  const data = parse(`
+    @prefix d: <urn:example:> .
+    d:one d:value "invalid" .
+    d:two d:value "invalid" .
+  `);
+  const shapes = parse(`
+    @prefix d: <urn:example:> .
+    @prefix sh: <http://www.w3.org/ns/shacl#> .
+    d:valueShape a sh:NodeShape ;
+      sh:targetSubjectsOf d:value ;
+      sh:property [ sh:path d:value ; sh:in ( "allowed" ) ] .
+  `);
+
+  for (const maxDiagnostics of [1, 0]) {
+    assert.deepEqual(await validateShaclDataset(data, shapes, { maxDiagnostics }), {
+      conforms: false,
+      diagnostics: [{ code: "SHACL_DIAGNOSTIC_LIMIT", rule: "", target: "", paths: [], detail: "" }]
+    });
+  }
+});
+
+test("rejects an oversized normalized SHACL diagnostic detail", async () => {
+  const data = loadSemanticSource(`
+    @prefix c: <https://github.com/TalbyAI/talby-domain/vocab/contract#> .
+    @prefix d: <urn:example:> .
+    d:orders a c:Module .
+  `);
+  const message = "é".repeat(8_193);
+  const shapes = `
+    @prefix c: <https://github.com/TalbyAI/talby-domain/vocab/contract#> .
+    @prefix d: <urn:example:> .
+    @prefix sh: <http://www.w3.org/ns/shacl#> .
+    d:moduleShape a sh:NodeShape ;
+      sh:targetClass c:Module ;
+      sh:property [ sh:path c:name ; sh:minCount 1 ; sh:message "${message}" ] .
+  `;
+
+  assert.deepEqual(await validateSemanticSource(data, shapes), {
+    conforms: false,
+    diagnostics: [{ code: "SHACL_DIAGNOSTIC_LIMIT", rule: "", target: "", paths: [], detail: "" }]
+  });
+});
+
+test("rejects normalized SHACL diagnostics that exceed the total output limit", async () => {
+  const data = loadSemanticSource(`
+    @prefix c: <https://github.com/TalbyAI/talby-domain/vocab/contract#> .
+    @prefix d: <urn:example:> .
+    ${Array.from({ length: 1_000 }, (_, index) => `d:module${index} a c:Module .`).join("\n    ")}
+  `);
+  const message = "x".repeat(2_048);
+  const shapes = `
+    @prefix c: <https://github.com/TalbyAI/talby-domain/vocab/contract#> .
+    @prefix d: <urn:example:> .
+    @prefix sh: <http://www.w3.org/ns/shacl#> .
+    d:moduleShape a sh:NodeShape ;
+      sh:targetClass c:Module ;
+      sh:property [ sh:path c:name ; sh:minCount 1 ; sh:message "${message}" ] .
+  `;
+
+  assert.deepEqual(await validateSemanticSource(data, shapes), {
+    conforms: false,
+    diagnostics: [{ code: "SHACL_DIAGNOSTIC_LIMIT", rule: "", target: "", paths: [], detail: "" }]
+  });
+});
+
 test("validates an explicit rdfs:subClassOf property path without inference", async () => {
   const data = loadSemanticSource(`
     @prefix c: <https://github.com/TalbyAI/talby-domain/vocab/contract#> .

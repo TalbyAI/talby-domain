@@ -5,6 +5,8 @@ import environment from "rdf-validate-shacl/src/defaultEnv.js";
 const SH = "http://www.w3.org/ns/shacl#";
 const RDFS_SUBCLASS_OF = "http://www.w3.org/2000/01/rdf-schema#subClassOf";
 const MAX_DIAGNOSTICS = 1_000;
+const MAX_DIAGNOSTIC_DETAIL_BYTES = 16_384;
+const MAX_DIAGNOSTIC_OUTPUT_BYTES = 1_048_576;
 
 function boundedMaxDiagnostics(value) {
   if (!Number.isFinite(value)) return MAX_DIAGNOSTICS;
@@ -89,18 +91,29 @@ export async function validateShaclDataset(dataDataset, shapesDataset, { maxDiag
     if (error?.message === "SHACL_IMPORT_FORBIDDEN") return { conforms: false, diagnostics: [boundaryDiagnostic("SHACL_IMPORT_FORBIDDEN")] };
     throw error;
   }
-  if (report.results.length > MAX_DIAGNOSTICS) return { conforms: false, diagnostics: [boundaryDiagnostic("SHACL_DIAGNOSTIC_LIMIT")] };
+  if (report.results.length > diagnosticLimit) return { conforms: false, diagnostics: [boundaryDiagnostic("SHACL_DIAGNOSTIC_LIMIT")] };
   const blankNodes = stableBlankNodes(shapesView);
-  const diagnostics = report.results.map((result) => ({
-    code: result.path && result.path.termType !== "NamedNode"
-      ? "SHACL_PATH_UNSUPPORTED"
-      : diagnosticCode(result.sourceConstraintComponent),
-    rule: stableRule(result.sourceShape ?? result.sourceConstraintComponent, blankNodes),
-    target: result.focusNode?.value ?? "",
-    paths: result.path && result.path.termType !== "NamedNode" ? [] : simplePointer(result.path),
-    detail: Array.isArray(result.message)
-      ? result.message.map((message) => message.value).sort().join("; ")
-      : result.message?.value ?? ""
-  })).sort((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right)));
+  const diagnostics = [];
+  let outputBytes = 2;
+  for (const result of report.results) {
+    const diagnostic = {
+      code: result.path && result.path.termType !== "NamedNode"
+        ? "SHACL_PATH_UNSUPPORTED"
+        : diagnosticCode(result.sourceConstraintComponent),
+      rule: stableRule(result.sourceShape ?? result.sourceConstraintComponent, blankNodes),
+      target: result.focusNode?.value ?? "",
+      paths: result.path && result.path.termType !== "NamedNode" ? [] : simplePointer(result.path),
+      detail: Array.isArray(result.message)
+        ? result.message.map((message) => message.value).sort().join("; ")
+        : result.message?.value ?? ""
+    };
+    if (Buffer.byteLength(diagnostic.detail, "utf8") > MAX_DIAGNOSTIC_DETAIL_BYTES) return { conforms: false, diagnostics: [boundaryDiagnostic("SHACL_DIAGNOSTIC_LIMIT")] };
+    const diagnosticBytes = Buffer.byteLength(JSON.stringify(diagnostic), "utf8");
+    const nextOutputBytes = outputBytes + diagnosticBytes + (diagnostics.length ? 1 : 0);
+    if (nextOutputBytes > MAX_DIAGNOSTIC_OUTPUT_BYTES) return { conforms: false, diagnostics: [boundaryDiagnostic("SHACL_DIAGNOSTIC_LIMIT")] };
+    diagnostics.push(diagnostic);
+    outputBytes = nextOutputBytes;
+  }
+  diagnostics.sort((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right)));
   return { conforms: report.conforms, diagnostics };
 }

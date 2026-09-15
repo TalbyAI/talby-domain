@@ -16,7 +16,7 @@
 - Keep RDF/JS `Store`/`DatasetCore` objects private; no RDF package object may appear in public inspection results or effective models.
 - Use direct `DatasetCore.match`; do not add `rdf-ext`, Comunica, `shacl-engine`, or `zazuko/env-node`, network loaders, reasoning, or external adapters.
 - Pin exact direct dependencies to `n3@2.7.12` and `rdf-validate-shacl@0.6.5` after dependency, license, and security checks.
-- Enforce 1 MiB UTF-8 Turtle input, 10,000 parsed quads, and 1,000 normalized SHACL diagnostics; callers cannot disable these ceilings.
+- Enforce 1 MiB UTF-8 Turtle input, 10,000 parsed quads, 1,000 normalized SHACL diagnostics, a 16 KiB UTF-8 limit per diagnostic detail, and a 1 MiB aggregate normalized-diagnostics limit before sorting; callers cannot disable these ceilings.
 - Keep Semantic, Visual, Mocking, and Governance Sources separate. Do not implement Visual Source binding or change prototypes, samples, or unrelated public contracts.
 - Human-readable repository prose, comments, docstrings, commits, and issue updates remain in English.
 - Production code follows TDD: each new behavior gets a failing test, the failure is observed, then the smallest implementation is added.

@@ -55,7 +55,7 @@ The existing Talby semantic verification remains separate and blocking. No unapp
 
 ## Safety and limits
 
-The source boundary will enforce explicit ceilings before exposing a dataset: 1 MiB of UTF-8 Turtle input, 10,000 parsed quads, and 1,000 normalized SHACL diagnostics. These defaults are above the 90-quad project fixture and tested at their boundaries; callers may not disable them. No reasoning, SPARQL engine, implicit IRI dereferencing, extension execution, or external adapter is introduced.
+The source boundary will enforce explicit ceilings before exposing a dataset: 1 MiB of UTF-8 Turtle input, 10,000 parsed quads, and 1,000 normalized SHACL diagnostics. Each normalized diagnostic detail is limited to 16 KiB of UTF-8 and the aggregate normalized diagnostics are limited to 1 MiB before sorting. These defaults are above the 90-quad project fixture and tested at their boundaries; callers may not disable them. No reasoning, SPARQL engine, implicit IRI dereferencing, extension execution, or external adapter is introduced.
 
 ## Verification
 
