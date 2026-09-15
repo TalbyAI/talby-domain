@@ -102,7 +102,8 @@ function listValues(source, head) {
   while (current && current !== RDF_NIL && !seen.has(current?.value ?? current)) {
     seen.add(current?.value ?? current);
     const first = objects(source, current, RDF_FIRST)[0];
-    if (first) values.push(first);
+    if (!first) break;
+    values.push(first);
     current = termValue(objects(source, current, RDF_REST)[0]);
   }
   return values;
