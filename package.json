@@ -1,0 +1,15 @@
+{
+  "name": "talby-domain",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "scripts": {
+    "test": "node --test"
+  },
+  "dependencies": {
+    "n3": "2.7.12",
+    "rdf-validate-shacl": "0.6.5"
+  }
+}
