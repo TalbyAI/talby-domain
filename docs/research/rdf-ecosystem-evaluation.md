@@ -1,6 +1,6 @@
 # RDF Ecosystem Evaluation
 
-**Status:** decision recorded; production migration deferred to a follow-up
+**Status:** implementation approved; follow-up tracked in [#40](https://github.com/TalbyAI/talby-domain/issues/40)
 
 **Date:** 2026-09-15
 
@@ -36,9 +36,10 @@ advanced or SPARQL-enabled SHACL features. It is not the smallest first
 delivery because its optional SPARQL support and runtime dependency graph are
 broader than the required structural profile.
 
-This decision does not add production dependencies in this ticket. A future
-migration must first add a package manifest and lockfile, preserve the public
-seam, and land focused conformance tests in a separate change.
+This decision did not add production dependencies in #38. The maintainer-
+approved implementation is tracked in [#40](https://github.com/TalbyAI/talby-domain/issues/40).
+The migration must first add a package manifest and lockfile, preserve the
+public seam, and land focused conformance tests in that separate change.
 
 No ADR or Contract Layer plan change is required for this research result:
 the recommendation preserves the existing domain and public inspection
@@ -281,8 +282,8 @@ read a PDF, call an external system, or execute extension content.
 
 ## Migration plan and cost
 
-The migration is localized and medium-sized, but it is not part of this
-research ticket:
+The migration is localized and medium-sized. It is tracked in the separate
+implementation follow-up [#40](https://github.com/TalbyAI/talby-domain/issues/40):
 
 1. Add a production package manifest and lockfile in a separate change with
    the pinned N3 and SHACL adapter versions.
@@ -316,8 +317,9 @@ the Semantic Source again or import RDF package objects. This preserves the
 boundary in [ADR-0009](../adr/0009-vinculo-ejecutable-fuente-visual-modulo.md)
 and the source isolation in [ADR-0008](../adr/0008-fuente-visual-anotaciones.md).
 
-The migration is therefore a release-quality follow-up, not a blocker for
-implementing the #36 binding seam once #37 is integrated.
+The approved migration is therefore a release-quality follow-up, not a blocker
+for implementing the #36 binding seam now that #37 is integrated. The #40
+migration and #36 can proceed independently from this point.
 
 ## Research acceptance status
 
