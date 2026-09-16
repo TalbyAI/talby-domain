@@ -543,6 +543,7 @@ test("keeps the Semantic Source graph, effective model, and execution isolated",
     const permissionBefore = service.execute(permissionRequest);
     const mockingBefore = service.client.approveProject("project-1");
     const compatibilityBefore = service.compareCompatibility(service.effectiveModel, service.effectiveModel);
+    const runtimeBefore = structuredClone(service.storage());
 
     const first = bindVisualSource(visualSource, service.effectiveModel);
     const second = bindVisualSource([
@@ -559,6 +560,7 @@ test("keeps the Semantic Source graph, effective model, and execution isolated",
     assert.deepEqual(service.effectiveModel, modelBefore);
     assert.equal(service.generatedClientSource, generatedBefore);
     assert.deepEqual(service.client.getProject("project-1"), payloadBefore);
+    assert.deepEqual(service.storage(), runtimeBefore);
     assert.deepEqual(service.execute(permissionRequest), permissionBefore);
     assert.deepEqual(service.client.approveProject("project-1"), mockingBefore);
     assert.deepEqual(service.compareCompatibility(service.effectiveModel, service.effectiveModel), compatibilityBefore);
