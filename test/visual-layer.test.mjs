@@ -332,6 +332,43 @@ test("stops an iterable graph at the quad limit", () => {
   assert.equal(nextCalls, 10_001);
 });
 
+test("normalizes input-controlled iterable errors as invalid graph diagnostics", () => {
+  const throwingGraph = (error) => ({
+    [Symbol.iterator]() {
+      return {
+        next() {
+          throw error;
+        }
+      };
+    }
+  });
+  const spoofedLimitError = new Error("input-controlled iterable failure");
+  spoofedLimitError.code = "VISUAL_QUAD_COUNT_LIMIT";
+
+  const result = bindVisualSource(throwingGraph(spoofedLimitError), model);
+
+  assert.deepEqual(result, {
+    status: "blocked",
+    selectedModule: null,
+    applied: [],
+    orphans: [],
+    diagnostics: [{
+      severity: "error",
+      code: "VISUAL_GRAPH_INVALID",
+      detail: "input-controlled iterable failure"
+    }]
+  });
+
+  const noDetailError = { code: "VISUAL_SOURCE_BYTES_LIMIT" };
+  const noDetailResult = bindVisualSource(throwingGraph(noDetailError), model);
+
+  assert.deepEqual(noDetailResult.diagnostics, [{
+    severity: "error",
+    code: "VISUAL_GRAPH_INVALID"
+  }]);
+  assert.equal(Object.hasOwn(noDetailResult.diagnostics[0], "detail"), false);
+});
+
 test("rejects DefaultGraph in RDF triple positions but accepts it as the quad graph", () => {
   const predicate = namedNode(VISUAL + "value");
   const subject = namedNode("urn:example:subject");
@@ -425,6 +462,53 @@ test("blocks invalid core data and never returns a partial annotation result", (
     assert.deepEqual(result.orphans, [], name);
     assert.ok(result.diagnostics.some((diagnostic) => diagnostic.code === code), name);
   }
+});
+
+test("validates every duplicate core value independent of graph order", () => {
+  const descriptor = blankNode("duplicate-descriptor");
+  const target = namedNode("urn:example:order");
+  const extension = blankNode("duplicate-extension");
+  const decimal = (value) => literal(value, namedNode(XSD + "decimal"));
+  const string = (value) => literal(value, namedNode(XSD + "string"));
+  const graph = [
+    quad(descriptor, namedNode(RDF_TYPE), namedNode(VISUAL + "VisualSource")),
+    quad(descriptor, namedNode(VISUAL + "module"), namedNode("urn:example:orders")),
+    quad(target, namedNode(VISUAL + "x"), decimal("1")),
+    quad(target, namedNode(VISUAL + "x"), string("invalid x")),
+    quad(target, namedNode(VISUAL + "y"), decimal("2")),
+    quad(target, namedNode(VISUAL + "y"), string("invalid y")),
+    quad(target, namedNode(VISUAL + "width"), decimal("10")),
+    quad(target, namedNode(VISUAL + "width"), string("invalid width")),
+    quad(target, namedNode(VISUAL + "height"), decimal("5")),
+    quad(target, namedNode(VISUAL + "height"), string("invalid height")),
+    quad(target, namedNode(VISUAL + "fill"), string("#11223344")),
+    quad(target, namedNode(VISUAL + "fill"), string("blue")),
+    quad(target, namedNode(VISUAL + "stroke"), string("#aabbccdd")),
+    quad(target, namedNode(VISUAL + "stroke"), string("blue")),
+    quad(target, namedNode(VISUAL + "extension"), extension),
+    quad(target, namedNode(VISUAL + "extension"), string("invalid extension")),
+    quad(extension, namedNode("urn:custom:note"), string("inert"))
+  ];
+  const results = [graph, [...graph].reverse()].map((input) => bindVisualSource(input, model));
+
+  assert.equal(results[0].status, "blocked");
+  assert.deepEqual(results[1].diagnostics, results[0].diagnostics);
+  assert.deepEqual(results[0].diagnostics.map(({ code, predicate }) => ({ code, predicate })), [
+    { code: "VISUAL_CARDINALITY_INVALID", predicate: VISUAL + "extension" },
+    { code: "VISUAL_EXTENSION_INVALID", predicate: VISUAL + "extension" },
+    { code: "VISUAL_CARDINALITY_INVALID", predicate: VISUAL + "fill" },
+    { code: "VISUAL_COLOR_INVALID", predicate: VISUAL + "fill" },
+    { code: "VISUAL_CARDINALITY_INVALID", predicate: VISUAL + "height" },
+    { code: "VISUAL_DECIMAL_INVALID", predicate: VISUAL + "height" },
+    { code: "VISUAL_CARDINALITY_INVALID", predicate: VISUAL + "stroke" },
+    { code: "VISUAL_COLOR_INVALID", predicate: VISUAL + "stroke" },
+    { code: "VISUAL_CARDINALITY_INVALID", predicate: VISUAL + "width" },
+    { code: "VISUAL_DECIMAL_INVALID", predicate: VISUAL + "width" },
+    { code: "VISUAL_CARDINALITY_INVALID", predicate: VISUAL + "x" },
+    { code: "VISUAL_DECIMAL_INVALID", predicate: VISUAL + "x" },
+    { code: "VISUAL_CARDINALITY_INVALID", predicate: VISUAL + "y" },
+    { code: "VISUAL_DECIMAL_INVALID", predicate: VISUAL + "y" }
+  ]);
 });
 
 test("requires annotation subjects to be Declaration Identifier IRIs", () => {

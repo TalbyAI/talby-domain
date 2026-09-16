@@ -309,25 +309,32 @@ function validateAnnotation(dataset, target) {
   const x = values(dataset, target, VISUAL_X);
   const y = values(dataset, target, VISUAL_Y);
   if ((x.length === 0) !== (y.length === 0)) diagnostics.push(diagnostic("VISUAL_COORDINATE_PAIR_INVALID", { target: target.value }));
-  if (x[0] && !isDecimal(x[0])) diagnostics.push(diagnostic("VISUAL_DECIMAL_INVALID", { target: target.value, predicate: VISUAL_X }));
-  if (y[0] && !isDecimal(y[0])) diagnostics.push(diagnostic("VISUAL_DECIMAL_INVALID", { target: target.value, predicate: VISUAL_Y }));
+  for (const [predicate, propertyValues] of [[VISUAL_X, x], [VISUAL_Y, y]]) {
+    for (const value of propertyValues) {
+      if (!isDecimal(value)) diagnostics.push(diagnostic("VISUAL_DECIMAL_INVALID", { target: target.value, predicate }));
+    }
+  }
 
   const width = values(dataset, target, VISUAL_WIDTH);
   const height = values(dataset, target, VISUAL_HEIGHT);
   if ((width.length === 0) !== (height.length === 0)) diagnostics.push(diagnostic("VISUAL_DIMENSION_PAIR_INVALID", { target: target.value }));
-  for (const [predicate, value] of [[VISUAL_WIDTH, width[0]], [VISUAL_HEIGHT, height[0]]]) {
-    if (!value) continue;
-    if (!isDecimal(value)) diagnostics.push(diagnostic("VISUAL_DECIMAL_INVALID", { target: target.value, predicate }));
-    else if (!isNonNegativeDecimal(value)) diagnostics.push(diagnostic("VISUAL_DIMENSION_NEGATIVE", { target: target.value, predicate }));
+  for (const [predicate, propertyValues] of [[VISUAL_WIDTH, width], [VISUAL_HEIGHT, height]]) {
+    for (const value of propertyValues) {
+      if (!isDecimal(value)) diagnostics.push(diagnostic("VISUAL_DECIMAL_INVALID", { target: target.value, predicate }));
+      else if (!isNonNegativeDecimal(value)) diagnostics.push(diagnostic("VISUAL_DIMENSION_NEGATIVE", { target: target.value, predicate }));
+    }
   }
 
   for (const predicate of [VISUAL_FILL, VISUAL_STROKE]) {
-    const value = values(dataset, target, predicate)[0];
-    if (value && !isColor(value)) diagnostics.push(diagnostic("VISUAL_COLOR_INVALID", { target: target.value, predicate }));
+    for (const value of values(dataset, target, predicate)) {
+      if (!isColor(value)) diagnostics.push(diagnostic("VISUAL_COLOR_INVALID", { target: target.value, predicate }));
+    }
   }
 
   const extensions = values(dataset, target, VISUAL_EXTENSION);
-  if (extensions[0] && !isNode(extensions[0])) diagnostics.push(diagnostic("VISUAL_EXTENSION_INVALID", { target: target.value, predicate: VISUAL_EXTENSION }));
+  for (const value of extensions) {
+    if (!isNode(value)) diagnostics.push(diagnostic("VISUAL_EXTENSION_INVALID", { target: target.value, predicate: VISUAL_EXTENSION }));
+  }
   return diagnostics;
 }
 
@@ -420,7 +427,9 @@ export function bindVisualSource(input, effectiveSemanticModel) {
   try {
     dataset = normalizeVisualGraph(input);
   } catch (error) {
-    return blocked([diagnostic(error.code ?? "VISUAL_GRAPH_INVALID", { detail: error.message })]);
+    const code = error instanceof VisualGraphLimitError ? error.code : "VISUAL_GRAPH_INVALID";
+    const fields = typeof error?.message === "string" ? { detail: error.message } : {};
+    return blocked([diagnostic(code, fields)]);
   }
   if (!validEffectiveModel(effectiveSemanticModel)) return blocked([diagnostic("VISUAL_EFFECTIVE_MODEL_INVALID")]);
   const extensionNodes = allExtensionNodes(dataset);
