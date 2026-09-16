@@ -1,15 +1,12 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes as secureRandomBytes } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
 
-import { inspectSemanticSource, loadSemanticSource } from "./contract-layer.mjs";
+import { inspectSemanticSource, loadSemanticSource, matchSemanticSource } from "./contract-layer.mjs";
 
 const CONTRACT = "https://github.com/TalbyAI/talby-domain/vocab/contract#";
 const MOCKING = "https://github.com/TalbyAI/talby-domain/vocab/mocking#";
 const XSD = "http://www.w3.org/2001/XMLSchema#";
 const RDF_TYPE = "http://www.w3.org/1999/02/22-rdf-syntax-ns#type";
-const RDF_FIRST = "http://www.w3.org/1999/02/22-rdf-syntax-ns#first";
-const RDF_REST = "http://www.w3.org/1999/02/22-rdf-syntax-ns#rest";
-const RDF_NIL = "http://www.w3.org/1999/02/22-rdf-syntax-ns#nil";
 
 const PROJECT = "urn:talby:contract:";
 
@@ -87,42 +84,26 @@ function termValue(term) {
   return term?.termType === "NamedNode" || term?.termType === "Literal" ? term.value : null;
 }
 
-function objects(graph, subject, predicate) {
-  return graph
-    .filter((triple) => triple.subject.value === subject && triple.predicate.value === predicate)
-    .map((triple) => triple.object);
+function objects(source, subject, predicate) {
+  return matchSemanticSource(source, { subject, predicate }).map(({ object }) => object);
 }
 
-function firstObject(graph, subject, predicate) {
-  return objects(graph, subject, predicate)[0] ?? null;
+function firstObject(source, subject, predicate) {
+  return objects(source, subject, predicate)[0] ?? null;
 }
 
-function listValues(graph, head) {
-  const values = [];
-  const seen = new Set();
-  let current = head?.value;
-  while (current && current !== RDF_NIL && !seen.has(current)) {
-    seen.add(current);
-    const first = firstObject(graph, current, RDF_FIRST);
-    if (first) values.push(first);
-    current = termValue(firstObject(graph, current, RDF_REST));
-  }
-  return values;
-}
-
-function extensionNodesFor(graph, extensionPredicate) {
+function extensionNodesFor(source, extensionPredicate) {
   const nodes = new Set();
-  const queue = graph
-    .filter((triple) => triple.predicate.value === extensionPredicate)
-    .map((triple) => triple.object)
+  const queue = matchSemanticSource(source, { predicate: extensionPredicate })
+    .map(({ object }) => object)
     .filter((term) => term.termType === "NamedNode" || term.termType === "BlankNode");
   while (queue.length) {
     const term = queue.shift();
     const key = `${term.termType}:${term.value}`;
     if (nodes.has(key)) continue;
     nodes.add(key);
-    for (const triple of graph) {
-      if (triple.subject.termType === term.termType && triple.subject.value === term.value && (triple.object.termType === "NamedNode" || triple.object.termType === "BlankNode")) queue.push(triple.object);
+    for (const { object } of matchSemanticSource(source, { subject: term })) {
+      if (object.termType === "NamedNode" || object.termType === "BlankNode") queue.push(object);
     }
   }
   return nodes;
@@ -326,8 +307,8 @@ function readProjects(database) {
   return database.prepare("SELECT document FROM projects ORDER BY id ASC").all().map((row) => JSON.parse(row.document));
 }
 
-function findDeclarationField(model, graph, entity, fieldName) {
-  const fieldIds = objects(graph, entity.declarationIdentifier, `${CONTRACT}field`)
+function findDeclarationField(model, source, entity, fieldName) {
+  const fieldIds = objects(source, entity.declarationIdentifier, `${CONTRACT}field`)
     .filter((term) => term.termType === "NamedNode")
     .map((term) => term.value);
   return fieldIds
@@ -337,13 +318,13 @@ function findDeclarationField(model, graph, entity, fieldName) {
 
 function projectModelFrom(inspected) {
   const base = inspected.effectiveModel;
-  const graph = inspected.source.graph;
+  const source = inspected.source;
   const project = declarationByName(base, "Entity", "Proyecto");
   const client = declarationByName(base, "Entity", "Cliente");
   const period = declarationByName(base, "FieldGroup", "Periodo");
   const command = declarationByName(base, "Command", "AprobarProyecto");
   const event = declarationByName(base, "Event", "ProjectApproved");
-  const field = (name) => findDeclarationField(base, graph, project, name);
+  const field = (name) => findDeclarationField(base, source, project, name);
   const fields = {
     id: { ...field("id"), type: "Identifier", origin: "declared" },
     clienteId: { ...field("clienteId"), type: "EntityReference", origin: "declared" },
@@ -389,7 +370,7 @@ function projectModelFrom(inspected) {
 function verifyProjectContract(inspected) {
   if (inspected.verification.status !== "verified") return inspected;
   const model = inspected.effectiveModel;
-  const graph = inspected.source.graph;
+  const source = inspected.source;
   const diagnostics = [];
   const module = declarationByName(model, "Module", "Project Management");
   const client = declarationByName(model, "Entity", "Cliente");
@@ -404,29 +385,29 @@ function verifyProjectContract(inspected) {
   if (!command) diagnostics.push(issue("DECLARATION_NOT_FOUND", [], "AprobarProyecto Command is required"));
   if (!event) diagnostics.push(issue("DECLARATION_NOT_FOUND", [], "ProjectApproved Event is required"));
   if (project) {
-    const crud = firstObject(graph, project.declarationIdentifier, `${CONTRACT}defaultCrud`);
+    const crud = firstObject(source, project.declarationIdentifier, `${CONTRACT}defaultCrud`);
     if (crud?.value !== "true") diagnostics.push(issue("DEFAULT_CRUD_REQUIRED", [`/${project.declarationIdentifier}`]));
-    const identifiers = objects(graph, project.declarationIdentifier, `${CONTRACT}identifierUse`);
+    const identifiers = objects(source, project.declarationIdentifier, `${CONTRACT}identifierUse`);
     if (identifiers.length !== 1) diagnostics.push(issue("IDENTIFIER_USE_REQUIRED", [`/${project.declarationIdentifier}`]));
     for (const required of ["id", "clienteId", "nombre", "periodo", "importe"]) {
-      if (!findDeclarationField(model, graph, project, required)) diagnostics.push(issue("FIELD_NOT_FOUND", [`/${project.declarationIdentifier}/${required}`]));
+      if (!findDeclarationField(model, source, project, required)) diagnostics.push(issue("FIELD_NOT_FOUND", [`/${project.declarationIdentifier}/${required}`]));
     }
   }
   if (period) {
-    const constraints = objects(graph, period.declarationIdentifier, `${CONTRACT}constraint`)
+    const constraints = objects(source, period.declarationIdentifier, `${CONTRACT}constraint`)
       .filter((term) => term.termType === "NamedNode")
-      .map((term) => firstObject(graph, term.value, `${CONTRACT}expression`)?.value);
+      .map((term) => firstObject(source, term, `${CONTRACT}expression`)?.value);
     if (!constraints.includes("fin >= inicio")) diagnostics.push(issue("ASSERTION_UNSUPPORTED", [`/${period.declarationIdentifier}`]));
   }
   if (project) {
-    const reference = findDeclarationField(model, graph, project, "clienteId");
-    const referenceType = reference && termValue(firstObject(graph, reference.declarationIdentifier, `${CONTRACT}valueType`));
-    const target = referenceType && termValue(firstObject(graph, referenceType, `${CONTRACT}targetEntity`));
+    const reference = findDeclarationField(model, source, project, "clienteId");
+    const referenceType = reference && termValue(firstObject(source, reference.declarationIdentifier, `${CONTRACT}valueType`));
+    const target = referenceType && termValue(firstObject(source, referenceType, `${CONTRACT}targetEntity`));
     if (referenceType && (!target || !model.declarationIndex[target])) diagnostics.push(issue("REFERENCE_NOT_FOUND", [`/${project.declarationIdentifier}/clienteId`], "Entity Reference target is not loaded"));
-    const amount = findDeclarationField(model, graph, project, "importe");
-    if (amount && termValue(firstObject(graph, amount.declarationIdentifier, `${CONTRACT}valueType`)) !== `${CONTRACT}ExactDecimal`) diagnostics.push(issue("DECIMAL_TYPE_REQUIRED", [`/${project.declarationIdentifier}/importe`]));
+    const amount = findDeclarationField(model, source, project, "importe");
+    if (amount && termValue(firstObject(source, amount.declarationIdentifier, `${CONTRACT}valueType`)) !== `${CONTRACT}ExactDecimal`) diagnostics.push(issue("DECIMAL_TYPE_REQUIRED", [`/${project.declarationIdentifier}/importe`]));
   }
-  for (const expression of graph.filter((triple) => triple.predicate.value === `${CONTRACT}expression`)) {
+  for (const expression of matchSemanticSource(source, { predicate: `${CONTRACT}expression` })) {
     if (expression.object.termType === "Literal" && expression.object.value !== "fin >= inicio") diagnostics.push(issue("FUNCTION_UNSUPPORTED", [`/${expression.subject.value}`]));
   }
   const result = diagnostics.length ? {
@@ -446,14 +427,24 @@ function parseMockingSource(input) {
     return { status: "blocked", diagnostics: [issue("MOCKING_SOURCE_SYNTAX_INVALID", [], error.message)], scenarios: [] };
   }
   const diagnostics = [];
-  const extensionNodes = extensionNodesFor(source.graph, `${MOCKING}extension`);
-  for (const triple of source.graph) if (!MOCKING_PREDICATES.has(triple.predicate.value) && !extensionNodes.has(`${triple.subject.termType}:${triple.subject.value}`)) diagnostics.push(issue("UNKNOWN_MOCKING_PROPERTY", [`/${triple.subject.value}`]));
-  const subjects = [...new Set(source.graph.filter((triple) => triple.predicate.value === `${MOCKING}operation`).map((triple) => triple.subject.value))];
-  const scenarios = subjects.map((subject) => {
-    const operation = termValue(firstObject(source.graph, subject, `${MOCKING}operation`));
-    const condition = termValue(firstObject(source.graph, subject, `${MOCKING}condition`)) ?? "true";
-    const response = termValue(firstObject(source.graph, subject, `${MOCKING}response`));
-    const error = termValue(firstObject(source.graph, subject, `${MOCKING}error`));
+  const triples = matchSemanticSource(source);
+  const extensionNodes = extensionNodesFor(source, `${MOCKING}extension`);
+  for (const triple of triples) if (!MOCKING_PREDICATES.has(triple.predicate.value) && !extensionNodes.has(`${triple.subject.termType}:${triple.subject.value}`)) diagnostics.push(issue("UNKNOWN_MOCKING_PROPERTY", [`/${triple.subject.value}`]));
+  const subjects = [];
+  const subjectKeys = new Set();
+  for (const { subject } of matchSemanticSource(source, { predicate: `${MOCKING}operation` })) {
+    const key = `${subject.termType}:${subject.value}`;
+    if (!subjectKeys.has(key)) {
+      subjectKeys.add(key);
+      subjects.push(subject);
+    }
+  }
+  const scenarios = subjects.map((subjectTerm) => {
+    const subject = subjectTerm.value;
+    const operation = termValue(firstObject(source, subjectTerm, `${MOCKING}operation`));
+    const condition = termValue(firstObject(source, subjectTerm, `${MOCKING}condition`)) ?? "true";
+    const response = termValue(firstObject(source, subjectTerm, `${MOCKING}response`));
+    const error = termValue(firstObject(source, subjectTerm, `${MOCKING}error`));
     if (!operation || (response && error) || (!response && !error)) diagnostics.push(issue("MOCK_SCENARIO_CONTRADICTION", [`/${subject}`]));
     if (response) {
       try { JSON.parse(response); } catch { diagnostics.push(issue("MOCK_RESPONSE_INVALID", [`/${subject}`])); }
