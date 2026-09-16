@@ -167,6 +167,84 @@ test("returns the same result for repeated validation and equivalent graph order
   assert.deepEqual(third, first);
 });
 
+test("keeps public annotation triples stable across equivalent graph orderings", () => {
+  const descriptor = blankNode("descriptor");
+  const target = namedNode("urn:example:order");
+  const extension = blankNode("extension");
+  const graph = [
+    quad(descriptor, namedNode(RDF_TYPE), namedNode(VISUAL + "VisualSource")),
+    quad(descriptor, namedNode(VISUAL + "module"), namedNode("urn:example:orders")),
+    quad(target, namedNode(VISUAL + "y"), literal("2", namedNode(XSD + "decimal"))),
+    quad(extension, namedNode("urn:custom:value"), literal("same", "en")),
+    quad(target, namedNode(VISUAL + "extension"), extension),
+    quad(extension, namedNode("urn:custom:value"), literal("same", namedNode(XSD + "string"))),
+    quad(target, namedNode(VISUAL + "x"), literal("1", namedNode(XSD + "decimal")))
+  ];
+
+  const first = bindVisualSource(graph, model);
+  const second = bindVisualSource([...graph].reverse(), model);
+
+  assert.equal(first.status, "bound");
+  assert.deepEqual(second, first);
+  assert.deepEqual(first.applied[0].triples.map(({ subject, predicate, object }) => [
+    subject.termType,
+    subject.value,
+    predicate.value,
+    object.termType,
+    object.value,
+    object.datatype ?? null,
+    object.language ?? null
+  ]), [
+    ["BlankNode", "extension", "urn:custom:value", "Literal", "same", "http://www.w3.org/1999/02/22-rdf-syntax-ns#langString", "en"],
+    ["BlankNode", "extension", "urn:custom:value", "Literal", "same", XSD + "string", null],
+    ["NamedNode", "urn:example:order", VISUAL + "extension", "BlankNode", "extension", null, null],
+    ["NamedNode", "urn:example:order", VISUAL + "x", "Literal", "1", XSD + "decimal", null],
+    ["NamedNode", "urn:example:order", VISUAL + "y", "Literal", "2", XSD + "decimal", null]
+  ]);
+});
+
+test("keeps blocking diagnostics stable across equivalent graph orderings", () => {
+  const first = bindVisualSource(visualWith("d:order", '<urn:z> "z" ; <urn:a> "a"'), model);
+  const second = bindVisualSource(visualWith("d:order", '<urn:a> "a" ; <urn:z> "z"'), model);
+
+  assert.equal(first.status, "blocked");
+  assert.deepEqual(second.diagnostics, first.diagnostics);
+  assert.deepEqual(first.diagnostics, [
+    {
+      severity: "error",
+      code: "VISUAL_UNKNOWN_PROPERTY",
+      target: "urn:example:order",
+      predicate: "urn:a"
+    },
+    {
+      severity: "error",
+      code: "VISUAL_UNKNOWN_PROPERTY",
+      target: "urn:example:order",
+      predicate: "urn:z"
+    }
+  ]);
+});
+
+test("orders non-BMP public targets by Unicode code point across equivalent graph orderings", () => {
+  const bmp = String.fromCodePoint(0xe000);
+  const nonBmp = String.fromCodePoint(0x1f600);
+  const first = bindVisualSource(multiVisual([
+    { target: `<urn:example:${nonBmp}>` },
+    { target: `<urn:example:${bmp}>` }
+  ]), multiModel);
+  const second = bindVisualSource(multiVisual([
+    { target: `<urn:example:${bmp}>` },
+    { target: `<urn:example:${nonBmp}>` }
+  ]), multiModel);
+
+  assert.equal(first.status, "bound");
+  assert.deepEqual(second.orphans.map(({ target }) => target), first.orphans.map(({ target }) => target));
+  assert.deepEqual(first.orphans.map(({ target }) => target), [
+    `urn:example:${bmp}`,
+    `urn:example:${nonBmp}`
+  ]);
+});
+
 test("accepts Turtle, a loaded source, { graph }, and an iterable RDF/JS graph", () => {
   const loaded = loadSemanticSource(emptyVisual);
   const rdfDataset = new Store(new Parser({ format: "text/turtle" }).parse(emptyVisual));

@@ -166,8 +166,8 @@ function annotationTriples(dataset, target) {
   const extensionNodes = extensionNodesFrom(dataset, target);
   return [...dataset]
     .filter(({ subject }) => termKey(subject) === termKey(target) || extensionNodes.has(termKey(subject)))
-    .sort((left, right) => compareText(tripleSortKey(left), tripleSortKey(right)))
-    .map(publicTriple);
+    .map(publicTriple)
+    .sort((left, right) => compareText(tripleSortKey(left), tripleSortKey(right)));
 }
 
 function rdfTerm(term) {
@@ -332,14 +332,21 @@ function validateAnnotation(dataset, target) {
 }
 
 function compareText(left, right) {
-  return left < right ? -1 : left > right ? 1 : 0;
+  const leftCodePoints = [...left];
+  const rightCodePoints = [...right];
+  const length = Math.min(leftCodePoints.length, rightCodePoints.length);
+  for (let index = 0; index < length; index += 1) {
+    const difference = leftCodePoints[index].codePointAt(0) - rightCodePoints[index].codePointAt(0);
+    if (difference !== 0) return difference;
+  }
+  return leftCodePoints.length - rightCodePoints.length;
 }
 
 function termSortKey(term) {
   return [
     term.termType,
     term.value,
-    term.datatype?.value ?? "",
+    term.datatype ?? "",
     term.language ?? ""
   ].join("\u0000");
 }
