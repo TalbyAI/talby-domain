@@ -12,10 +12,11 @@ const VISUAL_HEIGHT = VISUAL + "height";
 const VISUAL_FILL = VISUAL + "fill";
 const VISUAL_STROKE = VISUAL + "stroke";
 const VISUAL_EXTENSION = VISUAL + "extension";
-const CORE_PREDICATES = new Set([
+const CORE_PREDICATE_LIST = [
   VISUAL_X, VISUAL_Y, VISUAL_WIDTH, VISUAL_HEIGHT,
   VISUAL_FILL, VISUAL_STROKE, VISUAL_EXTENSION
-]);
+];
+const CORE_PREDICATES = new Set(CORE_PREDICATE_LIST);
 const DECIMAL_PATTERN = /^[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)$/;
 const COLOR_PATTERN = /^#[0-9A-Fa-f]{8}$/;
 const MAX_BYTES = 1_048_576;
@@ -239,9 +240,10 @@ function validEffectiveModel(model) {
     && typeof model.moduleOwnership === "object";
 }
 
-function selectModule(dataset, model) {
+function selectModule(dataset, model, extensionNodes) {
   const descriptors = [...dataset.match(null, namedNode(RDF_TYPE), namedNode(VISUAL_SOURCE))]
-    .map(({ subject }) => subject);
+    .map(({ subject }) => subject)
+    .filter((subject) => !extensionNodes.has(termKey(subject)));
   if (descriptors.length === 0) return { diagnostics: [diagnostic("VISUAL_SOURCE_DESCRIPTOR_REQUIRED")] };
   if (descriptors.length > 1) return { diagnostics: [diagnostic("VISUAL_SOURCE_DESCRIPTOR_CARDINALITY")] };
   const descriptor = descriptors[0];
@@ -295,8 +297,7 @@ function validateAnnotation(dataset, target) {
     }
   }
 
-  const properties = [VISUAL_X, VISUAL_Y, VISUAL_WIDTH, VISUAL_HEIGHT, VISUAL_FILL, VISUAL_STROKE, VISUAL_EXTENSION];
-  for (const predicate of properties) {
+  for (const predicate of CORE_PREDICATE_LIST) {
     if (values(dataset, target, predicate).length > 1) diagnostics.push(diagnostic("VISUAL_CARDINALITY_INVALID", { target: target.value, predicate }));
   }
 
@@ -381,11 +382,11 @@ export function bindVisualSource(input, effectiveSemanticModel) {
     return blocked([diagnostic(error.code ?? "VISUAL_GRAPH_INVALID", { detail: error.message })]);
   }
   if (!validEffectiveModel(effectiveSemanticModel)) return blocked([diagnostic("VISUAL_EFFECTIVE_MODEL_INVALID")]);
-  const selection = selectModule(dataset, effectiveSemanticModel);
+  const extensionNodes = allExtensionNodes(dataset);
+  const selection = selectModule(dataset, effectiveSemanticModel, extensionNodes);
   if (selection.diagnostics.length) return blocked(selection.diagnostics);
   const diagnostics = validateDescriptor(dataset, selection.descriptor);
   const records = [];
-  const extensionNodes = allExtensionNodes(dataset);
   for (const target of annotationSubjects(dataset, selection.descriptor, extensionNodes)) {
     const annotationDiagnostics = validateAnnotation(dataset, target);
     diagnostics.push(...annotationDiagnostics);

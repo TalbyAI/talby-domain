@@ -181,6 +181,24 @@ test("applies a valid annotation and preserves its extension closure as data", (
   assert.ok(triples.every((triple) => triple.subject.equals === undefined && triple.object.equals === undefined));
 });
 
+test("does not treat a VisualSource-typed extension node as a descriptor", () => {
+  const result = bindVisualSource(visualWith("d:order", [
+    "visual:extension [",
+    "  a visual:VisualSource ;",
+    "  visual:x \"not a decimal\" ;",
+    "  <urn:custom:note> \"inert\"",
+    "]"
+  ].join("\n")), model);
+
+  assert.equal(result.status, "bound");
+  assert.deepEqual(result.applied.map(({ target }) => target), ["urn:example:order"]);
+  assert.deepEqual(result.diagnostics, []);
+  const triples = result.applied[0].triples;
+  assert.ok(triples.some(({ predicate, object }) => predicate.value === RDF_TYPE && object.value === VISUAL + "VisualSource"));
+  assert.ok(triples.some(({ predicate, object }) => predicate.value === VISUAL + "x" && object.value === "not a decimal"));
+  assert.ok(triples.some(({ predicate, object }) => predicate.value === "urn:custom:note" && object.value === "inert"));
+});
+
 test("blocks invalid core data and never returns a partial annotation result", () => {
   const cases = [
     ["unknown predicate", "visual:bogus \"x\"", "VISUAL_UNKNOWN_PROPERTY"],
