@@ -21,12 +21,19 @@ const DECIMAL_PATTERN = /^[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)$/;
 const COLOR_PATTERN = /^#[0-9A-Fa-f]{8}$/;
 const MAX_BYTES = 1_048_576;
 const MAX_QUADS = 10_000;
+const TURTLE_LOCAL_NAME_CHARACTER = /[\p{L}\p{N}\p{M}_:%@.\-\u00B7\u200C\u200D\u203F\u2040]/u;
 
 class VisualGraphLimitError extends RangeError {
   constructor(code) {
     super(code);
     this.code = code;
   }
+}
+
+function previousCharacter(input, index) {
+  if (index === 0) return "";
+  const previous = input[index - 1];
+  return /[\uDC00-\uDFFF]/.test(previous) && index > 1 ? input.slice(index - 2, index) : previous;
 }
 
 function rejectNonTurtleExtensions(input) {
@@ -71,10 +78,10 @@ function rejectNonTurtleExtensions(input) {
     if (character === ">" && input[index + 1] === ">") throw new SyntaxError("RDF-star syntax is not supported");
     for (const directive of ["PREFIX", "BASE"]) {
       if (input.slice(index, index + directive.length).toUpperCase() !== directive) continue;
-      const previous = input[index - 1];
+      const previous = previousCharacter(input, index);
       const next = input[index + directive.length];
       const escapedPrevious = input[index - 2] === "\\";
-      const boundary = !escapedPrevious && (index === 0 || !/[A-Za-z0-9_:%@.-]/.test(previous) || (previous === "." && /[\s;,[\](){}]/.test(input[index - 2] ?? "")));
+      const boundary = !escapedPrevious && (index === 0 || !TURTLE_LOCAL_NAME_CHARACTER.test(previous) || (previous === "." && /[\s;,[\](){}]/.test(input[index - 2] ?? "")));
       if (boundary && /[\s#<]/.test(next ?? "")) throw new SyntaxError("SPARQL directives are not supported in Turtle");
     }
   }
@@ -234,12 +241,19 @@ function blocked(diagnostics, selectedModule = null) {
 }
 
 function validEffectiveModel(model) {
-  return model !== null
-    && typeof model === "object"
-    && model.declarationIndex !== null
-    && typeof model.declarationIndex === "object"
-    && model.moduleOwnership !== null
-    && typeof model.moduleOwnership === "object";
+  const isRecord = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
+  if (!isRecord(model) || !isRecord(model.declarationIndex) || !isRecord(model.moduleOwnership)) return false;
+  if (!Object.entries(model.declarationIndex).every(([identifier, declaration]) =>
+    isRecord(declaration)
+    && declaration.declarationIdentifier === identifier
+    && typeof declaration.kind === "string"
+  )) return false;
+  return Object.values(model.moduleOwnership).every((ownership) =>
+    isRecord(ownership)
+    && (ownership.ownerModule === null || typeof ownership.ownerModule === "string")
+    && Array.isArray(ownership.ownerModules)
+    && ownership.ownerModules.every((ownerModule) => typeof ownerModule === "string")
+  );
 }
 
 function selectModule(dataset, model, extensionNodes) {

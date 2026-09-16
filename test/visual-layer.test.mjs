@@ -125,6 +125,43 @@ test("retains missing, cross-Module, ambiguous, and unowned targets as orphans",
   assert.equal(result.orphans[3].diagnostic.ownerModules, undefined);
 });
 
+test("accepts Unicode prefixed local names containing BASE and PREFIX", () => {
+  const result = bindVisualSource([
+    "@prefix visual: <" + VISUAL + "> .",
+    "@prefix d: <urn:example:> .",
+    "@prefix xsd: <" + XSD + "> .",
+    "[] a visual:VisualSource ; visual:module d:orders .",
+    "d:éBASE visual:x \"1\"^^xsd:decimal ; visual:y \"2\"^^xsd:decimal .",
+    "d:éPREFIX visual:x \"3\"^^xsd:decimal ; visual:y \"4\"^^xsd:decimal ."
+  ].join("\n"), model);
+
+  assert.equal(result.status, "bound");
+  assert.deepEqual(result.applied, []);
+  assert.deepEqual(result.orphans.map(({ target }) => target), [
+    "urn:example:éBASE",
+    "urn:example:éPREFIX"
+  ]);
+  assert.deepEqual(result.diagnostics.map(({ reason, target }) => ({ reason, target })), [
+    { reason: "missing-target", target: "urn:example:éBASE" },
+    { reason: "missing-target", target: "urn:example:éPREFIX" }
+  ]);
+});
+
+test("blocks malformed effective-model ownership before annotation classification", () => {
+  const malformedModel = structuredClone(model);
+  malformedModel.moduleOwnership["urn:example:order"].ownerModules = ["urn:example:orders", 42];
+
+  const result = bindVisualSource(visualWith("d:order", "visual:x \"1\"^^xsd:decimal ; visual:y \"2\"^^xsd:decimal"), malformedModel);
+
+  assert.deepEqual(result, {
+    status: "blocked",
+    selectedModule: null,
+    applied: [],
+    orphans: [],
+    diagnostics: [{ severity: "error", code: "VISUAL_EFFECTIVE_MODEL_INVALID" }]
+  });
+});
+
 test("keeps a visual annotation attached after semantic rename and reorganization", () => {
   const firstModel = modelFrom([
     "@prefix c: <" + CONTRACT + "> .",
