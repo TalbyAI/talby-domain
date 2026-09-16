@@ -208,6 +208,37 @@ test("keeps public annotation triples stable across equivalent graph orderings",
   ]);
 });
 
+test("keeps colliding NUL-containing public literal fields stable across graph orderings", () => {
+  const nul = String.fromCodePoint(0);
+  const descriptor = blankNode("nul-descriptor");
+  const target = namedNode("urn:example:order");
+  const extension = blankNode("nul-extension");
+  const predicate = namedNode("urn:custom:value");
+  const graph = [
+    quad(descriptor, namedNode(RDF_TYPE), namedNode(VISUAL + "VisualSource")),
+    quad(descriptor, namedNode(VISUAL + "module"), namedNode("urn:example:orders")),
+    quad(target, namedNode(VISUAL + "extension"), extension),
+    quad(extension, predicate, literal("a" + nul + "b", namedNode("urn:datatype:c"))),
+    quad(extension, predicate, literal("a", namedNode("b" + nul + "urn:datatype:c")))
+  ];
+
+  const first = bindVisualSource(graph, model);
+  const second = bindVisualSource([...graph].reverse(), model);
+
+  assert.equal(first.status, "bound");
+  assert.deepEqual(second, first);
+  assert.deepEqual(first.applied[0].triples.map(({ object }) => [
+    object.termType,
+    object.value,
+    object.datatype,
+    object.language
+  ]), [
+    ["Literal", "a", "b" + nul + "urn:datatype:c", null],
+    ["Literal", "a" + nul + "b", "urn:datatype:c", null],
+    ["BlankNode", "nul-extension", undefined, undefined]
+  ]);
+});
+
 test("keeps blocking diagnostics stable across equivalent graph orderings", () => {
   const first = bindVisualSource(visualWith("d:order", '<urn:z> "z" ; <urn:a> "a"'), model);
   const second = bindVisualSource(visualWith("d:order", '<urn:a> "a" ; <urn:z> "z"'), model);

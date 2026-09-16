@@ -167,7 +167,7 @@ function annotationTriples(dataset, target) {
   return [...dataset]
     .filter(({ subject }) => termKey(subject) === termKey(target) || extensionNodes.has(termKey(subject)))
     .map(publicTriple)
-    .sort((left, right) => compareText(tripleSortKey(left), tripleSortKey(right)));
+    .sort(compareTriple);
 }
 
 function rdfTerm(term) {
@@ -229,10 +229,7 @@ function blocked(diagnostics, selectedModule = null) {
     selectedModule,
     applied: [],
     orphans: [],
-    diagnostics: [...diagnostics].sort((left, right) => compareText(
-      blockingDiagnosticSortKey(left),
-      blockingDiagnosticSortKey(right)
-    ))
+    diagnostics: [...diagnostics].sort(compareBlockingDiagnostic)
   };
 }
 
@@ -349,29 +346,45 @@ function compareText(left, right) {
   return leftCodePoints.length - rightCodePoints.length;
 }
 
-function termSortKey(term) {
-  return [
-    term.termType,
-    term.value,
-    term.datatype ?? "",
-    term.language ?? ""
-  ].join("\u0000");
+function compareTuple(left, right) {
+  for (let index = 0; index < left.length; index += 1) {
+    const difference = compareText(left[index], right[index]);
+    if (difference !== 0) return difference;
+  }
+  return 0;
 }
 
-function tripleSortKey(triple) {
-  return [
-    termSortKey(triple.subject),
-    termSortKey(triple.predicate),
-    termSortKey(triple.object)
-  ].join("\u0000");
+function compareTerm(left, right) {
+  return compareTuple(
+    [left.termType, left.value, left.datatype ?? "", left.language ?? ""],
+    [right.termType, right.value, right.datatype ?? "", right.language ?? ""]
+  );
 }
 
-function diagnosticSortKey(value) {
-  return [value.target ?? "", value.reason ?? "", value.code ?? "", value.predicate ?? ""].join("\u0000");
+function compareTriple(left, right) {
+  for (const [leftTerm, rightTerm] of [
+    [left.subject, right.subject],
+    [left.predicate, right.predicate],
+    [left.object, right.object]
+  ]) {
+    const difference = compareTerm(leftTerm, rightTerm);
+    if (difference !== 0) return difference;
+  }
+  return 0;
 }
 
-function blockingDiagnosticSortKey(value) {
-  return [value.target ?? "", value.predicate ?? "", value.code ?? "", value.detail ?? ""].join("\u0000");
+function compareDiagnostic(left, right) {
+  return compareTuple(
+    [left.target ?? "", left.reason ?? "", left.code ?? "", left.predicate ?? ""],
+    [right.target ?? "", right.reason ?? "", right.code ?? "", right.predicate ?? ""]
+  );
+}
+
+function compareBlockingDiagnostic(left, right) {
+  return compareTuple(
+    [left.target ?? "", left.predicate ?? "", left.code ?? "", left.detail ?? ""],
+    [right.target ?? "", right.predicate ?? "", right.code ?? "", right.detail ?? ""]
+  );
 }
 
 function orphan(record, selectedModule, reason, ownership = []) {
@@ -418,7 +431,7 @@ function bindValidatedAnnotations(records, model, selectedModule) {
   return {
     applied: applied.sort((left, right) => compareText(left.target, right.target)),
     orphans: orphans.sort((left, right) => compareText(left.target, right.target)),
-    diagnostics: diagnostics.sort((left, right) => compareText(diagnosticSortKey(left), diagnosticSortKey(right)))
+    diagnostics: diagnostics.sort(compareDiagnostic)
   };
 }
 
