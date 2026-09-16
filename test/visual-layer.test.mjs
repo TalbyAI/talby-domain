@@ -3,6 +3,11 @@ import test from "node:test";
 import { DataFactory, Parser, Store } from "n3";
 
 import { inspectSemanticSource, loadSemanticSource } from "../src/contract-layer.mjs";
+import {
+  PROJECT_MOCKING_SOURCE,
+  PROJECT_SEMANTIC_SOURCE,
+  createAcceptanceService
+} from "../src/contract-acceptance.mjs";
 import { bindVisualSource } from "../src/visual-layer.mjs";
 
 const CONTRACT = "https://github.com/TalbyAI/talby-domain/vocab/contract#";
@@ -494,4 +499,97 @@ test("rejects malformed Turtle and named RDF graphs as blocking graph errors", (
   assert.equal(result.diagnostics[0].code, "VISUAL_GRAPH_INVALID");
   assert.deepEqual(result.applied, []);
   assert.deepEqual(result.orphans, []);
+});
+
+test("keeps the Semantic Source graph, effective model, and execution isolated", () => {
+  const service = createAcceptanceService({
+    semanticSource: PROJECT_SEMANTIC_SOURCE,
+    mockingSource: PROJECT_MOCKING_SOURCE,
+    actor: "editor",
+    tokenSecret: Buffer.alloc(32, 7)
+  });
+  const visualSource = loadSemanticSource([
+    "@prefix visual: <" + VISUAL + "> .",
+    "@prefix d: <urn:talby:contract:> .",
+    "@prefix xsd: <" + XSD + "> .",
+    "[] a visual:VisualSource ; visual:module d:module .",
+    "d:proyecto visual:x \"1\"^^xsd:decimal ; visual:y \"2\"^^xsd:decimal ; visual:fill \"#11223344\" ."
+  ].join("\n"));
+
+  try {
+    const created = service.client.createProject({
+      clienteId: "cliente-1",
+      nombre: "Proyecto Atlas",
+      periodo: { inicio: "2026-01-01", fin: "2026-12-31" },
+      importe: "100.00"
+    });
+    assert.equal(created.status, 201);
+
+    const graphBefore = structuredClone(visualSource.graph);
+    const modelBefore = structuredClone(service.effectiveModel);
+    const generatedBefore = service.generatedClientSource;
+    const payloadBefore = service.client.getProject("project-1");
+    const permissionRequest = {
+      method: "POST",
+      path: "/projects",
+      headers: { "X-Test-Actor": "reader" },
+      body: JSON.stringify({
+        clienteId: "cliente-1",
+        nombre: "Reader Project",
+        periodo: { inicio: "2026-01-01", fin: "2026-12-31" },
+        importe: "100.00"
+      })
+    };
+    const permissionBefore = service.execute(permissionRequest);
+    const mockingBefore = service.client.approveProject("project-1");
+    const compatibilityBefore = service.compareCompatibility(service.effectiveModel, service.effectiveModel);
+
+    const first = bindVisualSource(visualSource, service.effectiveModel);
+    const second = bindVisualSource([
+      "@prefix visual: <" + VISUAL + "> .",
+      "@prefix d: <urn:talby:contract:> .",
+      "@prefix xsd: <" + XSD + "> .",
+      "[] a visual:VisualSource ; visual:module d:module .",
+      "d:proyecto visual:x \"99\"^^xsd:decimal ; visual:y \"100\"^^xsd:decimal ; visual:fill \"#ffeeddcc\" ."
+    ].join("\n"), service.effectiveModel);
+
+    assert.equal(first.status, "bound");
+    assert.equal(second.status, "bound");
+    assert.deepEqual(visualSource.graph, graphBefore);
+    assert.deepEqual(service.effectiveModel, modelBefore);
+    assert.equal(service.generatedClientSource, generatedBefore);
+    assert.deepEqual(service.client.getProject("project-1"), payloadBefore);
+    assert.deepEqual(service.execute(permissionRequest), permissionBefore);
+    assert.deepEqual(service.client.approveProject("project-1"), mockingBefore);
+    assert.deepEqual(service.compareCompatibility(service.effectiveModel, service.effectiveModel), compatibilityBefore);
+  } finally {
+    service.close();
+  }
+});
+
+test("does not dereference external extension IRIs or execute extension literals", () => {
+  const marker = "__visual_extension_marker__";
+  const previousFetch = globalThis.fetch;
+  let fetchCalls = 0;
+  globalThis.fetch = () => { fetchCalls += 1; };
+  globalThis[marker] = 0;
+
+  try {
+    const result = bindVisualSource([
+      "@prefix visual: <" + VISUAL + "> .",
+      "@prefix d: <urn:example:> .",
+      "@prefix xsd: <" + XSD + "> .",
+      "[] a visual:VisualSource ; visual:module d:orders .",
+      "d:order visual:x \"1\"^^xsd:decimal ; visual:y \"2\"^^xsd:decimal ; visual:extension d:extension .",
+      "d:extension <https://assets.invalid/layout.json> <https://assets.invalid/layout.json> ;",
+      "  <urn:custom:script> \"globalThis.__visual_extension_marker__ = 1\" ."
+    ].join("\n"), model);
+
+    assert.equal(result.status, "bound");
+    assert.equal(fetchCalls, 0);
+    assert.equal(globalThis[marker], 0);
+  } finally {
+    globalThis.fetch = previousFetch;
+    delete globalThis[marker];
+  }
 });
