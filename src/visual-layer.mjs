@@ -5,6 +5,19 @@ const RDF_TYPE = "http://www.w3.org/1999/02/22-rdf-syntax-ns#type";
 const VISUAL = "https://github.com/TalbyAI/talby-domain/vocab/visual#";
 const VISUAL_SOURCE = VISUAL + "VisualSource";
 const VISUAL_MODULE = VISUAL + "module";
+const VISUAL_X = VISUAL + "x";
+const VISUAL_Y = VISUAL + "y";
+const VISUAL_WIDTH = VISUAL + "width";
+const VISUAL_HEIGHT = VISUAL + "height";
+const VISUAL_FILL = VISUAL + "fill";
+const VISUAL_STROKE = VISUAL + "stroke";
+const VISUAL_EXTENSION = VISUAL + "extension";
+const CORE_PREDICATES = new Set([
+  VISUAL_X, VISUAL_Y, VISUAL_WIDTH, VISUAL_HEIGHT,
+  VISUAL_FILL, VISUAL_STROKE, VISUAL_EXTENSION
+]);
+const DECIMAL_PATTERN = /^[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)$/;
+const COLOR_PATTERN = /^#[0-9A-Fa-f]{8}$/;
 const MAX_BYTES = 1_048_576;
 const MAX_QUADS = 10_000;
 
@@ -92,6 +105,66 @@ function publicTriple(value) {
     predicate: publicTerm(value.predicate),
     object: publicTerm(value.object)
   };
+}
+
+function values(dataset, subject, predicate) {
+  return [...dataset.match(subject, namedNode(predicate), null)].map(({ object }) => object);
+}
+
+function isNode(term) {
+  return term?.termType === "NamedNode" || term?.termType === "BlankNode";
+}
+
+function isDecimal(term) {
+  return term?.termType === "Literal"
+    && term.datatype.value === "http://www.w3.org/2001/XMLSchema#decimal"
+    && DECIMAL_PATTERN.test(term.value);
+}
+
+function isNonNegativeDecimal(term) {
+  return isDecimal(term) && (!term.value.startsWith("-") || !/[1-9]/.test(term.value));
+}
+
+function isColor(term) {
+  return term?.termType === "Literal"
+    && !term.language
+    && term.datatype.value === "http://www.w3.org/2001/XMLSchema#string"
+    && COLOR_PATTERN.test(term.value);
+}
+
+function extensionNodesFrom(dataset, subject) {
+  const seen = new Set();
+  const queue = values(dataset, subject, VISUAL_EXTENSION).filter(isNode);
+  while (queue.length) {
+    const node = queue.shift();
+    const key = termKey(node);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    for (const { object } of dataset.match(node, null, null)) if (isNode(object)) queue.push(object);
+  }
+  return seen;
+}
+
+function allExtensionNodes(dataset) {
+  const seen = new Set();
+  for (const { subject } of dataset.match(null, namedNode(VISUAL_EXTENSION), null)) {
+    for (const key of extensionNodesFrom(dataset, subject)) seen.add(key);
+  }
+  return seen;
+}
+
+function annotationSubjects(dataset, descriptor, extensionNodes) {
+  const descriptorKey = termKey(descriptor);
+  return [...new Map([...dataset]
+    .filter(({ subject }) => termKey(subject) !== descriptorKey && !extensionNodes.has(termKey(subject)))
+    .map(({ subject }) => [termKey(subject), subject])).values()];
+}
+
+function annotationTriples(dataset, target) {
+  const extensionNodes = extensionNodesFrom(dataset, target);
+  return [...dataset]
+    .filter(({ subject }) => termKey(subject) === termKey(target) || extensionNodes.has(termKey(subject)))
+    .map(publicTriple);
 }
 
 function rdfTerm(term) {
@@ -185,6 +258,121 @@ function selectModule(dataset, model) {
   return { descriptor, selectedModule, diagnostics: [] };
 }
 
+function validateDescriptor(dataset, descriptor) {
+  const diagnostics = [];
+  const types = values(dataset, descriptor, RDF_TYPE);
+  if (types.length !== 1 || types[0]?.termType !== "NamedNode" || types[0].value !== VISUAL_SOURCE) {
+    diagnostics.push(diagnostic("VISUAL_DESCRIPTOR_TYPE_INVALID", {
+      target: descriptor.value,
+      predicate: RDF_TYPE
+    }));
+  }
+  for (const triple of dataset.match(descriptor, null, null)) {
+    if (triple.predicate.value !== RDF_TYPE && triple.predicate.value !== VISUAL_MODULE) {
+      diagnostics.push(diagnostic("VISUAL_UNKNOWN_PROPERTY", {
+        target: descriptor.value,
+        predicate: triple.predicate.value
+      }));
+    }
+  }
+  return diagnostics;
+}
+
+function validateAnnotation(dataset, target) {
+  const diagnostics = [];
+  if (target.termType !== "NamedNode") {
+    diagnostics.push(diagnostic("VISUAL_TARGET_IRI_REQUIRED", { target: target.value }));
+    return diagnostics;
+  }
+
+  const triples = [...dataset.match(target, null, null)];
+  for (const triple of triples) {
+    if (!CORE_PREDICATES.has(triple.predicate.value)) {
+      diagnostics.push(diagnostic("VISUAL_UNKNOWN_PROPERTY", {
+        target: target.value,
+        predicate: triple.predicate.value
+      }));
+    }
+  }
+
+  const properties = [VISUAL_X, VISUAL_Y, VISUAL_WIDTH, VISUAL_HEIGHT, VISUAL_FILL, VISUAL_STROKE, VISUAL_EXTENSION];
+  for (const predicate of properties) {
+    if (values(dataset, target, predicate).length > 1) diagnostics.push(diagnostic("VISUAL_CARDINALITY_INVALID", { target: target.value, predicate }));
+  }
+
+  const x = values(dataset, target, VISUAL_X);
+  const y = values(dataset, target, VISUAL_Y);
+  if ((x.length === 0) !== (y.length === 0)) diagnostics.push(diagnostic("VISUAL_COORDINATE_PAIR_INVALID", { target: target.value }));
+  if (x[0] && !isDecimal(x[0])) diagnostics.push(diagnostic("VISUAL_DECIMAL_INVALID", { target: target.value, predicate: VISUAL_X }));
+  if (y[0] && !isDecimal(y[0])) diagnostics.push(diagnostic("VISUAL_DECIMAL_INVALID", { target: target.value, predicate: VISUAL_Y }));
+
+  const width = values(dataset, target, VISUAL_WIDTH);
+  const height = values(dataset, target, VISUAL_HEIGHT);
+  if ((width.length === 0) !== (height.length === 0)) diagnostics.push(diagnostic("VISUAL_DIMENSION_PAIR_INVALID", { target: target.value }));
+  for (const [predicate, value] of [[VISUAL_WIDTH, width[0]], [VISUAL_HEIGHT, height[0]]]) {
+    if (!value) continue;
+    if (!isDecimal(value)) diagnostics.push(diagnostic("VISUAL_DECIMAL_INVALID", { target: target.value, predicate }));
+    else if (!isNonNegativeDecimal(value)) diagnostics.push(diagnostic("VISUAL_DIMENSION_NEGATIVE", { target: target.value, predicate }));
+  }
+
+  for (const predicate of [VISUAL_FILL, VISUAL_STROKE]) {
+    const value = values(dataset, target, predicate)[0];
+    if (value && !isColor(value)) diagnostics.push(diagnostic("VISUAL_COLOR_INVALID", { target: target.value, predicate }));
+  }
+
+  const extensions = values(dataset, target, VISUAL_EXTENSION);
+  if (extensions[0] && !isNode(extensions[0])) diagnostics.push(diagnostic("VISUAL_EXTENSION_INVALID", { target: target.value, predicate: VISUAL_EXTENSION }));
+  return diagnostics;
+}
+
+function compareText(left, right) {
+  return left < right ? -1 : left > right ? 1 : 0;
+}
+
+function orphan(record, selectedModule, reason, ownership = []) {
+  const diagnosticValue = {
+    severity: "warning",
+    code: "VISUAL_TARGET_ORPHAN",
+    reason,
+    target: record.target,
+    selectedModule
+  };
+  if (reason === "cross-module") diagnosticValue.ownerModule = ownership[0];
+  if (reason === "ambiguous-owner") diagnosticValue.ownerModules = [...ownership].sort(compareText);
+  return { target: record.target, triples: record.triples, diagnostic: diagnosticValue };
+}
+
+function classifyAnnotation(record, model, selectedModule) {
+  if (!Object.hasOwn(model.declarationIndex, record.target)) return orphan(record, selectedModule, "missing-target");
+  const ownership = model.moduleOwnership[record.target];
+  const ownerModules = Array.isArray(ownership?.ownerModules) ? [...ownership.ownerModules] : [];
+  if (ownerModules.length === 0) return orphan(record, selectedModule, "unowned-target");
+  if (ownerModules.length > 1) return orphan(record, selectedModule, "ambiguous-owner", ownerModules);
+  if (ownership.ownerModule === ownerModules[0] && ownerModules[0] === selectedModule) {
+    return { target: record.target, triples: record.triples };
+  }
+  if (ownership.ownerModule === ownerModules[0]) return orphan(record, selectedModule, "cross-module", ownerModules);
+  return orphan(record, selectedModule, "unowned-target");
+}
+
+function bindValidatedAnnotations(records, model, selectedModule) {
+  const applied = [];
+  const orphans = [];
+  const diagnostics = [];
+  for (const record of records) {
+    const classified = classifyAnnotation(record, model, selectedModule);
+    if (classified.diagnostic) {
+      orphans.push(classified);
+      const publicDiagnostic = { ...classified.diagnostic };
+      if (publicDiagnostic.ownerModules) publicDiagnostic.ownerModules = [...publicDiagnostic.ownerModules];
+      diagnostics.push(publicDiagnostic);
+    } else {
+      applied.push(classified);
+    }
+  }
+  return { applied, orphans, diagnostics };
+}
+
 export function bindVisualSource(input, effectiveSemanticModel) {
   let dataset;
   try {
@@ -195,11 +383,21 @@ export function bindVisualSource(input, effectiveSemanticModel) {
   if (!validEffectiveModel(effectiveSemanticModel)) return blocked([diagnostic("VISUAL_EFFECTIVE_MODEL_INVALID")]);
   const selection = selectModule(dataset, effectiveSemanticModel);
   if (selection.diagnostics.length) return blocked(selection.diagnostics);
+  const diagnostics = validateDescriptor(dataset, selection.descriptor);
+  const records = [];
+  const extensionNodes = allExtensionNodes(dataset);
+  for (const target of annotationSubjects(dataset, selection.descriptor, extensionNodes)) {
+    const annotationDiagnostics = validateAnnotation(dataset, target);
+    diagnostics.push(...annotationDiagnostics);
+    if (annotationDiagnostics.length === 0) {
+      records.push({ target: target.value, triples: annotationTriples(dataset, target) });
+    }
+  }
+  if (diagnostics.length) return blocked(diagnostics, selection.selectedModule);
+  const binding = bindValidatedAnnotations(records, effectiveSemanticModel, selection.selectedModule);
   return {
     status: "bound",
     selectedModule: selection.selectedModule,
-    applied: [],
-    orphans: [],
-    diagnostics: []
+    ...binding
   };
 }
