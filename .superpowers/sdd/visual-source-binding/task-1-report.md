@@ -55,3 +55,40 @@ No existing production modules, existing tests, package files, samples, prototyp
 ## Concerns
 
 Annotation application and orphan classification remain intentionally empty for the later Visual Source binding slices; this task establishes selection only. The full suite also emits Node's existing SQLite experimental-feature warning, without affecting test results.
+
+## Review Fix Report
+
+Applied the two Task 1 review fixes from implementation commit `16d5d8b`:
+
+- `normalizeVisualGraph` now consumes iterable graphs incrementally, raises `VISUAL_QUAD_COUNT_LIMIT` on the 10,001st value, and does not request any later values.
+- `rdfQuad` now requires a `NamedNode` or `BlankNode` subject, a `NamedNode` predicate, and an object other than `DefaultGraph`; `DefaultGraph` remains valid for the quad graph.
+- The plan-mandated `termKey`, `publicTerm`, and `publicTriple` helpers and the internal descriptor selection seam remain in place for Task 2.
+
+## TDD Evidence
+
+RED, before the production fix:
+
+```text
+node --test test/visual-layer.test.mjs
+4 tests, 2 passed, 2 failed
+stops an iterable graph at the quad limit: got VISUAL_GRAPH_INVALID instead of VISUAL_QUAD_COUNT_LIMIT
+rejects DefaultGraph in RDF triple positions: got bound instead of blocked
+```
+
+GREEN, after the production fix:
+
+```text
+node --test test/visual-layer.test.mjs
+4 tests passed, 0 failed
+```
+
+Full verification:
+
+```text
+npm test
+62 tests passed, 0 failed
+```
+
+`npm test` still emits Node's existing SQLite experimental-feature warning. `git diff --check` passed with no whitespace errors.
+
+Changed files are limited to `src/visual-layer.mjs`, `test/visual-layer.test.mjs`, and this report.

@@ -1,12 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { Parser, Store } from "n3";
+import { DataFactory, Parser, Store } from "n3";
 
 import { inspectSemanticSource, loadSemanticSource } from "../src/contract-layer.mjs";
 import { bindVisualSource } from "../src/visual-layer.mjs";
 
 const CONTRACT = "https://github.com/TalbyAI/talby-domain/vocab/contract#";
 const VISUAL = "https://github.com/TalbyAI/talby-domain/vocab/visual#";
+const RDF_TYPE = "http://www.w3.org/1999/02/22-rdf-syntax-ns#type";
+const { blankNode, defaultGraph, literal, namedNode, quad } = DataFactory;
 
 function modelFrom(turtle) {
   const result = inspectSemanticSource(turtle);
@@ -80,4 +82,58 @@ test("blocks an invalid descriptor or Module binding without a partial result", 
     assert.deepEqual(result.orphans, [], name);
     assert.ok(result.diagnostics.some((diagnostic) => diagnostic.code === code), name);
   }
+});
+
+test("stops an iterable graph at the quad limit", () => {
+  const value = quad(
+    namedNode("urn:example:subject"),
+    namedNode(VISUAL + "value"),
+    literal("1"),
+    defaultGraph()
+  );
+  let nextCalls = 0;
+  const graph = {
+    [Symbol.iterator]() {
+      return {
+        next() {
+          nextCalls += 1;
+          if (nextCalls > 10_001) throw new Error("iterated past visual graph limit");
+          return { done: false, value };
+        }
+      };
+    }
+  };
+
+  const result = bindVisualSource({ graph }, model);
+
+  assert.equal(result.status, "blocked");
+  assert.equal(result.diagnostics[0]?.code, "VISUAL_QUAD_COUNT_LIMIT");
+  assert.equal(nextCalls, 10_001);
+});
+
+test("rejects DefaultGraph in RDF triple positions but accepts it as the quad graph", () => {
+  const predicate = namedNode(VISUAL + "value");
+  const subject = namedNode("urn:example:subject");
+  const object = literal("1");
+  const descriptor = blankNode("descriptor");
+  const validQuads = [
+    quad(descriptor, namedNode(RDF_TYPE), namedNode(VISUAL + "VisualSource"), defaultGraph()),
+    quad(descriptor, namedNode(VISUAL + "module"), namedNode("urn:example:orders"), defaultGraph())
+  ];
+  const invalid = [
+    ["subject", quad(defaultGraph(), predicate, object, defaultGraph())],
+    ["object", quad(subject, predicate, defaultGraph(), defaultGraph())]
+  ];
+
+  for (const [position, value] of invalid) {
+    const result = bindVisualSource([...validQuads, value], model);
+    assert.equal(result.status, "blocked", position);
+    assert.equal(result.diagnostics[0]?.code, "VISUAL_GRAPH_INVALID", position);
+    assert.match(result.diagnostics[0]?.detail ?? "", /Invalid RDF triple positions/, position);
+  }
+
+  const result = bindVisualSource(validQuads, model);
+
+  assert.equal(result.status, "bound");
+  assert.equal(result.selectedModule, "urn:example:orders");
 });

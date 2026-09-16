@@ -118,7 +118,9 @@ function rdfQuad(value) {
   const subject = rdfTerm(value.subject);
   const predicate = rdfTerm(value.predicate);
   const object = rdfTerm(value.object);
-  if (subject.termType === "Literal" || predicate.termType !== "NamedNode") throw new TypeError("Invalid RDF triple positions");
+  if ((subject.termType !== "NamedNode" && subject.termType !== "BlankNode") || predicate.termType !== "NamedNode" || object.termType === "DefaultGraph") {
+    throw new TypeError("Invalid RDF triple positions");
+  }
   return quad(subject, predicate, object, graph);
 }
 
@@ -133,9 +135,12 @@ function normalizeVisualGraph(input) {
   }
   const graph = input?.graph ?? (input && typeof input[Symbol.iterator] === "function" ? input : null);
   if (!graph || typeof graph[Symbol.iterator] !== "function") throw new TypeError("Visual Source graph is required");
-  const values = [...graph];
-  if (values.length > MAX_QUADS) throw new VisualGraphLimitError("VISUAL_QUAD_COUNT_LIMIT");
-  return new Store(values.map(rdfQuad));
+  const values = [];
+  for (const value of graph) {
+    if (values.length === MAX_QUADS) throw new VisualGraphLimitError("VISUAL_QUAD_COUNT_LIMIT");
+    values.push(rdfQuad(value));
+  }
+  return new Store(values);
 }
 
 function diagnostic(code, fields = {}) {
