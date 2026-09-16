@@ -24,6 +24,17 @@ const model = modelFrom([
   "d:order a c:Entity ; c:name \"Order\" ; c:parent d:orders ."
 ].join("\n"));
 
+const multiModel = modelFrom([
+  "@prefix c: <" + CONTRACT + "> .",
+  "@prefix d: <urn:example:> .",
+  "d:orders a c:Module ; c:name \"Orders\" .",
+  "d:sales a c:Module ; c:name \"Sales\" .",
+  "d:order a c:Entity ; c:name \"Order\" ; c:parent d:orders .",
+  "d:invoice a c:Entity ; c:name \"Invoice\" ; c:parent d:sales .",
+  "d:shared a c:Field ; c:parent d:orders, d:sales .",
+  "d:unowned a c:Field ."
+].join("\n"));
+
 const emptyVisual = [
   "@prefix visual: <" + VISUAL + "> .",
   "@prefix d: <urn:example:> .",
@@ -40,9 +51,121 @@ function visualWith(target, body) {
   ].join("\n");
 }
 
+function multiVisual(entries, module = "d:orders") {
+  return [
+    "@prefix visual: <" + VISUAL + "> .",
+    "@prefix d: <urn:example:> .",
+    "@prefix xsd: <" + XSD + "> .",
+    "[] a visual:VisualSource ; visual:module " + module + " .",
+    entries.map(({ target, suffix = "" }) => target + " visual:x \"1\"^^xsd:decimal ; visual:y \"2\"^^xsd:decimal" + suffix + " .").join("\n")
+  ].join("\n");
+}
+
 function tripleKey(triple) {
   return JSON.stringify([triple.subject, triple.predicate, triple.object]);
 }
+
+test("retains missing, cross-Module, ambiguous, and unowned targets as orphans", () => {
+  const result = bindVisualSource(multiVisual([
+    { target: "d:unowned" },
+    { target: "d:missing", suffix: " ; visual:extension [ <urn:custom:orphan-note> \"preserve\" ]" },
+    { target: "d:invoice" },
+    { target: "d:shared" },
+    { target: "d:order" }
+  ]), multiModel);
+
+  assert.equal(result.status, "bound");
+  assert.equal(result.selectedModule, "urn:example:orders");
+  assert.deepEqual(result.applied.map(({ target }) => target), ["urn:example:order"]);
+  assert.deepEqual(result.orphans.map(({ target }) => target), [
+    "urn:example:invoice",
+    "urn:example:missing",
+    "urn:example:shared",
+    "urn:example:unowned"
+  ]);
+  assert.deepEqual(result.diagnostics, [
+    {
+      severity: "warning",
+      code: "VISUAL_TARGET_ORPHAN",
+      reason: "cross-module",
+      target: "urn:example:invoice",
+      selectedModule: "urn:example:orders",
+      ownerModule: "urn:example:sales"
+    },
+    {
+      severity: "warning",
+      code: "VISUAL_TARGET_ORPHAN",
+      reason: "missing-target",
+      target: "urn:example:missing",
+      selectedModule: "urn:example:orders"
+    },
+    {
+      severity: "warning",
+      code: "VISUAL_TARGET_ORPHAN",
+      reason: "ambiguous-owner",
+      target: "urn:example:shared",
+      selectedModule: "urn:example:orders",
+      ownerModules: ["urn:example:orders", "urn:example:sales"]
+    },
+    {
+      severity: "warning",
+      code: "VISUAL_TARGET_ORPHAN",
+      reason: "unowned-target",
+      target: "urn:example:unowned",
+      selectedModule: "urn:example:orders"
+    }
+  ]);
+  assert.ok(result.orphans[1].triples.some(({ predicate, object }) => predicate.value === "urn:custom:orphan-note" && object.value === "preserve"));
+  assert.equal(result.orphans[2].diagnostic.ownerModule, undefined);
+  assert.equal(result.orphans[3].diagnostic.ownerModules, undefined);
+});
+
+test("keeps a visual annotation attached after semantic rename and reorganization", () => {
+  const firstModel = modelFrom([
+    "@prefix c: <" + CONTRACT + "> .",
+    "@prefix d: <urn:stable:> .",
+    "d:one a c:Module ; c:name \"One\" .",
+    "d:order a c:Entity ; c:name \"Order\" ; c:parent d:one ."
+  ].join("\n"));
+  const secondModel = modelFrom([
+    "@prefix c: <" + CONTRACT + "> .",
+    "@prefix d: <urn:stable:> .",
+    "d:two a c:Module ; c:name \"Two\" .",
+    "d:group a c:Feature ; c:name \"Orders\" ; c:parent d:two .",
+    "d:order a c:Entity ; c:name \"Purchase\" ; c:parent d:group ."
+  ].join("\n"));
+  const visual = (module) => [
+    "@prefix visual: <" + VISUAL + "> .",
+    "@prefix d: <urn:stable:> .",
+    "@prefix xsd: <" + XSD + "> .",
+    "[] a visual:VisualSource ; visual:module " + module + " .",
+    "d:order visual:x \"1\"^^xsd:decimal ; visual:y \"2\"^^xsd:decimal ."
+  ].join("\n");
+
+  assert.deepEqual(bindVisualSource(visual("d:one"), firstModel).applied.map(({ target }) => target), ["urn:stable:order"]);
+  assert.deepEqual(bindVisualSource(visual("d:two"), secondModel).applied.map(({ target }) => target), ["urn:stable:order"]);
+});
+
+test("returns the same result for repeated validation and equivalent graph orderings", () => {
+  const first = bindVisualSource(multiVisual([
+    { target: "d:invoice" },
+    { target: "d:order" },
+    { target: "d:shared" }
+  ]), multiModel);
+  const second = bindVisualSource(multiVisual([
+    { target: "d:shared" },
+    { target: "d:order" },
+    { target: "d:invoice" }
+  ]), multiModel);
+  const third = bindVisualSource(multiVisual([
+    { target: "d:invoice" },
+    { target: "d:order" },
+    { target: "d:shared" }
+  ]), multiModel);
+
+  assert.deepEqual(second, first);
+  assert.deepEqual(third, first);
+});
 
 test("accepts Turtle, a loaded source, { graph }, and an iterable RDF/JS graph", () => {
   const loaded = loadSemanticSource(emptyVisual);

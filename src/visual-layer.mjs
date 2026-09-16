@@ -158,13 +158,15 @@ function annotationSubjects(dataset, descriptor, extensionNodes) {
   const descriptorKey = termKey(descriptor);
   return [...new Map([...dataset]
     .filter(({ subject }) => termKey(subject) !== descriptorKey && !extensionNodes.has(termKey(subject)))
-    .map(({ subject }) => [termKey(subject), subject])).values()];
+    .map(({ subject }) => [termKey(subject), subject])).values()]
+    .sort((left, right) => compareText(left.value, right.value));
 }
 
 function annotationTriples(dataset, target) {
   const extensionNodes = extensionNodesFrom(dataset, target);
   return [...dataset]
     .filter(({ subject }) => termKey(subject) === termKey(target) || extensionNodes.has(termKey(subject)))
+    .sort((left, right) => compareText(tripleSortKey(left), tripleSortKey(right)))
     .map(publicTriple);
 }
 
@@ -227,7 +229,10 @@ function blocked(diagnostics, selectedModule = null) {
     selectedModule,
     applied: [],
     orphans: [],
-    diagnostics
+    diagnostics: [...diagnostics].sort((left, right) => compareText(
+      blockingDiagnosticSortKey(left),
+      blockingDiagnosticSortKey(right)
+    ))
   };
 }
 
@@ -330,6 +335,31 @@ function compareText(left, right) {
   return left < right ? -1 : left > right ? 1 : 0;
 }
 
+function termSortKey(term) {
+  return [
+    term.termType,
+    term.value,
+    term.datatype?.value ?? "",
+    term.language ?? ""
+  ].join("\u0000");
+}
+
+function tripleSortKey(triple) {
+  return [
+    termSortKey(triple.subject),
+    termSortKey(triple.predicate),
+    termSortKey(triple.object)
+  ].join("\u0000");
+}
+
+function diagnosticSortKey(value) {
+  return [value.target ?? "", value.reason ?? "", value.code ?? "", value.predicate ?? ""].join("\u0000");
+}
+
+function blockingDiagnosticSortKey(value) {
+  return [value.target ?? "", value.predicate ?? "", value.code ?? "", value.detail ?? ""].join("\u0000");
+}
+
 function orphan(record, selectedModule, reason, ownership = []) {
   const diagnosticValue = {
     severity: "warning",
@@ -371,7 +401,11 @@ function bindValidatedAnnotations(records, model, selectedModule) {
       applied.push(classified);
     }
   }
-  return { applied, orphans, diagnostics };
+  return {
+    applied: applied.sort((left, right) => compareText(left.target, right.target)),
+    orphans: orphans.sort((left, right) => compareText(left.target, right.target)),
+    diagnostics: diagnostics.sort((left, right) => compareText(diagnosticSortKey(left), diagnosticSortKey(right)))
+  };
 }
 
 export function bindVisualSource(input, effectiveSemanticModel) {
