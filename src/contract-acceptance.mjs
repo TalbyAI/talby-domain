@@ -7,9 +7,6 @@ const CONTRACT = "https://github.com/TalbyAI/talby-domain/vocab/contract#";
 const MOCKING = "https://github.com/TalbyAI/talby-domain/vocab/mocking#";
 const XSD = "http://www.w3.org/2001/XMLSchema#";
 const RDF_TYPE = "http://www.w3.org/1999/02/22-rdf-syntax-ns#type";
-const RDF_FIRST = "http://www.w3.org/1999/02/22-rdf-syntax-ns#first";
-const RDF_REST = "http://www.w3.org/1999/02/22-rdf-syntax-ns#rest";
-const RDF_NIL = "http://www.w3.org/1999/02/22-rdf-syntax-ns#nil";
 
 const PROJECT = "urn:talby:contract:";
 
@@ -93,20 +90,6 @@ function objects(source, subject, predicate) {
 
 function firstObject(source, subject, predicate) {
   return objects(source, subject, predicate)[0] ?? null;
-}
-
-function listValues(source, head) {
-  const values = [];
-  const seen = new Set();
-  let current = head;
-  while (current && current !== RDF_NIL && !seen.has(current?.value ?? current)) {
-    seen.add(current?.value ?? current);
-    const first = objects(source, current, RDF_FIRST)[0];
-    if (!first) break;
-    values.push(first);
-    current = termValue(objects(source, current, RDF_REST)[0]);
-  }
-  return values;
 }
 
 function extensionNodesFor(source, extensionPredicate) {

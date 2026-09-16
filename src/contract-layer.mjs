@@ -85,7 +85,9 @@ function publicTriple(value) {
 
 function inputQuad(value) {
   if (Array.isArray(value)) return quad(namedNode(value[0]), namedNode(value[1]), namedNode(value[2]));
-  return quad(rdfTerm(value.subject), rdfTerm(value.predicate), rdfTerm(value.object), value.graph ? rdfTerm(value.graph) : defaultGraph());
+  const graph = value.graph ? rdfTerm(value.graph) : defaultGraph();
+  if (graph.termType !== "DefaultGraph") throw new TypeError("Named graphs are not supported in Turtle");
+  return quad(rdfTerm(value.subject), rdfTerm(value.predicate), rdfTerm(value.object), graph);
 }
 
 function rejectNonTurtleExtensions(input) {

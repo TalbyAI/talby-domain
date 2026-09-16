@@ -58,6 +58,20 @@ test("preserves RDF/JS language literals at the data-only boundary", () => {
   });
 });
 
+test("rejects named graphs at the Turtle data boundary", () => {
+  assert.throws(() => loadSemanticSource({
+    graph: [{
+      subject: { termType: "NamedNode", value: "urn:example:subject" },
+      predicate: { termType: "NamedNode", value: "urn:example:predicate" },
+      object: { termType: "NamedNode", value: "urn:example:object" },
+      graph: { termType: "NamedNode", value: "urn:example:graph" }
+    }]
+  }), {
+    name: "TypeError",
+    message: "Named graphs are not supported in Turtle"
+  });
+});
+
 test("rejects SPARQL directives and RDF-star syntax as non-Turtle", () => {
   const inputs = [
     "PREFIX ex: <urn:example:> ex:s ex:p ex:o .",
