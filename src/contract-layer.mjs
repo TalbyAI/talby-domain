@@ -1,9 +1,16 @@
 import { DataFactory, Parser, Store, Writer } from "n3";
 import { validateShaclDataset } from "./shacl-adapter.mjs";
+import {
+  containsQuadTerm,
+  publicTriple,
+  rdfTerm,
+  rejectNonTurtleExtensions,
+  TURTLE_LIMITS
+} from "./rdf-utils.mjs";
 
-const { blankNode, defaultGraph, literal, namedNode, quad } = DataFactory;
+const { defaultGraph, namedNode, quad } = DataFactory;
 const datasets = new WeakMap();
-const SOURCE_LIMITS = Object.freeze({ maxBytes: 1_048_576, maxQuads: 10_000, maxDiagnostics: 1_000 });
+const SOURCE_LIMITS = Object.freeze({ ...TURTLE_LIMITS, maxDiagnostics: 1_000 });
 
 class SourceLimitError extends RangeError {
   constructor(code) {
@@ -62,87 +69,11 @@ const declarationKinds = new Map([
 
 const organizationalKinds = new Set(["Feature", "Entity", "Command", "Query", "ReadModel", "Event"]);
 
-function publicTerm(term) {
-  if (term.termType === "Literal") {
-    return { termType: "Literal", value: term.value, datatype: term.datatype.value, language: term.language || null };
-  }
-  return { termType: term.termType, value: term.value };
-}
-
-function rdfTerm(term) {
-  if (term?.termType === "Literal") return term.language
-    ? literal(term.value, term.language)
-    : literal(term.value, namedNode(term.datatype?.value ?? term.datatype));
-  if (term?.termType === "BlankNode") return blankNode(term.value);
-  if (term?.termType === "DefaultGraph") return defaultGraph();
-  if (term?.termType === "NamedNode") return namedNode(term.value);
-  throw new TypeError("Unsupported RDF term");
-}
-
-function publicTriple(value) {
-  return { subject: publicTerm(value.subject), predicate: publicTerm(value.predicate), object: publicTerm(value.object) };
-}
-
 function inputQuad(value) {
   if (Array.isArray(value)) return quad(namedNode(value[0]), namedNode(value[1]), namedNode(value[2]));
   const graph = value.graph ? rdfTerm(value.graph) : defaultGraph();
   if (graph.termType !== "DefaultGraph") throw new TypeError("Named graphs are not supported in Turtle");
   return quad(rdfTerm(value.subject), rdfTerm(value.predicate), rdfTerm(value.object), graph);
-}
-
-function rejectNonTurtleExtensions(input) {
-  let comment = false;
-  let iri = false;
-  let quote = null;
-  for (let index = 0; index < input.length; index += 1) {
-    const character = input[index];
-    if (comment) {
-      if (character === "\n" || character === "\r") comment = false;
-      continue;
-    }
-    if (quote) {
-      if (character === "\\") {
-        index += 1;
-        continue;
-      }
-      if (input.startsWith(quote, index)) {
-        index += quote.length - 1;
-        quote = null;
-      }
-      continue;
-    }
-    if (iri) {
-      if (character === ">") iri = false;
-      continue;
-    }
-    if (character === "#") {
-      comment = true;
-      continue;
-    }
-    if (character === '"' || character === "'") {
-      quote = input.startsWith(character.repeat(3), index) ? character.repeat(3) : character;
-      index += quote.length - 1;
-      continue;
-    }
-    if (character === "<") {
-      if (input[index + 1] === "<") throw new SyntaxError("RDF-star syntax is not supported in Turtle");
-      iri = true;
-      continue;
-    }
-    if (character === ">" && input[index + 1] === ">") throw new SyntaxError("RDF-star syntax is not supported in Turtle");
-    for (const directive of ["PREFIX", "BASE"]) {
-      if (input.slice(index, index + directive.length).toUpperCase() !== directive) continue;
-      const previous = input[index - 1];
-      const next = input[index + directive.length];
-      const escapedPrevious = input[index - 2] === "\\";
-      const boundary = !escapedPrevious && (index === 0 || !/[A-Za-z0-9_:%@.-]/.test(previous) || (previous === "." && /[\s;,[\](){}]/.test(input[index - 2] ?? "")));
-      if (boundary && /[\s#<]/.test(next ?? "")) throw new SyntaxError("SPARQL directives are not supported in Turtle");
-    }
-  }
-}
-
-function containsQuadTerm(value) {
-  return [value.subject, value.predicate, value.object, value.graph].some((term) => term?.termType === "Quad");
 }
 
 function cloneTerm(term) {
@@ -321,7 +252,7 @@ function ownershipFor(declarations) {
 export function loadSemanticSource(input) {
   const raw = typeof input === "string" ? input : input?.raw ?? null;
   if (typeof raw === "string" && Buffer.byteLength(raw, "utf8") > SOURCE_LIMITS.maxBytes) throw sourceLimit("SOURCE_BYTES_LIMIT");
-  if (typeof input === "string") rejectNonTurtleExtensions(input);
+  if (typeof input === "string") rejectNonTurtleExtensions(input, "RDF-star syntax is not supported in Turtle");
   const parsed = typeof input === "string"
     ? new Parser({ format: "text/turtle" }).parse(input)
     : (input?.graph ?? []).map(inputQuad);
